@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>DoTo — Task Manager, Simple.</title>
+<meta name="description" content="DoTo — Task Manager, Simple. A Google Tasks-style task manager with external refs, colors, weight and importance." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%231a73e8'/%3E%3Cpath d='M14 24l7 7 13-14' stroke='white' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+<header class="topbar">
+  <button id="menuBtn" class="icon-btn" aria-label="Open menu">
+    <span class="material-icons-outlined">menu</span>
+  </button>
+  <div class="brand" id="brandHome" role="button" tabindex="0" title="DoTo home">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 48 48" width="30" height="30"><rect width="48" height="48" rx="10" fill="#1a73e8"/><path d="M14 24l7 7 13-14" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <span class="brand-text">
+      <span class="brand-name">DoTo</span>
+      <span class="brand-slogan">Task Manager, Simple.</span>
+    </span>
+  </div>
+  <div class="search-wrap">
+    <span class="material-icons-outlined search-icon">search</span>
+    <input id="searchInput" type="search" placeholder="Search tasks" autocomplete="off" aria-label="Search tasks" dir="auto" />
+    <button id="clearSearch" class="icon-btn sm hidden" aria-label="Clear search"><span class="material-icons-outlined">close</span></button>
+  </div>
+  <div class="topbar-actions">
+    <button id="sortBtn" class="icon-btn" aria-label="Sort tasks" title="Sort"><span class="material-icons-outlined">swap_vert</span></button>
+    <button id="themeBtn" class="icon-btn" aria-label="Toggle theme" title="Theme"><span class="material-icons-outlined">dark_mode</span></button>
+    <div id="sortMenu" class="menu hidden" role="menu">
+      <button data-sort="order" role="menuitem"><span class="material-icons-outlined">drag_handle</span> My order</button>
+      <button data-sort="date" role="menuitem"><span class="material-icons-outlined">event</span> Date</button>
+      <button data-sort="priority" role="menuitem"><span class="material-icons-outlined">flag</span> Importance &amp; weight</button>
+      <button data-sort="title" role="menuitem"><span class="material-icons-outlined">sort_by_alpha</span> Title</button>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+  <div id="scrim" class="scrim hidden"></div>
+
+  <aside id="sidebar" class="sidebar" aria-label="Task lists">
+    <div class="sidebar-scroll">
+      <nav class="list-nav" aria-label="Views">
+        <button id="navHome" class="list-item view-item"><span class="material-icons-outlined">home</span><span class="n">Home</span></button>
+        <button id="navAll" class="list-item view-item"><span class="material-icons-outlined">view_column</span><span class="n">Board</span><span class="c" id="allCount"></span></button>
+        <button id="navCal" class="list-item view-item"><span class="material-icons-outlined">calendar_month</span><span class="n">Calendar</span><span class="c" id="calCount"></span></button>
+        <button id="navTime" class="list-item view-item"><span class="material-icons-outlined">timer</span><span class="n">Time</span><span class="c" id="timeCount"></span></button>
+      </nav>
+      <div class="sidebar-head">
+        <span>Lists</span>
+      </div>
+      <nav id="listNav" class="list-nav" aria-label="Lists"></nav>
+      <button id="createListBtn" class="create-list"><span class="material-icons-outlined">add</span> Create new list</button>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-filters">
+        <div class="f-group"><span class="f-name">Color</span><div id="filterColorBtns" class="f-btns colors"></div></div>
+        <div class="f-group"><span class="f-name">Weight</span><div id="filterWeightBtns" class="f-btns"></div></div>
+        <div class="f-group"><span class="f-name">Importance</span><div id="filterImportanceBtns" class="f-btns"></div></div>
+        <button id="clearFilters" class="link-btn hidden">Clear filters</button>
+      </div>
+      <div class="sidebar-foot">
+        <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed</label>
+        <div class="io-row">
+          <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
+          <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
+        </div>
+      </div>
+    </div>
+    <div id="sideResizer" class="resizer resizer-side" title="Drag to resize lists panel"></div>
+  </aside>
+
+  <main class="main" id="main">
+    <!-- HOME / SUMMARY VIEW -->
+    <section id="viewHome" class="view">
+      <div class="home-hero">
+        <div>
+          <h1 id="homeGreet">Good day 👋</h1>
+          <p class="eyebrow" id="homeDate"></p>
+          <p class="muted" id="homeSub"></p>
+        </div>
+        <div class="home-hero-actions">
+          <button id="homeBoardBtn" class="btn-ghost"><span class="material-icons-outlined">view_column</span> Board</button>
+          <button id="homeCalBtn" class="btn-ghost"><span class="material-icons-outlined">calendar_month</span> Calendar</button>
+          <button id="homeTimeBtn" class="btn-ghost"><span class="material-icons-outlined">timer</span> Time</button>
+          <button id="homeAddBtn" class="btn-primary"><span class="material-icons-outlined">add</span> New task</button>
+        </div>
+      </div>
+      <div class="home-meta">
+        <div id="weatherCard" class="weather hidden" title="Today's weather">
+          <span id="weatherIcon" class="material-icons-outlined">wb_sunny</span>
+          <div><div id="weatherTemp"></div><div id="weatherDesc" class="muted small"></div></div>
+          <div class="wx-tom"><span class="muted small">Tomorrow</span><span id="wxTomIcon" class="material-icons-outlined">wb_cloudy</span><span id="wxTomTemp"></span></div>
+        </div>
+        <div class="quote"><span class="material-icons-outlined">format_quote</span><p id="quoteText" dir="auto"></p></div>
+      </div>
+      <div id="homeStats" class="stat-grid"></div>
+      <div class="chips" data-chips></div>
+      <div class="home-grid">
+        <section class="card"><h2><span class="material-icons-outlined danger">warning</span> Overdue</h2><ul id="homeOverdue" class="task-list"></ul></section>
+        <section class="card"><h2><span class="material-icons-outlined blue">today</span> Today's tasks</h2><ul id="homeToday" class="task-list"></ul></section>
+        <section class="card"><h2><span class="material-icons-outlined red">priority_high</span> Most important first</h2><ul id="homeImportant" class="task-list"></ul></section>
+        <section class="card"><h2><span class="material-icons-outlined purple">fitness_center</span> Heavy lifting</h2><ul id="homeHeavy" class="task-list"></ul></section>
+      </div>
+    </section>
+
+    <!-- SINGLE LIST VIEW -->
+    <section id="viewList" class="view hidden">
+      <div class="list-header">
+        <h1 id="listTitle" dir="auto">My Tasks</h1>
+        <div class="list-header-actions">
+          <span id="taskCount" class="count-pill"></span>
+          <button id="listMenuBtn" class="icon-btn" aria-label="List options"><span class="material-icons-outlined">more_vert</span></button>
+          <div id="listMenu" class="menu hidden" role="menu">
+            <button id="renameListBtn" role="menuitem"><span class="material-icons-outlined">edit</span> Rename list</button>
+            <button id="deleteCompletedBtn" role="menuitem"><span class="material-icons-outlined">delete_sweep</span> Delete completed</button>
+            <button id="deleteListBtn" role="menuitem" class="danger"><span class="material-icons-outlined">delete</span> Delete list</button>
+          </div>
+        </div>
+      </div>
+      <div id="activeFilterChips" class="chips" data-chips></div>
+      <form id="addForm" class="add-bar" autocomplete="off">
+        <button type="button" class="add-plus" aria-label="Add a task"><span class="material-icons-outlined">add</span></button>
+        <input id="addInput" type="text" placeholder="Add a task" aria-label="Add a task" maxlength="200" dir="auto" />
+        <button type="submit" class="add-go" aria-label="Save task"><span class="material-icons-outlined">add</span></button>
+      </form>
+      <div id="quickAddMeta" class="quick-add-meta">
+        <div class="qa-group">
+          <span>Due</span>
+          <input id="qaDate" type="date" title="Due date for the new task" aria-label="Due date" />
+          <button type="button" data-qa="today"><span class="material-icons-outlined">today</span> Today</button>
+          <button type="button" data-qa="tomorrow"><span class="material-icons-outlined">event</span> Tomorrow</button>
+        </div>
+        <div class="qa-group">
+          <span>Weight</span>
+          <div class="qa-seg" id="qaWeight" role="radiogroup" aria-label="Weight">
+            <button type="button" data-v="light" title="Light"><span class="material-icons-outlined">arrow_downward</span></button>
+            <button type="button" data-v="medium" title="Medium"><span class="material-icons-outlined">remove</span></button>
+            <button type="button" data-v="heavy" title="Heavy"><span class="material-icons-outlined">arrow_upward</span></button>
+          </div>
+        </div>
+        <div class="qa-group">
+          <span>Importance</span>
+          <div class="qa-seg" id="qaImportance" role="radiogroup" aria-label="Importance">
+            <button type="button" data-v="low" title="Low"><span class="material-icons-outlined">arrow_downward</span></button>
+            <button type="button" data-v="medium" title="Medium"><span class="material-icons-outlined">remove</span></button>
+            <button type="button" data-v="high" title="High"><span class="material-icons-outlined">arrow_upward</span></button>
+          </div>
+        </div>
+        <div class="qa-group">
+          <span>Color</span>
+          <div id="qaColors" class="qa-colors"></div>
+        </div>
+      </div>
+      <section aria-label="Open tasks">
+        <ul id="openList" class="task-list"></ul>
+        <div id="openEmpty" class="empty hidden">
+          <img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90' viewBox='0 0 120 90'%3E%3Crect x='8' y='8' width='104' height='74' rx='12' fill='%23e8f0fe'/%3E%3Cpath d='M30 45l12 12 28-30' stroke='%231a73e8' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+          <p><strong>All clear!</strong><br />Add your first task above, or drag one here from another list.</p>
+        </div>
+      </section>
+      <section class="completed-section" aria-label="Completed tasks">
+        <button id="completedToggle" class="completed-toggle" aria-expanded="true">
+          <span class="material-icons-outlined chev">expand_more</span>
+          <span>Completed</span>
+          <span id="completedCount" class="count-pill muted"></span>
+        </button>
+        <ul id="doneList" class="task-list done"></ul>
+      </section>
+    </section>
+
+    <!-- ALL BOARD VIEW -->
+    <section id="viewAll" class="view hidden">
+      <div class="list-header">
+        <div><h1>All lists</h1><p class="muted small board-hint">Each category is a column — drag tasks between columns or onto the sidebar.</p></div>
+        <span id="allCountPill" class="count-pill"></span>
+      </div>
+      <div class="chips" data-chips></div>
+      <div id="board" class="board"></div>
+    </section>
+
+    <!-- CALENDAR VIEW -->
+    <section id="viewCal" class="view hidden">
+      <div class="list-header">
+        <div class="cal-title-row">
+          <h1 id="calTitle">Calendar</h1>
+          <div class="seg-mini" id="calViewSeg" role="tablist" aria-label="Calendar view">
+            <button data-v="month" role="tab" class="selected">Month</button>
+            <button data-v="year" role="tab">Year</button>
+          </div>
+        </div>
+        <div class="list-header-actions">
+          <button id="calPrev" class="icon-btn" aria-label="Previous"><span class="material-icons-outlined">chevron_left</span></button>
+          <button id="calTodayBtn" class="btn-ghost">Today</button>
+          <button id="calNext" class="icon-btn" aria-label="Next"><span class="material-icons-outlined">chevron_right</span></button>
+        </div>
+      </div>
+      <div class="chips" data-chips></div>
+      <div id="calYearGrid" class="cal-year hidden"></div>
+      <div class="cal-wrap">
+        <div class="cal-main">
+          <div class="cal-dow" id="calDow"></div>
+          <div id="calGrid" class="cal-grid"></div>
+        </div>
+        <div class="cal-side">
+          <div class="cal-agenda-head">
+            <h2 id="calDayTitle" dir="auto"></h2>
+            <span id="calDayCount" class="count-pill muted"></span>
+          </div>
+          <form id="calAddForm" class="board-add" autocomplete="off">
+            <input id="calAddInput" maxlength="200" placeholder="Add task" dir="auto" aria-label="Add task on selected day" />
+          </form>
+          <ul id="calDayList" class="task-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TIME TRACKER VIEW -->
+    <section id="viewTime" class="view hidden">
+      <div class="list-header">
+        <h1>Time tracker</h1>
+        <span id="timeTotalPill" class="count-pill"></span>
+      </div>
+      <div class="chips" data-chips></div>
+      <div class="time-wrap">
+        <section class="card time-tasks">
+          <h2><span class="material-icons-outlined purple">assignment</span> Pick a task</h2>
+          <div class="search-wrap time-search">
+            <span class="material-icons-outlined search-icon">search</span>
+            <input id="timeSearch" type="search" placeholder="Search tasks" autocomplete="off" aria-label="Search tasks" dir="auto" />
+          </div>
+          <ul id="timeTaskList" class="task-list"></ul>
+        </section>
+        <section class="card time-records">
+          <h2><span class="material-icons-outlined blue">history</span> Logged time</h2>
+          <ul id="timeRecords" class="task-list"></ul>
+        </section>
+        <section class="card time-tracker">
+          <h2><span class="material-icons-outlined red">timer</span> Tracker</h2>
+          <div id="timeForTaskCard"></div>
+          <div id="timeDisplay" class="time-display" dir="ltr">00:00:00,00</div>
+          <div class="time-btns">
+            <button id="timePlay" class="time-btn play" aria-label="Start"><span class="material-icons-outlined">play_arrow</span></button>
+            <button id="timePause" class="time-btn pause" aria-label="Pause"><span class="material-icons-outlined">pause</span></button>
+            <button id="timeStop" class="time-btn stop" aria-label="Stop and save"><span class="material-icons-outlined">stop</span></button>
+          </div>
+          <p class="muted small time-hint">Play starts, pause holds, stop saves the record.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <aside id="detail" class="detail hidden" aria-label="Task details">
+    <div id="detailResizer" class="resizer resizer-detail" title="Drag to resize details panel"></div>
+    <div class="detail-head">
+      <button id="detailBack" class="icon-btn" aria-label="Close details"><span class="material-icons-outlined">arrow_back</span></button>
+      <span class="detail-title">Details</span>
+      <span id="dListName" class="count-pill muted"></span>
+      <button id="detailDelete" class="icon-btn" aria-label="Delete task"><span class="material-icons-outlined">delete</span></button>
+      <button id="detailClose" class="icon-btn desktop-only" aria-label="Close panel"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="detail-body">
+      <input id="dTitle" type="text" class="d-title" placeholder="Title" maxlength="200" dir="auto" />
+      <div class="d-section">
+        <p class="d-label">List / Category <span class="hint">— move task</span></p>
+        <div class="d-row">
+          <span class="material-icons-outlined muted">list</span>
+          <select id="dList"></select>
+        </div>
+      </div>
+      <div class="d-section">
+        <p class="d-label">Color <span class="hint">— also tap dot in list</span></p>
+        <div id="dColors" class="palette"></div>
+      </div>
+      <div class="d-grid">
+        <div class="d-section">
+          <p class="d-label">Weight</p>
+          <div id="dWeight" class="segmented" role="radiogroup" aria-label="Weight">
+            <button data-v="light" role="radio"><span class="material-icons-outlined">arrow_downward</span>Light</button>
+            <button data-v="medium" role="radio"><span class="material-icons-outlined">remove</span>Medium</button>
+            <button data-v="heavy" role="radio"><span class="material-icons-outlined">arrow_upward</span>Heavy</button>
+          </div>
+        </div>
+        <div class="d-section">
+          <p class="d-label">Importance</p>
+          <div id="dImportance" class="segmented importance" role="radiogroup" aria-label="Importance">
+            <button data-v="low" role="radio"><span class="material-icons-outlined">arrow_downward</span>Low</button>
+            <button data-v="medium" role="radio"><span class="material-icons-outlined">remove</span>Med</button>
+            <button data-v="high" role="radio"><span class="material-icons-outlined">arrow_upward</span>High</button>
+          </div>
+        </div>
+      </div>
+      <div class="d-section">
+        <p class="d-label">Due</p>
+        <div class="d-row">
+          <input id="dDate" type="date" />
+          <input id="dTime" type="time" />
+          <button id="dClearDate" class="icon-btn sm" aria-label="Clear date"><span class="material-icons-outlined">close</span></button>
+        </div>
+      </div>
+      <div class="d-section">
+        <p class="d-label">Repeat</p>
+        <div class="d-row">
+          <span class="material-icons-outlined muted">repeat</span>
+          <select id="dRecurFreq" aria-label="Repeat">
+            <option value="">Does not repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <div id="dRecurCustom" class="d-row hidden" style="margin-top:8px">
+          <span class="muted small">Every</span>
+          <input id="dRecurN" type="number" min="1" max="99" value="2" aria-label="Every N" />
+          <select id="dRecurUnit" aria-label="Repeat unit">
+            <option value="daily">day(s)</option>
+            <option value="weekly">week(s)</option>
+            <option value="monthly">month(s)</option>
+            <option value="yearly">year(s)</option>
+          </select>
+        </div>
+        <div id="dRecurDays" class="day-chips hidden" aria-label="Repeat on days"></div>
+        <p id="dRecurHint" class="muted small" style="margin:6px 0 0"></p>
+      </div>
+      <div class="d-section">
+        <p class="d-label">External ref <span class="hint">— url or anything</span></p>
+        <div class="d-row">
+          <span class="material-icons-outlined muted">link</span>
+          <input id="dExt" type="text" placeholder="https://… or ticket #123, file path…" maxlength="500" dir="auto" />
+          <a id="dExtOpen" class="icon-btn sm hidden" target="_blank" rel="noopener" aria-label="Open external reference"><span class="material-icons-outlined">open_in_new</span></a>
+        </div>
+      </div>
+      <div class="d-section">
+        <p class="d-label">Notes</p>
+        <textarea id="dNotes" rows="3" placeholder="Add details" dir="auto"></textarea>
+      </div>
+      <div class="d-section">
+        <p class="d-label">Subtasks <span id="subCount" class="count-pill muted"></span></p>
+        <ul id="dSubs" class="sub-list"></ul>
+        <form id="subForm" class="sub-add" autocomplete="off">
+          <span class="material-icons-outlined">add</span>
+          <input id="subInput" placeholder="Add subtask" maxlength="150" aria-label="Add subtask" dir="auto" />
+        </form>
+      </div>
+    </div>
+    <div class="detail-foot">
+      <span id="dMeta" class="muted small"></span>
+      <button id="dDoneToggle" class="btn-primary">Mark complete</button>
+    </div>
+  </aside>
+</div>
+
+<button id="fab" class="fab" aria-label="Add task"><span class="material-icons-outlined">add</span></button>
+<div id="colorPop" class="menu palette-pop hidden"></div>
+<div id="weightPop" class="menu hidden"></div>
+<div id="importancePop" class="menu hidden"></div>
+<div id="movePop" class="menu hidden"></div>
+<div id="modalScrim" class="modal-scrim hidden">
+  <form id="modalBox" class="modal" role="dialog" aria-modal="true" autocomplete="off">
+    <h3 id="modalTitle"></h3>
+    <p id="modalMsg" class="muted small"></p>
+    <input id="modalInput" type="text" dir="auto" maxlength="60" class="hidden" />
+    <div class="modal-actions">
+      <button type="button" id="modalCancel" class="btn-ghost">Cancel</button>
+      <button type="submit" id="modalOk" class="btn-primary">OK</button>
+    </div>
+  </form>
+</div>
+<div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
+<input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
+
+<script src="app.js"></script>
+</body>
+</html>
