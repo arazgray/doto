@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788696491'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788700736'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -17,9 +17,15 @@ const COLORS = [
   { id: 'green', name: 'Green', hex: '#188038' },
   { id: 'purple', name: 'Purple', hex: '#9334e6' },
 ];
-const colorHex = (id) => (COLORS.find((c) => c.id === id) || COLORS[0]).hex;
+const BUILTIN_COLOR_IDS = new Set(COLORS.map((c) => c.id));
+function allColors() { return COLORS.concat((typeof state !== 'undefined' && state.customColors) || []); }
+function validCustomColor(c) {
+  return !!c && typeof c.id === 'string' && typeof c.name === 'string' && typeof c.hex === 'string'
+    && /^#[0-9a-fA-F]{6}$/.test(c.hex) && c.name.trim().length >= 1 && c.name.trim().length <= 24;
+}
+const colorHex = (id) => (allColors().find((c) => c.id === id) || COLORS[0]).hex;
 const colorName = (id) => {
-  const c = COLORS.find((x) => x.id === id) || COLORS[0];
+  const c = allColors().find((x) => x.id === id) || COLORS[0];
   return (state.colorNames && state.colorNames[c.id]) || c.name;
 };
 
@@ -42,6 +48,7 @@ function seed() {
     showCompleted: true,
     filters: { color: '', weight: '', importance: '' },
     colorNames: {},
+    customColors: [],
     prefs: { sideW: 280, detailW: 440 },
     times: [],
     timer: null,
@@ -72,9 +79,16 @@ function migrate(s) {
   s.tasks.forEach((t) => { if (!t.weight) t.weight = 'medium'; if (!t.importance) t.importance = 'medium'; if (!t.color) t.color = 'default'; if (!Array.isArray(t.subtasks)) t.subtasks = []; if (!('recId' in t)) t.recId = ''; if (!('recur' in t)) t.recur = null; if (t.recur && !['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) t.recur = null; });
   // retired colors (yellow/teal/pink) map to their closest surviving color
   const legacyColor = { yellow: 'orange', teal: 'blue', pink: 'purple' };
-  const validColors = new Set(COLORS.map((c) => c.id));
+  if (!Array.isArray(s.customColors)) s.customColors = [];
+  s.customColors = s.customColors
+    .filter(validCustomColor)
+    .filter((c) => !BUILTIN_COLOR_IDS.has(c.id))
+    .map((c) => ({ id: c.id.slice(0, 24), name: c.name.trim().slice(0, 24), hex: c.hex.toLowerCase() }))
+    .slice(0, 10);
+  const validColors = new Set([...BUILTIN_COLOR_IDS, ...s.customColors.map((c) => c.id)]);
   s.tasks.forEach((t) => { if (legacyColor[t.color]) t.color = legacyColor[t.color]; else if (!validColors.has(t.color)) t.color = 'default'; });
   if (s.filters && s.filters.color && !validColors.has(s.filters.color)) s.filters.color = '';
+  Object.keys(s.colorNames).forEach((k) => { if (!validColors.has(k)) delete s.colorNames[k]; });
   if (!Array.isArray(s.times)) s.times = [];
   if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
   if (typeof s.userName !== 'string') s.userName = '';
@@ -463,7 +477,7 @@ function renderNav() {
     nav.appendChild(b);
   });
   const fc = $('#filterColorBtns'); fc.innerHTML = '';
-  COLORS.forEach((c) => {
+  allColors().forEach((c) => {
     const b = document.createElement('button');
     b.className = 'f-dot' + (state.filters.color === c.id ? ' selected' : '');
     b.style.background = c.hex; b.title = colorName(c.id); b.setAttribute('aria-label', 'Filter by ' + colorName(c.id));
@@ -476,7 +490,7 @@ function renderNav() {
       const b = document.createElement('button');
       b.className = 'f-btn' + (state.filters[key] === v ? ' selected' : '');
       b.innerHTML = `<span class="material-icons-outlined">${m.icon}</span><span></span>`;
-      b.querySelector('span:last-child').textContent = m.label;
+      b.querySelector('span:last-child').textContent = m.label[0];
       b.title = m.label; b.setAttribute('aria-label', 'Filter by ' + m.label);
       b.onclick = () => { state.filters[key] = state.filters[key] === v ? '' : v; save(); renderAll(); };
       h.appendChild(b);
@@ -654,7 +668,32 @@ function taskRow(t, opts = {}) {
   title.dir = 'auto';
   title.title = 'Click for details · double-click to rename';
   title.ondblclick = (e) => { e.stopPropagation(); clearTimeout(pendingDetailTimer); inlineRename(); };
-  main.appendChild(title);
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'task-titlewrap';
+  titleWrap.appendChild(title);
+  if (t.subtasks.length) {
+    const subs = document.createElement('ul');
+    subs.className = 'task-subs';
+    t.subtasks.slice(0, 3).forEach((s) => {
+      const sli = document.createElement('li');
+      if (s.done) sli.className = 'done';
+      const st = document.createElement('span');
+      st.textContent = s.title || '(untitled)'; st.dir = 'auto';
+      sli.appendChild(st);
+      sli.title = s.done ? 'Mark subtask open' : 'Mark subtask done';
+      sli.onclick = (e) => { e.stopPropagation(); s.done = !s.done; save(); renderAll(); };
+      subs.appendChild(sli);
+    });
+    if (t.subtasks.length > 3) {
+      const more = document.createElement('li');
+      more.className = 'more';
+      more.textContent = `+${t.subtasks.length - 3} more`;
+      more.onclick = (e) => { e.stopPropagation(); clearTimeout(pendingDetailTimer); openDetail(t.id); };
+      subs.appendChild(more);
+    }
+    titleWrap.appendChild(subs);
+  }
+  main.appendChild(titleWrap);
   function inlineRename() {
     const inp = document.createElement('input');
     inp.className = 'task-title'; inp.value = t.title; inp.maxLength = 200;
@@ -664,7 +703,7 @@ function taskRow(t, opts = {}) {
     inp.addEventListener('blur', () => commit(true));
     inp.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Enter') inp.blur(); if (ev.key === 'Escape') commit(false); });
     ['click', 'dblclick', 'dragstart'].forEach((ev) => inp.addEventListener(ev, (e2) => e2.stopPropagation()));
-    main.replaceChild(inp, title);
+    titleWrap.replaceChild(inp, title);
     inp.focus(); inp.select();
   }
 
@@ -1707,7 +1746,7 @@ function renderDetail() {
   }
 
   const pal = $('#dColors'); pal.innerHTML = '';
-  COLORS.forEach((c) => {
+  allColors().forEach((c) => {
     const b = document.createElement('button');
     b.className = 'swatch' + (t.color === c.id ? ' selected' : '');
     b.style.background = c.hex; b.title = colorName(c.id); b.setAttribute('aria-label', colorName(c.id));
@@ -1749,7 +1788,7 @@ function openColorPop(anchor, taskId, mini) {
   closeMovePop(); closeWeightPop(); closeImportancePop();
   const pop = $('#colorPop'); pop.innerHTML = '';
   pop.classList.toggle('mini', !!mini);
-  COLORS.forEach((c) => {
+  allColors().forEach((c) => {
     const b = document.createElement('button');
     b.className = 'swatch-wrap'; b.style.background = c.hex; b.title = colorName(c.id);
     b.setAttribute('aria-label', colorName(c.id));
@@ -1860,7 +1899,7 @@ function download(filename, text) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function exportJSON() {
-  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [] };
+  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [], customColors: state.customColors || [], colorNames: state.colorNames || {} };
   const d = new Date().toISOString().slice(0, 10);
   download(`doto-export-${d}.json`, JSON.stringify(payload, null, 2));
   toast(`Exported ${state.tasks.length} tasks`);
@@ -1945,6 +1984,20 @@ function googleItemsToList(items, name, listCreatedAt, schedules) {
   });
   return { list, tasks };
 }
+function importCustomColors(arr) {
+  if (!Array.isArray(arr)) return 0;
+  if (!Array.isArray(state.customColors)) state.customColors = [];
+  const ids = new Set([...BUILTIN_COLOR_IDS, ...state.customColors.map((c) => c.id)]);
+  let n = 0;
+  arr.forEach((c) => {
+    if (!validCustomColor(c) || ids.has(c.id)) return;
+    ids.add(c.id);
+    if (state.customColors.length >= 10) return;
+    state.customColors.push({ id: c.id, name: c.name.trim().slice(0, 24), hex: c.hex.toLowerCase() });
+    n++;
+  });
+  return n;
+}
 function importTimes(arr, taskIdMap) {
   if (!Array.isArray(arr)) return 0;
   let n = 0;
@@ -1976,7 +2029,15 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
         createdAt: t.createdAt || Date.now(), subtasks: Array.isArray(t.subtasks) ? t.subtasks.map((s) => ({ id: uid(), title: String(s.title || '').slice(0, 150), done: !!s.done })) : [],
       });
     });
-    return { lists: parsed.lists.length, tasks: parsed.tasks.length, times: importTimes(parsed.times, taskIdMap) };
+    const addedColors = importCustomColors(parsed.customColors);
+    if (parsed.colorNames && typeof parsed.colorNames === 'object') {
+      const okIds = new Set(allColors().map((c) => c.id));
+      if (!state.colorNames) state.colorNames = {};
+      Object.entries(parsed.colorNames).forEach(([k, v]) => {
+        if (okIds.has(k) && typeof v === 'string' && v.trim() && !state.colorNames[k]) state.colorNames[k] = v.trim().slice(0, 24);
+      });
+    }
+    return { lists: parsed.lists.length, tasks: parsed.tasks.length, times: importTimes(parsed.times, taskIdMap), colors: addedColors };
   }
   if (mode === 'doto') throw new Error('Not a DoTo backup — switch the source to Google Tasks or Auto-detect');
   const base = (fileName || 'Imported').replace(/\.json$/i, '').split('/').pop() || 'Imported';
@@ -2016,19 +2077,19 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
     : 'Unrecognized JSON — expected DoTo export or Google Takeout Tasks file');
 }
 async function importFiles(files, mode = 'auto') {
-  let L = 0, T = 0, TM = 0; const errors = [];
+  let L = 0, T = 0, TM = 0, CM = 0; const errors = [];
   for (const f of files) {
     try {
       const text = await f.text();
       const parsed = JSON.parse(text);
       const r = detectAndImport(parsed, f.name, mode);
-      L += r.lists; T += r.tasks; TM += r.times || 0;
+      L += r.lists; T += r.tasks; TM += r.times || 0; CM += r.colors || 0;
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
   if (state.activeView !== HOME && state.activeView !== ALL && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
-  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : ''));
+  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} colors` : ''));
   if (errors.length) toast('Import issue: ' + errors[0]);
 }
 
@@ -2298,6 +2359,7 @@ function snapState(s) {
   return JSON.parse(JSON.stringify({
     lists: s.lists || [], tasks: s.tasks || [], times: s.times || [],
     timer: s.timer || null, colorNames: s.colorNames || {},
+    customColors: s.customColors || [], userName: s.userName || '',
   }));
 }
 const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -2337,22 +2399,35 @@ function mergeObj(base, local, remote, takeRemote) {
     ? { obj: remote, conflict: 1, fromRemote: 1 }
     : { obj: local, conflict: 1, fromRemote: 0 };
 }
+function mergeScalar(base, local, remote, takeRemote) {
+  if (local === base && remote === base) return { obj: local, conflict: 0, fromRemote: 0 };
+  if (local !== base && remote === base) return { obj: local, conflict: 0, fromRemote: 0 };
+  if (local === base && remote !== base) return { obj: remote, conflict: 0, fromRemote: 1 };
+  if (local === remote) return { obj: local, conflict: 0, fromRemote: 0 };
+  return takeRemote
+    ? { obj: remote, conflict: 1, fromRemote: 1 }
+    : { obj: local, conflict: 1, fromRemote: 0 };
+}
 function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
-  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null, colorNames: {} };
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null, colorNames: {}, customColors: [], userName: '' };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote);
   const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote);
   const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote);
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
+  const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote);
+  const mu = mergeScalar(typeof base.userName === 'string' ? base.userName : '', state.userName || '', typeof remote.userName === 'string' ? remote.userName : '', takeRemote);
   let timer = state.timer, tConflict = 0;
   const bt = base.timer || null, rt = remote.timer || null;
   if (!recEq(timer, bt) && !recEq(rt, bt) && takeRemote) { timer = rt; tConflict = 1; }
   else if (recEq(timer, bt)) timer = rt;
   state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
   state.colorNames = mc.obj;
-  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict + mc.conflict;
-  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote;
+  state.customColors = mcc.arr;
+  state.userName = mu.obj;
+  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict + mc.conflict + mcc.conflicts + mu.conflict;
+  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote + mcc.fromRemote + mu.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
@@ -2405,7 +2480,7 @@ async function pullNow(mode) {
         const res = applyRemote(remote, remoteTime);
         // converge the other side immediately when local had its own changes
         const merged = snapState(state);
-        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null, colorNames: remote.colorNames || {} };
+        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null, colorNames: remote.colorNames || {}, customColors: remote.customColors || [], userName: remote.userName || '' };
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
@@ -2447,8 +2522,52 @@ function openAccount() {
   paintSync();
   const ni = $('#userNameInput');
   if (ni && document.activeElement !== ni) ni.value = state.userName || '';
-  $$('#colorNames input').forEach((inp) => { if (document.activeElement !== inp) inp.value = (state.colorNames && state.colorNames[inp.dataset.color]) || ''; });
+  paintColorEditor();
   $('#accountScrim').classList.remove('hidden');
+}
+function colorLabelRow(c, custom) {
+  const row = document.createElement('div');
+  row.className = 'color-row';
+  const dot = document.createElement('span');
+  dot.className = 'dot'; dot.style.background = c.hex;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.maxLength = 24; inp.dataset.color = c.id;
+  inp.placeholder = c.name; inp.dir = 'auto';
+  inp.value = (state.colorNames && state.colorNames[c.id]) || '';
+  inp.setAttribute('aria-label', 'Label for ' + c.name + ' color');
+  inp.oninput = () => {
+    const v = inp.value.trim().slice(0, 24);
+    if (v && v !== c.name) state.colorNames[c.id] = v;
+    else delete state.colorNames[c.id];
+    save(); renderNav(); renderCurrentView();
+  };
+  row.append(dot, inp);
+  if (custom) {
+    const del = document.createElement('button');
+    del.className = 'icon-btn sm'; del.title = 'Delete color';
+    del.setAttribute('aria-label', 'Delete ' + c.name);
+    del.innerHTML = '<span class="material-icons-outlined">close</span>';
+    del.onclick = () => deleteCustomColor(c.id);
+    row.appendChild(del);
+  }
+  return row;
+}
+function paintColorEditor() {
+  const host = $('#colorNames');
+  if (!host) return;
+  host.innerHTML = '';
+  COLORS.forEach((c) => host.appendChild(colorLabelRow(c, false)));
+  (state.customColors || []).forEach((c) => host.appendChild(colorLabelRow(c, true)));
+}
+function deleteCustomColor(id) {
+  state.customColors = (state.customColors || []).filter((c) => c.id !== id);
+  if (state.colorNames) delete state.colorNames[id];
+  let n = 0;
+  state.tasks.forEach((t) => { if (t.color === id) { t.color = 'default'; n++; } });
+  if (state.filters.color === id) state.filters.color = '';
+  if (ui.quick.color === id) ui.quick.color = undefined;
+  save(); renderAll(); paintColorEditor();
+  toast(n ? `Color deleted — ${n} task${n === 1 ? '' : 's'} reset to Gray` : 'Color deleted');
 }
 function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
@@ -2494,27 +2613,15 @@ function bindSync() {
     state.userName = e.target.value.slice(0, 40);
     save(); renderCurrentView();
   };
-  const cnHost = $('#colorNames');
-  if (cnHost && !cnHost.children.length) {
-    COLORS.forEach((c) => {
-      const row = document.createElement('div');
-      row.className = 'color-row';
-      const dot = document.createElement('span');
-      dot.className = 'dot'; dot.style.background = c.hex;
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.maxLength = 24; inp.dataset.color = c.id;
-      inp.placeholder = c.name; inp.dir = 'auto';
-      inp.setAttribute('aria-label', 'Label for ' + c.name + ' color');
-      inp.oninput = () => {
-        const v = inp.value.trim().slice(0, 24);
-        if (v && v !== c.name) state.colorNames[c.id] = v;
-        else delete state.colorNames[c.id];
-        save(); renderNav(); renderCurrentView();
-      };
-      row.append(dot, inp);
-      cnHost.appendChild(row);
-    });
-  }
+  $('#customColorAdd').onclick = () => {
+    const hex = ($('#customColorPick').value || '').toLowerCase();
+    const name = $('#customColorName').value.trim().slice(0, 24);
+    if (!/^#[0-9a-f]{6}$/.test(hex) || !name) { toast('Pick a color and a label first'); return; }
+    if ((state.customColors || []).length >= 10) { toast('Color limit reached (10)'); return; }
+    state.customColors.push({ id: 'c-' + uid(), name, hex });
+    $('#customColorName').value = '';
+    save(); renderAll(); paintColorEditor();
+  };
   window.addEventListener('online', () => { paintSync(); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
   document.addEventListener('visibilitychange', () => {
@@ -2660,7 +2767,7 @@ function bind() {
   segInit('qaWeight', 'weight');
   segInit('qaImportance', 'importance');
   const qaC = $('#qaColors');
-  COLORS.forEach((c) => {
+  allColors().forEach((c) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'f-dot'; b.style.background = c.hex;
     b.title = colorName(c.id); b.setAttribute('aria-label', 'Color ' + colorName(c.id));

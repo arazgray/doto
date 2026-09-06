@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788696491" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788700736" />
 </head>
 <body>
 <header class="topbar">
@@ -389,6 +389,13 @@
     <div class="setup-row name-row">
       <input id="userNameInput" type="text" placeholder="Your name (shown in greetings)" autocomplete="off" maxlength="40" aria-label="Your name" dir="auto" />
     </div>
+    <div class="modal-actions account-actions">
+      <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
+      <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
+      <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
+      <button type="button" id="logOpenBtn" class="btn-ghost"><span class="material-icons-outlined">history</span> History</button>
+    </div>
+    <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
     <p id="accountLast" class="muted small"></p>
     <p id="accountError" class="sync-err hidden"></p>
     <div class="set-group">
@@ -399,12 +406,11 @@
     <div class="set-group">
       <p class="d-label">Color labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
       <div id="colorNames" class="color-names"></div>
-    </div>
-    <div class="modal-actions account-actions">
-      <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
-      <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
-      <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
-      <button type="button" id="logOpenBtn" class="btn-ghost"><span class="material-icons-outlined">history</span> History</button>
+      <div class="setup-row color-add-row">
+        <input type="color" id="customColorPick" value="#1a73e8" aria-label="Custom color" />
+        <input id="customColorName" type="text" placeholder="Label, e.g. Home" maxlength="24" aria-label="Custom color label" dir="auto" />
+        <button type="button" id="customColorAdd" class="btn-primary">Add</button>
+      </div>
     </div>
     <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
     <div class="sidebar-divider"></div>
@@ -456,6 +462,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788696491"></script>
+<script src="app.js?v=1.0-1788700736"></script>
 </body>
 </html>

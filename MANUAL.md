@@ -55,7 +55,8 @@ How it works and what to expect:
 - Sync dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
 - Import / Export live in the Sync dialog (same JSON backup as before).
 - The dialog also holds **Display** settings (show completed, dark mode),
-  **Color labels**, and your **name** (used in the Home greeting).
+  **Color labels** (rename + custom colors), and your **name** (used in the
+  Home greeting, synced across devices).
 
 ## Views
 
@@ -76,10 +77,15 @@ Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
 - **Complete**: the circle on the row, or select it and press `x`. Deleted or completed-by-mistake items can be undone from the toast popup.
 - **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, color, weight, importance, external reference (URL or ticket number), list assignment and subtasks.
 - **Rename inline**: double-click the title.
-- **Color**: tap the color dot on the row. Colors carry your own labels (Sync & Settings → Color labels, e.g. red for Home, blue for Work). **Weight / Importance**: tap the badges on the row.
+- **Color**: tap the color dot on the row. Colors carry your own labels, and
+  you can add fully custom colors too (Sync & Settings → Color labels, e.g.
+  red for Home, blue for Work, a new teal for Side projects). Custom colors
+  and labels sync, export and import alongside everything else.
+  **Weight / Importance**: tap the badges on the row.
 - **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.
 - **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Completing a dated repeating task schedules the next occurrence and resets its subtasks.
 - **Subtasks**: in the details panel, with a `done/total` progress badge on the row.
+  The first few subtasks also show under the task title everywhere — tap one to toggle it.
 
 ## Search, filters and sorting
 

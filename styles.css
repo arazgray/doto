@@ -337,10 +337,19 @@ input,select,textarea{font:inherit;color:inherit}
   &:hover{border-color:var(--blue)}
 }
 .task-main{display:contents;min-width:0}
-.task-title{width:100%;border:0;outline:0;background:transparent;font-size:15px;padding:6px 2px;min-width:0;grid-column:3;grid-row:2;text-align:left}
+.task-titlewrap{grid-column:3;grid-row:2;min-width:0}
+.task-title{width:100%;border:0;outline:0;background:transparent;font-size:15px;padding:6px 2px;min-width:0;text-align:left}
 span.task-title{display:block;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 span.task-title.empty{opacity:.55;font-style:italic}
 input.task-title{cursor:text}
+.task-subs{list-style:none;margin:1px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+.task-subs li{display:flex;align-items:center;gap:5px;cursor:pointer;min-width:0}
+.task-subs li::before{content:"";width:9px;height:9px;border:1.5px solid var(--muted);border-radius:3px;flex:none}
+.task-subs li.done::before{background:var(--blue);border-color:var(--blue)}
+.task-subs li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-subs li.done span{text-decoration:line-through}
+.task-subs li.more{color:var(--blue)}
+.task-subs li.more::before{display:none}
 .task-meta{
   display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--muted);
   grid-row:1;grid-column:1/-1;padding:0;margin:0;justify-content:flex-end;
@@ -816,6 +825,9 @@ a.btn-ghost{text-decoration:none}
 .color-row .dot{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 1px var(--line)}
 .color-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;outline:0;min-width:0;background:var(--bg)}
 .color-row input:focus{border-color:var(--blue)}
+.color-row .icon-btn.sm{width:26px;height:26px;flex:none}
+.color-add-row{margin-top:8px}
+.color-add-row input[type="color"]{width:42px;height:42px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--bg);flex:none;cursor:pointer}
 .sync-err{color:var(--danger);font-size:13px;margin:6px 0 0}
 .account-actions{justify-content:flex-start;flex-wrap:wrap}
 
