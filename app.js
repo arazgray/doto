@@ -1424,7 +1424,8 @@ function renderYear(gridAnim) {
     for (let b = 0; b < lead; b++) cells.push('<span></span>');
     for (let d = 1; d <= days; d++) {
       const iso = `${Y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      cells.push(`<span class="${busy.has(iso) ? 'has' : ''}${iso === tIso ? ' today' : ''}">${d}</span>`);
+      const cls = [busy.has(iso) ? 'has' : '', (lead + d - 1) % 7 >= 5 ? 'weekend' : '', iso === tIso ? 'today' : ''].filter(Boolean).join(' ');
+      cells.push(`<span${cls ? ` class="${cls}"` : ''}>${d}</span>`);
     }
     card.innerHTML = `<h3></h3><div class="cal-ym-grid">${cells.join('')}</div>`;
     card.querySelector('h3').textContent = name;
