@@ -6,8 +6,7 @@ with full touch + mouse parity.
 
 **Live app: <https://arazgray.github.io/doto/>**
 **Manual: [MANUAL.md](MANUAL.md)** (also readable in-app via sidebar → Manual,
-or on the [GitHub wiki](https://github.com/arazgray/doto/wiki) once enabled —
-see below).
+or on the [GitHub wiki](https://github.com/arazgray/doto/wiki)).
 
 ## Run it
 
@@ -123,17 +122,16 @@ Corrupted saves are detected on load: the raw data is stashed under a
 - The user manual lives in [MANUAL.md](MANUAL.md) and is rendered in-app at
   [`manual.html`](https://arazgray.github.io/doto/manual.html) (sidebar →
   **Manual**).
-- To also publish it on the **GitHub wiki** (one-time):
-  1. Open <https://github.com/arazgray/doto/settings> → check
-     **Wikis** under Features (this creates the wiki repo).
-  2. Then run:
-     ```
-     git clone git@github.com:arazgray/doto.wiki.git /tmp/doto.wiki
-     cp MANUAL.md "/tmp/doto.wiki/Home.md"
-     cd /tmp/doto.wiki && git add Home.md && git commit -m "Publish manual" && git push
-     ```
-  The sidebar Manual button points at the in-app page, which never 404s;
-  link to the wiki from the manual once it exists.
+- It is also published on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
+  After editing `MANUAL.md`, re-publish with:
+  ```
+  cp MANUAL.md /tmp/doto.wiki/Home.md
+  cd /tmp/doto.wiki && git add Home.md && git commit -m "Update manual" && git push
+  ```
+  (First-time setup: enable **Wikis** under
+  <https://github.com/arazgray/doto/settings>, then
+  `git clone git@github.com:arazgray/doto.wiki.git /tmp/doto.wiki`.)
+  The sidebar Manual button points at the in-app page, which never 404s.
 
 ## Project layout
 
