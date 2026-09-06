@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788686110" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788687793" />
 </head>
 <body>
 <header class="topbar">
@@ -100,7 +100,7 @@
           <button id="homeBoardBtn" class="btn-ghost"><span class="material-icons-outlined">view_column</span> Board</button>
           <button id="homeCalBtn" class="btn-ghost"><span class="material-icons-outlined">calendar_month</span> Calendar</button>
           <button id="homeTimeBtn" class="btn-ghost"><span class="material-icons-outlined">timer</span> Time</button>
-          <button id="homeAddBtn" class="btn-primary"><span class="material-icons-outlined">add</span> New task</button>
+          <button id="homeAddBtn" class="btn-primary"><span class="material-icons-outlined">add</span><span class="full-t">New task</span><span class="short-t">New</span></button>
         </div>
       </div>
       <div class="home-meta">
@@ -369,7 +369,6 @@
   </aside>
 </div>
 
-<button id="fab" class="fab" aria-label="Add task"><span class="material-icons-outlined">add</span></button>
 <div id="colorPop" class="menu palette-pop hidden"></div>
 <div id="weightPop" class="menu hidden"></div>
 <div id="importancePop" class="menu hidden"></div>
@@ -408,7 +407,7 @@
         <option value="google">Google Tasks</option>
       </select>
       <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
-      <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
+      <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export</button>
     </div>
     <p class="muted small">Synced copy lives in your Drive's hidden app folder — only you can see it. This device always works offline; sync merges changes per item.</p>
     <div class="modal-actions">
@@ -449,6 +448,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788686110"></script>
+<script src="app.js?v=1.0-1788687793"></script>
 </body>
 </html>

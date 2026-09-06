@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788686110'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788687793'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -225,7 +225,7 @@ function paletteCommands() {
     { icon: 'view_column', label: 'Go to Board', run: () => go(ALL) },
     { icon: 'calendar_month', label: 'Go to Calendar', run: () => go(CAL) },
     { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
-    { icon: 'add', label: 'New task', run: () => $('#fab').click() },
+    { icon: 'add', label: 'New task', run: () => focusComposer() },
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
     { icon: 'dark_mode', label: 'Toggle dark mode', run: () => $('#themeBtn').click() },
     { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
@@ -354,7 +354,7 @@ function bindShortcuts() {
     if (k === 'g' || k === 'G') { pendingG = setTimeout(() => { pendingG = 0; }, 900); return; }
     if (k === '/') { e.preventDefault(); const s = $('#searchInput'); s.focus(); s.select(); return; }
     if (k === '?') { openHelp(); return; }
-    if (k === 'n' || k === 'N') { $('#fab').click(); return; }
+    if (k === 'n' || k === 'N') { focusComposer(); return; }
     if (k === 'j' || k === 'J') { e.preventDefault(); selectStep(1); return; }
     if (k === 'k' || k === 'K') { e.preventDefault(); selectStep(-1); return; }
     if (k === 'ArrowDown' || k === 'ArrowUp') {
@@ -1520,6 +1520,13 @@ function addTask(title, extra = {}, toTop = false) {
   const lid = targetListForAdd(); if (!lid) { toast('Create a list first'); return null; }
   return addTaskTo(lid, title, extra, toTop);
 }
+function focusComposer() {
+  if (isHome()) { const f = fallbackList(); if (f) go(f.id); }
+  else if (isAll()) { const first = $('#board input'); if (first) first.focus(); }
+  else if (isCal()) { const ci = $('#calAddInput'); if (ci) { ci.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ci.focus(), 250); } return; }
+  else if (isTime()) { const ts = $('#timeSearch'); if (ts) { ts.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ts.focus(), 250); } return; }
+  window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $('#addInput') && $('#addInput').focus(), 250);
+}
 function addTaskTo(listId, title, extra = {}, toTop = false) {
   title = (title || '').trim(); if (!title) return null;
   const t = { id: uid(), listId, title: title.slice(0, 200), notes: '', date: '', time: '', extRef: '', color: 'default', weight: 'medium', importance: 'medium', recur: null, done: false, completedAt: 0, order: nextOrder(listId, false), createdAt: Date.now(), subtasks: [], ...extra };
@@ -2542,14 +2549,6 @@ function bind() {
     }, true);
     if (t) { inp.value = ''; inp.focus(); } // presets persist
   };
-  $('#fab').onclick = () => {
-    if (isHome()) { const f = fallbackList(); if (f) go(f.id); }
-    else if (isAll()) { const first = $('#board input'); if (first) first.focus(); }
-    else if (isCal()) { const ci = $('#calAddInput'); if (ci) { ci.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ci.focus(), 250); } return; }
-    else if (isTime()) { const ts = $('#timeSearch'); if (ts) { ts.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ts.focus(), 250); } return; }
-    window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $('#addInput') && $('#addInput').focus(), 250);
-  };
-
   // completed collapse
   $('#completedToggle').onclick = () => { ui.completedOpen = !ui.completedOpen; renderAll(); };
 
