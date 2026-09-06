@@ -5,7 +5,7 @@
 
 ![DoTo screenshot](screenshot.png)
 
-A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
+A ridiculously fast, light and powerful task manager. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
 
@@ -175,16 +175,14 @@ Corrupted saves are detected on load: the raw data is stashed under a
 
 ## Manual & wiki
 
-- The user manual lives in [MANUAL.md](MANUAL.md) and is rendered in-app at
-  [`manual.html`](https://arazgray.github.io/doto/manual.html) (sidebar →
-  **Manual**).
-- It is also published on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
-  After editing `MANUAL.md`, re-publish from the nested clone:
-  ```
-  cp MANUAL.md doto.wiki/Home.md
-  git -C doto.wiki add Home.md && git -C doto.wiki commit -m "Update manual" && git -C doto.wiki push
-  ```
-  The sidebar Manual button points at the in-app page, which never 404s.
+Full user manual: [MANUAL.md](MANUAL.md), also readable
+[in-app](https://arazgray.github.io/doto/manual.html) (sidebar → **Manual**)
+and on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
+
+<!-- Maintainer: after editing MANUAL.md, re-publish the wiki from the nested clone:
+cp MANUAL.md doto.wiki/Home.md
+git -C doto.wiki add Home.md && git -C doto.wiki commit -m "Update manual" && git -C doto.wiki push
+(Sidebar Manual button points at the in-app page, which never 404s.) -->
 
 ## Project layout
 

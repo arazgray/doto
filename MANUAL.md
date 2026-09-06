@@ -1,7 +1,7 @@
 # DoTo Manual
 
-> DoTo — Task Manager, Simple. A Google Tasks-style task manager that lives
-> entirely in your browser. No account, no server, no build step.
+> DoTo — Task Manager, Simple. A ridiculously fast, light and powerful task
+> manager that lives entirely in your browser. No account, no server, no build step.
 >
 > Live app: <https://arazgray.github.io/doto/>
 
@@ -17,6 +17,7 @@
 - [Time tracker](#time-tracker)
 - [Import and export](#import-and-export)
 - [Installing the app](#installing-the-app)
+- [Hosting it yourself](#hosting-it-yourself)
 - [Data and privacy](#data-and-privacy)
 - [FAQ](#faq)
 
@@ -37,8 +38,8 @@ button at the bottom of the sidebar, or the status pill in the top bar)
 connects your Google Drive for multi-device sync — still with no DoTo server:
 
 1. Open Sync & Settings and press **Sign in with Google** (the app ships with
-   its own client ID — no setup needed; only repo forks need their own),
-   then **Sync now**.
+   its own client ID — no setup needed; only repo forks need their own, see
+   [Hosting it yourself](#hosting-it-yourself)), then **Sync now**.
 2. From then on: changes upload automatically a few seconds after you make
    them, and the app pulls on launch, when the tab regains focus, and when
    you come back online.
@@ -161,6 +162,43 @@ DoTo is installable (PWA) and works offline once installed:
 - **iPhone / iPad**: Share → Add to Home Screen for a fullscreen icon on your home screen.
 
 Installing requires the hosted `https://` address — it does not work from a downloaded `file://` copy.
+
+## Hosting it yourself
+
+DoTo is static — no server, no build step. Fork it and host it anywhere:
+
+1. **Fork** the repo at <https://github.com/arazgray/doto> (or download it).
+2. **Serve it**: in your fork go to Settings → Pages → Deploy from a branch
+   → `main`, folder `/ (root)`. Your copy lives at
+   `https://<you>.github.io/doto/`. Any static host works the same.
+3. **Use it as-is** — everything except Google Drive sync works immediately.
+   Sync needs its own client ID, because the shipped one only accepts the
+   original site's address (Google answers other origins with an
+   origin-mismatch error).
+
+### Your own Google client ID (for sync on your host)
+
+1. Open <https://console.cloud.google.com/> and create (or pick) a project.
+2. **APIs & Services → Library**: find and **Enable** the **Google Drive API**.
+3. **APIs & Services → OAuth consent screen**: choose External, fill in app
+   name + support email, and add these two scopes:
+   - `https://www.googleapis.com/auth/drive.appdata`
+   - `https://www.googleapis.com/auth/userinfo.email`
+   - Under Test users, add your Gmail address. New projects start in Testing
+     mode — only listed users can sign in, and sign-in expires about weekly.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
+   application type **Web application**. Under **Authorized JavaScript
+   origins** add your exact site address, e.g. `https://<you>.github.io`
+   (address only, no path at the end), then Create and copy the client ID
+   (it ends with `.apps.googleusercontent.com`).
+5. In your fork, paste it into `app.js` as `GOOGLE_CLIENT_ID` (top of the
+   sync section), commit and push. Bump the release trio as usual (`?v=`
+   stamps in `index.html`, `APP_VERSION`, `version.json` — all the same
+   `1.0-<unix time>`) so installed copies pick up the update.
+6. Open your hosted copy → Sync & Settings → Sign in with Google → Sync now.
+
+That is all — sync data moves only between your browser and your own Drive;
+there is still no DoTo server involved.
 
 ## Data and privacy
 
