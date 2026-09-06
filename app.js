@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788701627'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788703551'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -168,7 +168,12 @@ function toast(msg, undoFn, label) {
 function hideToast() { $('#toast').classList.add('hidden'); }
 
 /* Update detector: version.json is never cached (SW bypass + no-store), so a
-   stale WebView (iOS has no hard-refresh) still notices a new release. */
+   stale WebView (iOS has no hard-refresh) still notices a new release.
+   Taps are counted: if ?u= reloads keep serving the stale shell (offline SW
+   fallback, WebView cache), the 3rd prompt escalates to a full refresh. */
+function sessNum(k) { try { return parseInt(sessionStorage.getItem(k) || '0', 10) || 0; } catch { return 0; } }
+function sessSet(k, v) { try { sessionStorage.setItem(k, v); } catch {} }
+function sessDel(k) { try { sessionStorage.removeItem(k); } catch {} }
 async function checkForUpdate() {
   if (!navigator.onLine) return;
   try {
@@ -177,12 +182,25 @@ async function checkForUpdate() {
     const j = await r.json();
     if (j && j.version && j.version !== APP_VERSION && j.version !== updateNotified) {
       updateNotified = j.version;
-      toast('New version available — reload to update', forceReload, 'Update');
+      const tries = sessNum('doto-update-tries');
+      slog('info', `Update available: ${j.version} (running ${APP_VERSION}, attempt ${tries + 1})`);
+      if (tries >= 2) {
+        toast('Update is stuck — tap for a full refresh', () => { sessDel('doto-update-tries'); forceUpdate(); }, 'Full refresh');
+      } else {
+        toast('New version available — reload to update', forceReload, 'Update');
+      }
+    } else if (j && j.version && j.version === APP_VERSION) {
+      let wasUpdating = false;
+      try { wasUpdating = sessNum('doto-update-tries') > 0 || !!sessionStorage.getItem('doto-updating'); } catch {}
+      if (wasUpdating) slog('ok', `Updated to ${APP_VERSION}`);
+      sessDel('doto-update-tries'); sessDel('doto-updating');
     }
   } catch {}
 }
 function forceReload() {
   try {
+    sessSet('doto-update-tries', String(sessNum('doto-update-tries') + 1));
+    sessSet('doto-updating', APP_VERSION);
     const u = new URL(location.href);
     u.searchParams.set('u', Date.now().toString(36)); // bust the cached shell
     location.href = u.toString();
@@ -2160,7 +2178,7 @@ function loadSyncMeta() {
   return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null };
 }
 let syncMeta = loadSyncMeta();
-let syncStatus = 'signedout'; // setup|signedout|syncing|ok|error
+let syncStatus = 'signedout'; // setup|signedout|checking|syncing|ok|error
 let lastSyncError = '';
 function saveSyncMeta() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncMeta)); } catch {} }
 function setSync(s) { syncStatus = s; if (s === 'ok') lastSyncError = ''; paintSync(); }
@@ -2171,9 +2189,17 @@ function friendlySyncError(e) {
   if (m.indexOf('drive') === 0) return 'Drive request failed (' + m + ').';
   return 'Sync failed — retry.';
 }
-function handleSyncFailure(e, mode, prev) {
+function handleSyncFailure(e, mode, prev, logIt) {
   const m = (e && e.message) || '';
-  if (m === 'auth' || m === 'setup') { setSync('signedout'); return; }
+  if (m === 'auth' || m === 'setup') {
+    if (logIt) {
+      const msg = 'Google session ended — sign in again';
+      const last = syncLog[syncLog.length - 1];
+      if (!last || last.msg !== msg) slog('info', msg);
+    }
+    setSync('signedout');
+    return;
+  }
   if (mode === 'silent') { syncStatus = prev; paintSync(); return; } // background stays quiet
   lastSyncError = friendlySyncError(e);
   slog('error', lastSyncError);
@@ -2197,7 +2223,23 @@ function slog(kind, msg) {
   if (isLogOpen()) paintLog();
 }
 function isLogOpen() { const s = $('#logScrim'); return !!s && !s.classList.contains('hidden'); }
+function diagLines() {
+  const t = syncMeta.token;
+  const exp = t && t.expires_at ? Math.round((t.expires_at - Date.now()) / 60000) + ' min' : 'none';
+  return [
+    'status: ' + syncStatus,
+    'email: ' + (syncMeta.email || 'none'),
+    'token: ' + (t && t.access_token ? 'present' : 'none') + ' (expires in ' + exp + ')',
+    'fileId: ' + (syncMeta.fileId ? 'set' : 'none'),
+    'base: ' + (syncMeta.base ? 'set' : 'none'),
+    'lastSynced: ' + (syncMeta.lastSyncedAt ? new Date(syncMeta.lastSyncedAt).toLocaleString() : 'never'),
+    'auto: ' + (!!syncMeta.auto) + ' | online: ' + navigator.onLine,
+    'app: ' + APP_VERSION,
+  ].join('\n');
+}
 function paintLog() {
+  const dt = $('#diagText');
+  if (dt) dt.textContent = diagLines();
   const ul = $('#syncLogList');
   if (!ul) return;
   ul.innerHTML = '';
@@ -2227,7 +2269,7 @@ function fmtAgo(ts) {
 function syncLabel() {
   if (!googleClientId()) return ['Setup needed', 'warn'];
   if (!navigator.onLine) return ['Offline', 'warn'];
-  if (syncStatus === 'syncing') return ['Syncing…', 'busy'];
+  if (syncStatus === 'syncing' || syncStatus === 'checking') return [syncStatus === 'checking' ? 'Checking…' : 'Syncing…', 'busy'];
   if (syncStatus === 'error') return ['Sync failed — retry', 'err'];
   if (syncStatus === 'ok') return [syncMeta.lastSyncedAt ? 'Synced ' + fmtAgo(syncMeta.lastSyncedAt) : 'Synced', 'ok'];
   return [syncMeta.lastSyncedAt ? 'Sign in to sync' : 'Not synced yet', syncMeta.lastSyncedAt ? 'warn' : ''];
@@ -2465,7 +2507,7 @@ async function pushNow(mode) {
     if (mode !== 'silent') slog('ok', `Pushed to Drive (${state.tasks.length} tasks, ${state.lists.length} lists)`);
     setSync('ok');
   } catch (e) {
-    handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout');
+    handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout', false);
   } finally { syncing = false; paintSync(); }
 }
 async function pullNow(mode) {
@@ -2509,7 +2551,7 @@ async function pullNow(mode) {
     }
     setSync('ok');
   } catch (e) {
-    handleSyncFailure(e, mode, prev);
+    handleSyncFailure(e, mode, prev, true);
   } finally { syncing = false; paintSync(); }
 }
 async function syncNowFlow() {
@@ -2614,6 +2656,9 @@ function bindSync() {
   $('#logOpenBtn').onclick = openLog;
   $('#logClose').onclick = closeLog;
   $('#logClear').onclick = () => { syncLog = []; saveSyncLog(); paintLog(); };
+  $('#diagCopy').onclick = async () => {
+    toast(await copyText(diagLines() + '\n\n' + syncLog.slice(-20).map((e) => new Date(e.t).toLocaleString() + ' [' + e.kind + '] ' + e.msg).join('\n')) ? 'Diagnostics copied' : 'Copy failed');
+  };
   $('#logScrim').onclick = (e) => { if (e.target === $('#logScrim')) closeLog(); };
   $('#autoSyncToggle').onchange = (e) => {
     syncMeta.auto = e.target.checked; saveSyncMeta(); paintSync();
@@ -2638,7 +2683,13 @@ function bindSync() {
     if (!document.hidden && Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
   });
   window.addEventListener('load', () => {
-    pullNow('silent').catch(() => {});
+    if (syncMeta.email) setSync('checking');
+    pullNow('silent').catch(() => {}).finally(() => {
+      // one retry for flaky mobile networks (quiet if never signed in)
+      setTimeout(() => {
+        if (syncStatus === 'checking' || syncStatus === 'signedout') pullNow('silent').catch(() => {});
+      }, 30000);
+    });
     try {
       if (sessionStorage.getItem('doto-updated')) {
         sessionStorage.removeItem('doto-updated');

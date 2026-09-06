@@ -179,7 +179,10 @@ Most common cause: the Google Drive API is not enabled for your Cloud project
 make sure you ticked the Drive checkbox on Google's consent screen and that
 sign-in popups are not blocked. If the Google window opens and closes with
 nothing happening, allow popups for this site and try again — the exact
-reason is recorded under Sync → History.
+reason is recorded under Sync → History. That History page also has a
+**Copy diagnostics** button: if sync looks wrong (e.g. pill says sign-in is
+needed while the dialog shows you signed in), open it right after the failure
+and send the text — it shows token state, last sync and recent events.
 
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.
@@ -187,7 +190,10 @@ It needs location permission (or IP-based fallback) and internet. Everything els
 **My phone shows an old version of the app.**
 Open the app with internet — it checks for updates on launch and shows an
 **Update** button when one is ready. To force it any time: sidebar bottom row
-→ **Update** wipes the offline cache and reloads the newest version. If it
+→ **Update** wipes the offline cache and reloads the newest version. If the
+update toast keeps coming back instead of finishing, it escalates by itself:
+after two tries the button becomes **Full refresh**, which does the same
+cache wipe. Every step is logged under Sync → History. If it
 stays stuck (iOS has no hard-refresh), remove the home-screen icon and re-add it.
 
 **Where do I report a bug or ask for a feature?**

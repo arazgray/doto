@@ -837,6 +837,9 @@ a.btn-ghost{text-decoration:none}
 
 /* Sync history log */
 .log-modal{width:min(480px,100%);max-height:min(80dvh,600px);display:flex;flex-direction:column}
+.diag-box{background:var(--bg2);border:1px solid var(--line-soft);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.diag-text{margin:0 0 8px;font-family:Consolas,monospace;font-size:11px;line-height:1.5;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+.diag-box .btn-ghost{font-size:12px;padding:6px 10px}
 .sync-log{list-style:none;margin:0 0 6px;padding:0;overflow-y:auto;min-height:0}
 .log-row{display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line-soft);font-size:13px}
 .log-row:last-child{border-bottom:0}
