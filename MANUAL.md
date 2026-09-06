@@ -35,8 +35,8 @@ By default your data lives only in this browser. **Account & Sync** (blue
 button at the bottom of the sidebar, or the status pill in the top bar)
 connects your Google Drive for multi-device sync — still with no DoTo server:
 
-1. Open Account & Sync. The first time, paste a Google OAuth client ID (the
-   dialog explains how to create one — it stays in your browser).
+1. Open Account & Sync and press **Sign in with Google** (the app ships with
+   its own client ID — no setup needed; only repo forks need their own).
 2. **Sign in with Google**, then **Sync now**.
 3. From then on: changes upload automatically a few seconds after you make
    them, and the app pulls on launch, when the tab regains focus, and when

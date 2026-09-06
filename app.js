@@ -1951,7 +1951,7 @@ function renderAll() {
    push to Drive's hidden app folder (debounced) and pull on launch,
    focus and reconnect. Merge is per-item, three-way against the last
    synced snapshot; both-sides-edited items resolve newest-wins. */
-const GOOGLE_CLIENT_ID = ''; // default; per-browser override in the Account dialog
+const GOOGLE_CLIENT_ID = '555553216011-6bsgaeq6mp075agej6paup0bn3r1t2cl.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
 const SYNC_KEY = 'doto-sync';
