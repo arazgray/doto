@@ -24,7 +24,8 @@
 
 1. Open <https://arazgray.github.io/doto/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
-3. Click the menu button (top left) to open the sidebar, then **Create new list** for your own categories.
+3. Click the menu button (top left) to open the sidebar — or on touch screens,
+   drag right starting anywhere in the left half — then **Create new list** for your own categories.
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
 Everything is saved automatically in your browser as you type.
@@ -171,6 +172,9 @@ Only from a JSON export or your Drive sync copy (re-sign-in re-pulls it). Export
 
 **Does it sync between phone and desktop?**
 Yes — via Sync & Settings (Google Drive). Sign in on each device and both stay merged.
+Google's login lasts about an hour; the app renews it silently when it can
+(on iOS silent renewal is often refused — then just tap Sync now when
+prompted).
 
 **Can I share a list with someone?**
 Not yet — export the JSON and send them the file; they can import it.

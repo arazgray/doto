@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788704287'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788718345'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2232,11 +2232,15 @@ function slog(kind, msg) {
 function isLogOpen() { const s = $('#logScrim'); return !!s && !s.classList.contains('hidden'); }
 function diagLines() {
   const t = syncMeta.token;
-  const exp = t && t.expires_at ? Math.round((t.expires_at - Date.now()) / 60000) + ' min' : 'none';
+  let texp = 'none';
+  if (t && t.expires_at) {
+    const m = Math.round((t.expires_at - Date.now()) / 60000);
+    texp = m >= 0 ? `expires in ${m} min` : `expired ${-m} min ago`;
+  }
   return [
     'status: ' + syncStatus,
     'email: ' + (syncMeta.email || 'none'),
-    'token: ' + (t && t.access_token ? 'present' : 'none') + ' (expires in ' + exp + ')',
+    'token: ' + (t && t.access_token ? 'present' : 'none') + ' (' + texp + ')',
     'fileId: ' + (syncMeta.fileId ? 'set' : 'none'),
     'base: ' + (syncMeta.base ? 'set' : 'none'),
     'lastSynced: ' + (syncMeta.lastSyncedAt ? new Date(syncMeta.lastSyncedAt).toLocaleString() : 'never'),
@@ -2501,7 +2505,38 @@ function applyRemote(remote, remoteTime) {
   return { conflicts, fresh };
 }
 
+/* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
+   proactively in the last 10 minutes (while the session is still warm) instead
+   of waiting for expiry. iOS WebViews often refuse silent renewal entirely —
+   then nudge once per expiry instead of dying quietly. */
+let lastRefreshTry = 0, nudgeForExpiry = 0, syncStartAt = 0;
+async function maybeRefreshToken() {
+  if (!syncMeta.email || !syncMeta.token || !navigator.onLine) return;
+  const left = syncMeta.token.expires_at - Date.now();
+  if (left > 10 * 60000 || left < -12 * 3600000) return;
+  if (Date.now() - lastRefreshTry < 5 * 60000) return;
+  lastRefreshTry = Date.now();
+  const epoch = syncMeta.token.expires_at;
+  try {
+    await ensureToken('silent');
+    if (syncMeta.token.expires_at > epoch) slog('info', 'Token renewed silently');
+  } catch {
+    if (document.visibilityState === 'visible' && nudgeForExpiry !== epoch) {
+      nudgeForExpiry = epoch;
+      try { toast('Sync paused — open Sync & Settings and tap Sync now'); } catch {}
+      slog('info', 'Token expired and silent renewal failed — tap Sync now');
+    }
+  }
+}
 let syncing = false, lastPullAt = 0, pushTimer = 0;
+function syncWatchdog() {
+  if (syncing && syncStartAt && Date.now() - syncStartAt > 90000) {
+    syncing = false; syncStartAt = 0;
+    lastSyncError = 'Sync timed out — retry';
+    slog('error', lastSyncError);
+    setSync('error');
+  }
+}
 function schedulePush() {
   if (!syncMeta.auto) return;
   if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
@@ -2512,7 +2547,7 @@ async function pushNow(mode) {
   if (syncing || !navigator.onLine || !googleClientId()) return;
   if (!syncMeta.auto && mode === 'silent') return;
   if (!syncMeta.email && !syncMeta.token) return;
-  syncing = true; setSync('syncing');
+  syncing = true; syncStartAt = Date.now(); setSync('syncing');
   try {
     await driveUpload(state, mode);
     syncMeta.base = snapState(state);
@@ -2522,13 +2557,13 @@ async function pushNow(mode) {
     setSync('ok');
   } catch (e) {
     handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout', false);
-  } finally { syncing = false; paintSync(); }
+  } finally { syncing = false; syncStartAt = 0; paintSync(); }
 }
 async function pullNow(mode) {
   if (syncing || !navigator.onLine || !googleClientId()) return;
   if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
   const prev = syncStatus;
-  syncing = true; lastPullAt = Date.now(); setSync('syncing');
+  syncing = true; syncStartAt = Date.now(); lastPullAt = Date.now(); setSync('syncing');
   try {
     const found = await driveFind(mode);
     if (!found) {
@@ -2566,7 +2601,7 @@ async function pullNow(mode) {
     setSync('ok');
   } catch (e) {
     handleSyncFailure(e, mode, prev, true);
-  } finally { syncing = false; paintSync(); }
+  } finally { syncing = false; syncStartAt = 0; paintSync(); }
 }
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
@@ -2594,7 +2629,8 @@ function openAccount() {
 function colorLabelRow(c) {
   const row = document.createElement('div');
   row.className = 'color-row';
-  row.style.setProperty('--c-dot', c.hex);
+  const dot = document.createElement('span');
+  dot.className = 'dot'; dot.style.background = c.hex;
   const inp = document.createElement('input');
   inp.type = 'text'; inp.maxLength = 24; inp.dataset.color = c.id;
   inp.placeholder = c.name; inp.dir = 'auto';
@@ -2606,7 +2642,7 @@ function colorLabelRow(c) {
     else delete state.colorNames[c.id];
     save(); renderNav(); renderCurrentView();
   };
-  row.append(inp);
+  row.append(dot, inp);
   const del = document.createElement('button');
   del.className = 'icon-btn sm'; del.title = 'Delete color';
   del.setAttribute('aria-label', 'Delete ' + c.name);
@@ -2700,10 +2736,14 @@ function bindSync() {
     save(); renderAll(); paintColorEditor();
   };
   $('#resetColorsBtn').onclick = resetColors;
-  window.addEventListener('online', () => { paintSync(); pullNow('silent').catch(() => {}); });
+  window.addEventListener('online', () => { paintSync(); maybeRefreshToken().catch(() => {}); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
+  window.addEventListener('focus', () => { maybeRefreshToken().catch(() => {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
+    if (!document.hidden) {
+      maybeRefreshToken().catch(() => {});
+      if (Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
+    }
   });
   window.addEventListener('load', () => {
     if (syncMeta.email) setSync('checking');
@@ -2726,40 +2766,65 @@ function bindSync() {
   });
   bindPullToRefresh();
   bindEdgeSwipe();
-  setInterval(paintSync, 5000);
+  setInterval(() => { paintSync(); syncWatchdog(); }, 5000);
+  setInterval(() => { maybeRefreshToken().catch(() => {}); }, 60000);
   paintSync();
 }
 
 /* Pull-to-refresh (touch): drag down from the very top of any page to force
    a Drive sync. Desktop unaffected (no touch drag). */
-/* Edge swipe (touch): swipe right from the left screen edge to slide in the
-   sidebar. Mobile only; ignored when the drawer is open, a dialog/popup is
-   up, the detail sheet is open, or the gesture starts on another axis. */
+/* Edge swipe (touch): drag right starting in the left half to slide the sidebar
+   in WITH the finger; release past ~35% to open. Starts right of the system
+   back-gesture strip (x>20) and outside the board's horizontal scroller, task
+   drag handles and text fields, so nothing fights. Mobile drawer only. */
 function bindEdgeSwipe() {
-  const EDGE = 28, ACTIVATE = 70;
-  let sx = null, sy = null;
-  const overlaysOpen = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
-    .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
+  let sx = null, sy = null, active = false, sbW = 0, lastDx = 0;
+  const sb = () => $('#sidebar');
+  const sc = () => $('#scrim');
+  const blocked = () => window.innerWidth >= 1024
+    || sb().classList.contains('open') || ui.detailId
+    || ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
+      .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
+  const reset = () => { sx = sy = null; active = false; lastDx = 0; };
   document.addEventListener('touchstart', (e) => {
-    sx = sy = null;
-    if (e.touches.length !== 1 || window.innerWidth >= 1024) return;
-    if ($('#sidebar').classList.contains('open')) return;
-    if (ui.detailId || overlaysOpen()) return;
+    reset();
+    if (e.touches.length !== 1 || blocked()) return;
     const t = e.touches[0];
-    if (t.clientX > EDGE) return;
-    sx = t.clientX; sy = t.clientY;
+    if (t.clientX < 20 || t.clientX > window.innerWidth * 0.45) return;
+    if (t.target && t.target.closest && t.target.closest('#board,.drag,input,textarea,select,[contenteditable]')) return;
+    sx = t.clientX; sy = t.clientY; sbW = sb().offsetWidth || 300;
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (sx === null) return;
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
-    if (dx < -12 || Math.abs(dy) > Math.abs(dx) * 1.4) { sx = sy = null; return; }
-    if (dx > ACTIVATE) {
-      sx = sy = null;
-      openSidebar();
+    if (!active) {
+      if (dx < -12 || Math.abs(dy) > Math.abs(dx) * 1.4) { reset(); return; }
+      if (dx < 24) return;
+      active = true;
+      sb().style.transition = 'none';
+      sc().classList.remove('hidden');
     }
+    lastDx = Math.min(Math.max(dx, 0), sbW);
+    sb().style.transform = `translateX(${-sbW + lastDx}px)`;
+    sc().style.opacity = String(0.35 * (lastDx / sbW));
   }, { passive: true });
-  document.addEventListener('touchend', () => { sx = sy = null; });
-  document.addEventListener('touchcancel', () => { sx = sy = null; });
+  const settle = () => {
+    if (sx === null && !active) return;
+    const open = active && lastDx > sbW * 0.35;
+    sb().style.transition = '';
+    sc().style.opacity = '';
+    sb().style.transform = '';
+    if (open) openSidebar();
+    else sc().classList.add('hidden');
+    reset();
+  };
+  document.addEventListener('touchend', settle);
+  document.addEventListener('touchcancel', () => {
+    sb().style.transition = ''; sb().style.transform = '';
+    sc().style.opacity = '';
+    if (!sb().classList.contains('open')) sc().classList.add('hidden');
+    reset();
+  });
 }
 function bindPullToRefresh() {  const ptr = document.createElement('div');
   ptr.id = 'ptrSync'; ptr.className = 'ptr-sync hidden';
