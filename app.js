@@ -2892,7 +2892,7 @@ function bindSync() {
    and outside the board's horizontal scroller, task drag handles and text
    fields, so nothing fights. Mobile drawer only. */
 function bindEdgeSwipe() {
-  let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0;
+  let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0, fadeT = 0;
   const sb = () => $('#sidebar');
   const sc = () => $('#scrim');
   const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
@@ -2902,6 +2902,7 @@ function bindEdgeSwipe() {
   const field = (t) => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
   document.addEventListener('touchstart', (e) => {
     reset();
+    clearTimeout(fadeT); // a new gesture wins over a pending scrim fade
     if (e.touches.length !== 1 || blocked() || field(e.target)) return;
     const t = e.touches[0], open = sb().classList.contains('open');
     if (!open) {
@@ -2922,33 +2923,76 @@ function bindEdgeSwipe() {
       if (Math.abs(dx) < 24) return;
       active = true;
       sb().style.transition = 'none';
+      sc().style.transition = 'none';
       sc().classList.remove('hidden');
     }
     if (mode === 'open') {
       lastDx = Math.min(Math.max(dx, 0), sbW);
       sb().style.transform = `translateX(${-sbW + lastDx}px)`;
-      sc().style.opacity = String(0.35 * (lastDx / sbW));
+      // 0 → 1 so the finger position matches the settled scrim (its bg already carries the .35 alpha)
+      sc().style.opacity = String(lastDx / sbW);
     } else {
       lastDx = Math.max(Math.min(dx, 0), -sbW);
       sb().style.transform = `translateX(${lastDx}px)`;
-      sc().style.opacity = String(0.35 * (1 + lastDx / sbW));
+      sc().style.opacity = String(1 + lastDx / sbW);
     }
   }, { passive: true });
   const settle = () => {
     if (sx === null && !active) return;
-    sb().style.transition = '';
-    sc().style.opacity = '';
-    sb().style.transform = '';
-    if (mode === 'open' && active && lastDx > sbW * 0.35) openSidebar();
-    else if (mode === 'close' && (!active || lastDx > -sbW * 0.35)) { /* snap back open */ }
-    else if (mode === 'close') closeSidebar();
-    else sc().classList.add('hidden');
+    const wb = sb(), wc = sc();
+    wb.style.transition = ''; wc.style.transition = '';
+    if (!active) { // plain tap — restore defaults, no animation
+      wb.style.transform = ''; wc.style.opacity = '';
+      if (mode === 'open' && !wb.classList.contains('open') && !ui.detailId) wc.classList.add('hidden');
+      reset();
+      return;
+    }
+    clearTimeout(fadeT);
+    if (mode === 'open' && lastDx > sbW * 0.35) {
+      // finish opening: drawer glides home while the scrim fades the rest of the way in
+      wc.classList.remove('hidden');
+      wc.style.opacity = String(lastDx / sbW);
+      void wc.offsetWidth; // pin the fade start to the finger position
+      wb.style.transform = '';
+      openSidebar();
+      wc.style.opacity = '1';
+      fadeT = setTimeout(() => { if (wb.classList.contains('open')) wc.style.opacity = ''; }, 250);
+    } else if (mode === 'close' && lastDx <= -sbW * 0.35) {
+      // finish closing: drawer slides shut while the scrim fades out with it
+      wb.style.transform = '';
+      wb.classList.remove('open');
+      wc.style.opacity = String(1 + lastDx / sbW);
+      void wc.offsetWidth;
+      wc.style.opacity = '0';
+      fadeT = setTimeout(() => {
+        if (!wb.classList.contains('open') && !ui.detailId) wc.classList.add('hidden');
+        wc.style.opacity = '';
+      }, 250);
+    } else if (mode === 'close') {
+      // snap back open
+      wb.style.transform = '';
+      wc.style.opacity = String(1 + lastDx / sbW);
+      void wc.offsetWidth;
+      wc.style.opacity = '1';
+      fadeT = setTimeout(() => { if (wb.classList.contains('open')) wc.style.opacity = ''; }, 250);
+    } else {
+      // open cancelled below threshold: slide back shut, fade the scrim out
+      wb.style.transform = '';
+      wc.style.opacity = String(lastDx / sbW);
+      void wc.offsetWidth;
+      wc.style.opacity = '0';
+      fadeT = setTimeout(() => {
+        if (!wb.classList.contains('open') && !ui.detailId) wc.classList.add('hidden');
+        wc.style.opacity = '';
+      }, 250);
+    }
     reset();
   };
   document.addEventListener('touchend', settle);
   document.addEventListener('touchcancel', () => {
+    clearTimeout(fadeT);
     sb().style.transition = ''; sb().style.transform = '';
-    sc().style.opacity = '';
+    sc().style.transition = ''; sc().style.opacity = '';
     if (!sb().classList.contains('open')) sc().classList.add('hidden');
     reset();
   });
