@@ -37,6 +37,7 @@ self.addEventListener('fetch', (e) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // fonts, weather APIs: network only
+  if (url.pathname.endsWith('version.json')) return; // update detector: always network
   if (request.mode === 'navigate') {
     e.respondWith(
       fetch(request)

@@ -786,10 +786,7 @@ a.btn-ghost{text-decoration:none}
 /* Account dialog */
 .account-modal{width:min(460px,100%);max-height:min(86dvh,700px);overflow-y:auto}
 .sync-err{color:var(--danger);font-size:13px;margin:6px 0 0}
-.full-btn{width:100%;justify-content:center;margin-top:8px}
-.api-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
-.api-note .btn-ghost{font-size:13px;padding:7px 12px}
-.api-note .btn-ghost .material-icons-outlined{font-size:17px}
+.account-actions{justify-content:flex-start;flex-wrap:wrap}
 
 /* Sync history log */
 .log-modal{width:min(480px,100%);max-height:min(80dvh,600px);display:flex;flex-direction:column}
@@ -801,12 +798,6 @@ a.btn-ghost{text-decoration:none}
 .log-row.conflict{color:#b06000}
 .account-actions{justify-content:flex-start;flex-wrap:wrap}
 .account-actions .btn-ghost .material-icons-outlined{font-size:18px}
-.setup-box{
-  background:var(--bg2);border:1px solid var(--line-soft);border-radius:12px;padding:10px 14px;
-  & ol{margin:6px 0;padding-left:20px}
-  & li{margin:4px 0}
-  & code{font-family:Consolas,monospace;font-size:.85em;background:var(--bg);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px;word-break:break-all}
-}
 .setup-row{display:flex;gap:8px;margin-top:8px}
 .setup-row input{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 12px;outline:0;min-width:0;background:var(--bg)}
 .setup-row input:focus{border-color:var(--blue)}

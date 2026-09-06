@@ -2,6 +2,8 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
+const APP_VERSION = '1.0-1788686110'; // bump with ?v= stamps + version.json on every release
+let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
@@ -134,16 +136,39 @@ function go(view) { state.activeView = view; save(); closeSidebar(); closeDetail
 
 /* ---------- toast with undo ---------- */
 let toastTimer = 0;
-function toast(msg, undoFn) {
+function toast(msg, undoFn, label) {
   $('#toastMsg').textContent = msg;
   const u = $('#toastUndo');
   u.classList.toggle('hidden', !undoFn);
+  u.textContent = label || 'Undo';
   u.onclick = () => { hideToast(); undoFn && undoFn(); };
   $('#toast').classList.remove('hidden');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(hideToast, 4200);
 }
 function hideToast() { $('#toast').classList.add('hidden'); }
+
+/* Update detector: version.json is never cached (SW bypass + no-store), so a
+   stale WebView (iOS has no hard-refresh) still notices a new release. */
+async function checkForUpdate() {
+  if (!navigator.onLine) return;
+  try {
+    const r = await fetch('version.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.version && j.version !== APP_VERSION && j.version !== updateNotified) {
+      updateNotified = j.version;
+      toast('New version available — reload to update', forceReload, 'Update');
+    }
+  } catch {}
+}
+function forceReload() {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set('u', Date.now().toString(36)); // bust the cached shell
+    location.href = u.toString();
+  } catch { location.reload(); }
+}
 
 /* ---------- keyboard shortcuts + command palette ---------- */
 const SHORTCUTS = [
@@ -2062,8 +2087,6 @@ function paintSync() {
   if (so) so.classList.toggle('hidden', !syncMeta.email);
   const at = $('#autoSyncToggle');
   if (at && document.activeElement !== at) at.checked = !!syncMeta.auto;
-  const setup = $('#accountSetup');
-  if (setup) setup.classList.toggle('hidden', !!googleClientId());
 }
 
 /* ----- Google auth (GIS token flow, client-side only) ----- */
@@ -2349,14 +2372,6 @@ function bindSync() {
     syncMeta.auto = e.target.checked; saveSyncMeta(); paintSync();
     if (syncMeta.auto) schedulePush();
   };
-  $('#clientIdSave').onclick = () => {
-    const v = $('#clientIdInput').value.trim();
-    if (!v) return;
-    try { localStorage.setItem(CLIENT_KEY, v); } catch {}
-    $('#clientIdInput').value = '';
-    paintSync();
-    toast('Client ID saved — sign in to start syncing');
-  };
   $('#userNameInput').oninput = (e) => {
     state.userName = e.target.value.slice(0, 40);
     save(); renderCurrentView();
@@ -2619,7 +2634,24 @@ renderAll();
 
 // PWA: offline + installable (Chrome/Edge desktop & Android, iOS Add to Home)
 if ('serviceWorker' in navigator) {
+  const pokeSw = () => {
+    navigator.serviceWorker.getRegistration()
+      .then((reg) => { try { reg && reg.update(); } catch {} })
+      .catch(() => {});
+  };
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+    pokeSw();
+    checkForUpdate();
   });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && Date.now() - lastUpdateCheck > 60000) {
+      lastUpdateCheck = Date.now();
+      pokeSw();
+      checkForUpdate();
+    }
+  });
+  window.addEventListener('online', () => checkForUpdate());
+} else {
+  window.addEventListener('load', () => checkForUpdate());
 }
