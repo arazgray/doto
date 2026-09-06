@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788694443'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788696491'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2033,10 +2033,38 @@ async function importFiles(files, mode = 'auto') {
 }
 
 /* ---------- events ---------- */
+const SCROLL_SEL = '.board-col-body,#board,.cal-side,#timeTaskList,.sidebar,.detail-body,#paletteList,.board-col';
+function scrollKey(el) {
+  if (el.id) return '#' + el.id;
+  const col = el.closest ? el.closest('[data-list-id]') : null;
+  return String(el.className || '').split(' ')[0] + (col ? '|' + col.dataset.listId : '');
+}
+function snapScroll() {
+  const m = new Map();
+  document.querySelectorAll(SCROLL_SEL).forEach((el) => {
+    if (el.scrollTop || el.scrollLeft) m.set(scrollKey(el), [el.scrollLeft, el.scrollTop]);
+  });
+  if (window.scrollX || window.scrollY) m.set('__win', [window.scrollX, window.scrollY]);
+  return m;
+}
+function restoreScroll(m) {
+  if (!m || !m.size) return;
+  document.querySelectorAll(SCROLL_SEL).forEach((el) => {
+    const v = m.get(scrollKey(el));
+    if (v) {
+      if (v[0]) { try { el.scrollLeft = v[0]; } catch {} }
+      if (v[1]) { try { el.scrollTop = v[1]; } catch {} }
+    }
+  });
+  const w = m.get('__win');
+  if (w) { try { window.scrollTo(w[0], w[1]); } catch {} }
+}
 function renderAll() {
+  const sc = snapScroll();
   applySizes(); renderNav(); renderCurrentView(); if (ui.detailId) renderDetail();
   if (ui.selectedId && !getTask(ui.selectedId)) ui.selectedId = null;
   paintSelection(false);
+  restoreScroll(sc);
 }
 
 /* ---------- Google Drive sync (Sync & Settings, no backend) ----------
