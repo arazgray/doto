@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788700736'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788701627'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -188,10 +188,12 @@ function forceReload() {
     location.href = u.toString();
   } catch { location.reload(); }
 }
-/* Manual nuke: drop service workers + offline caches, then reload newest.
-   Works in browser tab, installed PWA and iOS home-screen app. */
+/* Manual nuke: push pending work first (so nothing is lost), drop service
+   workers + offline caches, then reload newest. Token/email live in
+   localStorage and survive this — only the runnable code is replaced. */
 async function forceUpdate() {
-  toast('Updating to newest version…');
+  toast('Saving + updating to newest version…');
+  try { await pushNow('silent'); } catch {}
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
@@ -202,6 +204,8 @@ async function forceUpdate() {
       await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
     }
   } catch {}
+  try { sessionStorage.setItem('doto-updated', '1'); } catch {}
+  slog('info', 'Force update: work pushed, cache cleared, reloading');
   setTimeout(forceReload, 350);
 }
 
@@ -1167,6 +1171,7 @@ function renderSingle() {
   $('#completedCount').textContent = done.length ? String(done.length) : '';
   $('#completedCount').classList.toggle('hidden', !done.length);
   $('#taskCount').textContent = open.length ? `${open.length} open` : 'All done 🎉';
+  paintQuickMeta();
 }
 
 function renderBoard() {
@@ -1560,6 +1565,7 @@ function renderTime() {
   const q = (ui.timeQuery || '').trim().toLowerCase();
   const tasks = state.tasks
     .filter((t) => !t.done)
+    .filter(matchesFilters)
     .filter((t) => !q || (t.title + ' ' + t.notes).toLowerCase().includes(q))
     .sort((a, b) => taskTime(b.id) - taskTime(a.id) || b.createdAt - a.createdAt)
     .slice(0, 80);
@@ -1615,6 +1621,10 @@ function targetListForAdd() {
 function addTask(title, extra = {}, toTop = false) {
   const lid = targetListForAdd(); if (!lid) { toast('Create a list first'); return null; }
   return addTaskTo(lid, title, extra, toTop);
+}
+function paintQuickMeta() {
+  const inp = $('#addInput'), qa = $('#quickAddMeta');
+  if (inp && qa) qa.classList.toggle('hidden', !inp.value.trim());
 }
 function focusComposer() {
   if (isHome()) { const f = fallbackList(); if (f) go(f.id); }
@@ -2627,9 +2637,64 @@ function bindSync() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
   });
-  window.addEventListener('load', () => { pullNow('silent').catch(() => {}); });
+  window.addEventListener('load', () => {
+    pullNow('silent').catch(() => {});
+    try {
+      if (sessionStorage.getItem('doto-updated')) {
+        sessionStorage.removeItem('doto-updated');
+        slog('info', 'Updated — re-checking Drive sync');
+        setTimeout(() => {
+          if (syncMeta.email && !tokenValid()) setSync('signedout');
+          paintSync();
+        }, 1500);
+      }
+    } catch {}
+  });
+  bindPullToRefresh();
   setInterval(paintSync, 5000);
   paintSync();
+}
+
+/* Pull-to-refresh (touch): drag down from the very top of any page to force
+   a Drive sync. Desktop unaffected (no touch drag). */
+function bindPullToRefresh() {
+  const ptr = document.createElement('div');
+  ptr.id = 'ptrSync'; ptr.className = 'ptr-sync hidden';
+  ptr.innerHTML = '<span class="material-icons-outlined">sync</span><span>Pull to sync</span>';
+  document.body.appendChild(ptr);
+  const label = () => ptr.querySelector('span:last-child');
+  let start = null, ready = false;
+  const reset = () => { start = null; ready = false; ptr.classList.add('hidden'); };
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || window.scrollY > 0) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#sidebar,#detail,.modal-scrim,.menu,#sortMenu,#listMenu,.toast')) return;
+    start = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!start) return;
+    if (window.scrollY > 0) { reset(); return; }
+    const dx = e.touches[0].clientX - start.x, dy = e.touches[0].clientY - start.y;
+    if (dy < 24 || Math.abs(dx) > dy) { if (dy < 0) reset(); return; }
+    ptr.classList.remove('hidden');
+    ready = dy > 84;
+    ptr.classList.toggle('ready', ready);
+    label().textContent = ready ? 'Release to sync' : 'Pull to sync';
+  }, { passive: true });
+  const end = () => {
+    if (!start) return;
+    const go = ready;
+    reset();
+    if (go) {
+      label().textContent = 'Syncing…';
+      ptr.classList.remove('hidden');
+      ptr.classList.add('ready');
+      setTimeout(() => ptr.classList.add('hidden'), 30000); // backstop if auth hangs
+      syncNowFlow().catch(() => {}).finally(() => ptr.classList.add('hidden'));
+    }
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', reset);
 }
 
 function setTheme(dark) {
@@ -2785,8 +2850,9 @@ function bind() {
       weight: ui.quick.weight || 'medium',
       color: ui.quick.color || 'default',
     }, true);
-    if (t) { inp.value = ''; inp.focus(); } // presets persist
+    if (t) { inp.value = ''; paintQuickMeta(); inp.focus(); } // presets persist
   };
+  inp.addEventListener('input', paintQuickMeta);
   // completed collapse
   $('#completedToggle').onclick = () => { ui.completedOpen = !ui.completedOpen; renderAll(); };
 

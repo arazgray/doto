@@ -52,6 +52,8 @@ How it works and what to expect:
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
 - Signing out keeps a full copy on that device; signing back in merges it.
+- **Pull to refresh**: on touch devices, drag down from the very top of any
+  page and release to force a Drive sync.
 - Sync dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
 - Import / Export live in the Sync dialog (same JSON backup as before).
 - The dialog also holds **Display** settings (show completed, dark mode),
