@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788718345'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788718955'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2773,48 +2773,62 @@ function bindSync() {
 
 /* Pull-to-refresh (touch): drag down from the very top of any page to force
    a Drive sync. Desktop unaffected (no touch drag). */
-/* Edge swipe (touch): drag right starting in the left half to slide the sidebar
-   in WITH the finger; release past ~35% to open. Starts right of the system
-   back-gesture strip (x>20) and outside the board's horizontal scroller, task
-   drag handles and text fields, so nothing fights. Mobile drawer only. */
+/* Sidebar drag (touch): drag right starting in the left half to slide it in
+   WITH the finger; drag left anywhere while open to slide it out. Release
+   past ~35% to settle. Starts right of the system back-gesture strip (x>20)
+   and outside the board's horizontal scroller, task drag handles and text
+   fields, so nothing fights. Mobile drawer only. */
 function bindEdgeSwipe() {
-  let sx = null, sy = null, active = false, sbW = 0, lastDx = 0;
+  let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0;
   const sb = () => $('#sidebar');
   const sc = () => $('#scrim');
-  const blocked = () => window.innerWidth >= 1024
-    || sb().classList.contains('open') || ui.detailId
-    || ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
-      .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
-  const reset = () => { sx = sy = null; active = false; lastDx = 0; };
+  const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
+    .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
+  const blocked = () => window.innerWidth >= 1024 || ui.detailId || overlays();
+  const reset = () => { sx = sy = null; active = false; mode = null; lastDx = 0; };
+  const field = (t) => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
   document.addEventListener('touchstart', (e) => {
     reset();
-    if (e.touches.length !== 1 || blocked()) return;
-    const t = e.touches[0];
-    if (t.clientX < 20 || t.clientX > window.innerWidth * 0.45) return;
-    if (t.target && t.target.closest && t.target.closest('#board,.drag,input,textarea,select,[contenteditable]')) return;
+    if (e.touches.length !== 1 || blocked() || field(e.target)) return;
+    const t = e.touches[0], open = sb().classList.contains('open');
+    if (!open) {
+      if (t.clientX < 20 || t.clientX > window.innerWidth * 0.45) return;
+      if (t.target && t.target.closest && t.target.closest('#board,.drag')) return;
+      mode = 'open';
+    } else {
+      mode = 'close';
+    }
     sx = t.clientX; sy = t.clientY; sbW = sb().offsetWidth || 300;
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (sx === null) return;
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
     if (!active) {
-      if (dx < -12 || Math.abs(dy) > Math.abs(dx) * 1.4) { reset(); return; }
-      if (dx < 24) return;
+      if (mode === 'open' && (dx < -12 || Math.abs(dy) > Math.abs(dx) * 1.4)) { reset(); return; }
+      if (mode === 'close' && (dx > 12 || Math.abs(dy) > Math.abs(dx) * 1.4)) { reset(); return; }
+      if (Math.abs(dx) < 24) return;
       active = true;
       sb().style.transition = 'none';
       sc().classList.remove('hidden');
     }
-    lastDx = Math.min(Math.max(dx, 0), sbW);
-    sb().style.transform = `translateX(${-sbW + lastDx}px)`;
-    sc().style.opacity = String(0.35 * (lastDx / sbW));
+    if (mode === 'open') {
+      lastDx = Math.min(Math.max(dx, 0), sbW);
+      sb().style.transform = `translateX(${-sbW + lastDx}px)`;
+      sc().style.opacity = String(0.35 * (lastDx / sbW));
+    } else {
+      lastDx = Math.max(Math.min(dx, 0), -sbW);
+      sb().style.transform = `translateX(${lastDx}px)`;
+      sc().style.opacity = String(0.35 * (1 + lastDx / sbW));
+    }
   }, { passive: true });
   const settle = () => {
     if (sx === null && !active) return;
-    const open = active && lastDx > sbW * 0.35;
     sb().style.transition = '';
     sc().style.opacity = '';
     sb().style.transform = '';
-    if (open) openSidebar();
+    if (mode === 'open' && active && lastDx > sbW * 0.35) openSidebar();
+    else if (mode === 'close' && (!active || lastDx > -sbW * 0.35)) { /* snap back open */ }
+    else if (mode === 'close') closeSidebar();
     else sc().classList.add('hidden');
     reset();
   };
