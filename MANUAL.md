@@ -163,7 +163,9 @@ Not yet — export the JSON and send them the file; they can import it.
 Most common cause: the Google Drive API is not enabled for your Cloud project
 (Drive answers 403) — enable it under APIs & Services, then Sync now. Also
 make sure you ticked the Drive checkbox on Google's consent screen and that
-sign-in popups are not blocked.
+sign-in popups are not blocked. If the Google window opens and closes with
+nothing happening, allow popups for this site and try again — the exact
+reason is recorded under Account → History.
 
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.

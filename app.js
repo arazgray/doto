@@ -2067,7 +2067,7 @@ function paintSync() {
 }
 
 /* ----- Google auth (GIS token flow, client-side only) ----- */
-let gisReady = null, tokenClient = null;
+let gisReady = null, tokenClient = null, tokenClientId = '';
 function gisLoad() {
   if (gisReady) return gisReady;
   gisReady = new Promise((res, rej) => {
@@ -2085,22 +2085,36 @@ function tokenValid() {
   const t = syncMeta.token;
   return !!(t && t.access_token && t.expires_at - Date.now() > 60000);
 }
+function gisAttempt(tc, prompt, ms) {
+  return new Promise((resolve) => {
+    let done = false;
+    const to = setTimeout(() => { if (!done) { done = true; resolve({ error: 'timeout' }); } }, ms);
+    tc.callback = (r) => { if (!done) { done = true; clearTimeout(to); resolve(r || { error: 'unknown' }); } };
+    try { tc.requestAccessToken({ prompt }); }
+    catch { if (!done) { done = true; clearTimeout(to); resolve({ error: 'popup_failed' }); } }
+  });
+}
 async function ensureToken(mode) {
   if (tokenValid()) return syncMeta.token.access_token;
   await gisLoad();
   const cid = googleClientId();
   if (!cid) throw new Error('setup');
-  if (!tokenClient) {
+  if (!tokenClient || tokenClientId !== cid) {
     tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cid, scope: DRIVE_SCOPE, callback: () => {} });
+    tokenClientId = cid;
   }
-  const attempt = (prompt) => new Promise((resolve) => {
-    tokenClient.callback = (r) => resolve(r);
-    try { tokenClient.requestAccessToken({ prompt }); } catch { resolve(null); }
-  });
-  // 'none' never shows UI (silent); consent popup only as explicit fallback
-  let tok = await attempt('none');
-  if ((!tok || !tok.access_token) && mode === 'popup') tok = await attempt('consent');
-  if (!tok || !tok.access_token) throw new Error('auth');
+  // Explicit sign-in: ONE consent popup (a silent-first attempt would burn the
+  // click's popup permission and flash a window that auto-closes).
+  // Background: 'none' never shows UI.
+  const tok = mode === 'popup' ? await gisAttempt(tokenClient, 'consent', 180000) : await gisAttempt(tokenClient, 'none', 10000);
+  if (!tok || !tok.access_token) {
+    const code = (tok && (tok.error || tok.error_subtype)) || 'no_token';
+    const desc = tok && tok.error_description ? ' — ' + tok.error_description : '';
+    if (mode !== 'silent') slog('error', 'Google sign-in failed: ' + code + desc);
+    const err = new Error('auth');
+    err.gis = String(code);
+    throw err;
+  }
   syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000 };
   saveSyncMeta();
   fetchEmail().catch(() => {});
@@ -2283,7 +2297,14 @@ async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
   if (!syncMeta.email && !tokenValid()) {
     try { await ensureToken('popup'); await fetchEmail(); }
-    catch (e) { setSync(e && e.message === 'setup' ? 'setup' : 'signedout'); paintSync(); return; }
+    catch (e) {
+      lastSyncError = e && e.gis
+        ? 'Google sign-in failed (' + e.gis + '). Allow popups for this site and try again.'
+        : 'Sign-in failed — try again.';
+      slog('error', lastSyncError);
+      setSync('error'); paintSync();
+      return;
+    }
   }
   await pullNow('popup');
 }
@@ -2296,8 +2317,16 @@ function bindSync() {
   $('#accountClose').onclick = closeAccount;
   $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
   $('#signInBtn').onclick = async () => {
+    if (!googleClientId()) { setSync('setup'); paintSync(); return; }
     try { await ensureToken('popup'); }
-    catch (e) { setSync(!googleClientId() ? 'setup' : 'signedout'); paintSync(); return; }
+    catch (e) {
+      lastSyncError = e && e.gis
+        ? 'Google sign-in failed (' + e.gis + '). Allow popups for this site and try again.'
+        : 'Sign-in failed — try again.';
+      slog('error', lastSyncError);
+      setSync('error'); paintSync();
+      return;
+    }
     try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
     slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
     await pullNow('popup');
