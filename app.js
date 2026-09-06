@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788691655'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788694443'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1469,7 +1469,7 @@ function renderTime() {
     const p = document.createElement('p'); p.className = 'mini-empty'; p.textContent = 'No time logged yet — start the tracker.';
     ul.appendChild(p);
   }
-  const timeRecRow = (r, withCopy) => {
+  const timeRecRow = (r) => {
     const li = document.createElement('li'); li.className = 'time-rec';
     const d = new Date(r.startedAt);
     const when = isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -1492,29 +1492,31 @@ function renderTime() {
       save(); renderAll();
       toast('Record deleted', () => { state.times.unshift(r); save(); renderAll(); });
     };
-    if (withCopy) {
-      const cp = document.createElement('button');
-      cp.className = 'icon-btn sm'; cp.title = 'Copy to clipboard';
-      cp.innerHTML = '<span class="material-icons-outlined">content_copy</span>';
-      cp.onclick = async (e) => {
-        e.stopPropagation();
-        const ok = await copyText(`${fmtDurShort(r.seconds)} - ${r.title || '(untitled)'}`);
-        toast(ok ? 'Copied to clipboard' : 'Copy failed');
-      };
-      li.append(cp);
-    }
     li.append(open, del);
     li.onclick = () => { if (getTask(r.taskId)) { ui.timeTaskId = r.taskId; renderAll(); } };
     return li;
   };
-  const dayHead = (label) => {
-    const h = document.createElement('p'); h.className = 'rec-day'; h.textContent = label;
+  const dayHead = (label, rows) => {
+    const h = document.createElement('div'); h.className = 'rec-day-head';
+    const s = document.createElement('span'); s.textContent = label;
+    h.appendChild(s);
+    if (rows && rows.length) {
+      const cp = document.createElement('button');
+      cp.className = 'btn-ghost'; cp.title = 'Copy day as text';
+      cp.innerHTML = '<span class="material-icons-outlined">content_copy</span><span>Copy day</span>';
+      cp.onclick = async (e) => {
+        e.stopPropagation();
+        const lines = rows.map((r) => `${fmtDurShort(r.seconds)} - ${r.title || '(untitled)'}`);
+        toast(await copyText(lines.join('\n')) ? 'Day copied to clipboard' : 'Copy failed');
+      };
+      h.appendChild(cp);
+    }
     ul.appendChild(h);
   };
   const todayRs = state.times.filter((r) => recDay(r) === todayIso()).slice(0, 30);
   const prevRs = state.times.filter((r) => recDay(r) !== todayIso()).slice(0, 30);
-  if (todayRs.length) { dayHead('Today'); todayRs.forEach((r) => ul.appendChild(timeRecRow(r, true))); }
-  if (prevRs.length) { dayHead('Previously'); prevRs.forEach((r) => ul.appendChild(timeRecRow(r, false))); }
+  if (todayRs.length) { dayHead('Today', todayRs); todayRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
+  if (prevRs.length) { dayHead('Previously', null); prevRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
   // middle: searchable tasks with totals
   const q = (ui.timeQuery || '').trim().toLowerCase();
   const tasks = state.tasks
@@ -2265,7 +2267,10 @@ async function driveUpload(data, mode) {
 
 /* ----- three-way merge (base = last synced snapshot) ----- */
 function snapState(s) {
-  return JSON.parse(JSON.stringify({ lists: s.lists || [], tasks: s.tasks || [], times: s.times || [], timer: s.timer || null }));
+  return JSON.parse(JSON.stringify({
+    lists: s.lists || [], tasks: s.tasks || [], times: s.times || [],
+    timer: s.timer || null, colorNames: s.colorNames || {},
+  }));
 }
 const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function mergeArrays(base, local, remote, takeRemote) {
@@ -2294,20 +2299,32 @@ function mergeArrays(base, local, remote, takeRemote) {
   });
   return { arr: out, conflicts, fromRemote };
 }
+function mergeObj(base, local, remote, takeRemote) {
+  base = base || {}; local = local || {}; remote = remote || {};
+  if (recEq(local, base) && recEq(remote, base)) return { obj: local, conflict: 0, fromRemote: 0 };
+  if (!recEq(local, base) && recEq(remote, base)) return { obj: local, conflict: 0, fromRemote: 0 };
+  if (recEq(local, base) && !recEq(remote, base)) return { obj: remote, conflict: 0, fromRemote: 1 };
+  if (recEq(local, remote)) return { obj: local, conflict: 0, fromRemote: 0 };
+  return takeRemote
+    ? { obj: remote, conflict: 1, fromRemote: 1 }
+    : { obj: local, conflict: 1, fromRemote: 0 };
+}
 function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
-  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null };
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null, colorNames: {} };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote);
   const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote);
   const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote);
+  const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
   let timer = state.timer, tConflict = 0;
   const bt = base.timer || null, rt = remote.timer || null;
   if (!recEq(timer, bt) && !recEq(rt, bt) && takeRemote) { timer = rt; tConflict = 1; }
   else if (recEq(timer, bt)) timer = rt;
   state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
-  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict;
-  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote;
+  state.colorNames = mc.obj;
+  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict + mc.conflict;
+  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
@@ -2360,7 +2377,7 @@ async function pullNow(mode) {
         const res = applyRemote(remote, remoteTime);
         // converge the other side immediately when local had its own changes
         const merged = snapState(state);
-        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null };
+        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null, colorNames: remote.colorNames || {} };
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();

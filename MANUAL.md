@@ -127,7 +127,8 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing 
    (On desktop, the timer button on a task row jumps here pre-selecting it.)
 2. Press play. Pause holds the clock, stop saves a record.
 3. Records group under Today / Previously and can be deleted (undoable).
-   Today's records have a copy button producing e.g. `5h - Write report`.
+   **Copy day** next to Today copies the whole day as text, e.g.
+   `5h - Write report` per line.
 4. The running timer keeps going across page reloads — the total on Home counts it live.
 
 ## Import and export

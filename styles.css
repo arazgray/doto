@@ -464,8 +464,11 @@ body.view-time{
   & .time-rec-main{flex:1;min-width:0}
   & .time-rec-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
-.rec-day{font-size:12px;font-weight:500;color:var(--muted);margin:10px 0 2px}
-.rec-day:first-child{margin-top:2px}
+.rec-day-head{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
+.rec-day-head:first-child{margin-top:2px}
+.rec-day-head > span{font-size:12px;font-weight:500;color:var(--muted)}
+.rec-day-head .btn-ghost{font-size:12px;padding:5px 10px;margin-left:auto}
+.rec-day-head .btn-ghost .material-icons-outlined{font-size:15px}
 .time-pick{
   display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid transparent;border-radius:10px;cursor:pointer;
   & .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
