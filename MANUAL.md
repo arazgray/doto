@@ -8,6 +8,7 @@
 ## Contents
 
 - [Getting started](#getting-started)
+- [Account and sync](#account-and-sync)
 - [Views](#views)
 - [Tasks](#tasks)
 - [Search, filters and sorting](#search-filters-and-sorting)
@@ -27,6 +28,31 @@
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
 Everything is saved automatically in your browser as you type.
+
+## Account and sync
+
+By default your data lives only in this browser. **Account & Sync** (blue
+button at the bottom of the sidebar, or the status pill in the top bar)
+connects your Google Drive for multi-device sync — still with no DoTo server:
+
+1. Open Account & Sync. The first time, paste a Google OAuth client ID (the
+   dialog explains how to create one — it stays in your browser).
+2. **Sign in with Google**, then **Sync now**.
+3. From then on: changes upload automatically a few seconds after you make
+   them, and the app pulls on launch, when the tab regains focus, and when
+   you come back online.
+
+How it works and what to expect:
+
+- The synced copy is a single file in Drive's hidden app folder — only your
+  Google account can see it.
+- Merging is per item: edits made on one device at a time always merge
+  cleanly. If the same task was edited on two devices between syncs, the
+  newest version wins and the app tells you.
+- Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
+  or `Synced Xs ago`.
+- Signing out keeps a full copy on that device; signing back in merges it.
+- Import / Export moved into the Account dialog (same JSON backup as before).
 
 ## Views
 
@@ -101,7 +127,9 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing 
 ## Import and export
 
 - **Export JSON** (sidebar): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks and time records. Back these up — your data lives only in this browser.
-- **Import** (sidebar, multi-select): accepts DoTo exports (appended as new lists) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
+- **Import** (Account dialog, multi-select): pick the source — **Auto-detect**,
+  **DoTo backup**, or **Google Tasks** — then choose files. Accepts DoTo exports
+  (appended as new lists) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
 
 ## Installing the app
 
@@ -125,7 +153,7 @@ Installing requires the hosted `https://` address — it does not work from a do
 Only from a JSON export (sidebar → Export JSON). Export regularly; there is no cloud copy.
 
 **Does it sync between phone and desktop?**
-Not yet — each browser has its own data. Use export/import to move between devices.
+Yes — via Account & Sync (Google Drive). Sign in on each device and both stay merged.
 
 **Can I share a list with someone?**
 Not yet — export the JSON and send them the file; they can import it.

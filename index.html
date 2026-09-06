@@ -40,6 +40,7 @@
     <button id="clearSearch" class="icon-btn sm hidden" aria-label="Clear search"><span class="material-icons-outlined">close</span></button>
   </div>
   <div class="topbar-actions">
+    <button id="syncPill" class="sync-pill" title="Sync status — open Account & Sync"><span class="dot"></span><span id="syncPillText">Not synced yet</span></button>
     <button id="sortBtn" class="icon-btn" aria-label="Sort tasks" title="Sort"><span class="material-icons-outlined">swap_vert</span></button>
     <button id="themeBtn" class="icon-btn" aria-label="Toggle theme" title="Theme"><span class="material-icons-outlined">dark_mode</span></button>
     <div id="sortMenu" class="menu hidden" role="menu">
@@ -76,10 +77,7 @@
       </div>
       <div class="sidebar-foot">
         <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed</label>
-        <div class="io-row">
-          <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
-          <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
-        </div>
+        <button id="accountBtn" class="btn-account"><span class="material-icons-outlined">cloud</span><span class="t">Account &amp; Sync</span><span id="accountState" class="s"></span></button>
         <div class="io-row">
           <a id="manualBtn" class="btn-ghost" href="manual.html" target="_blank" rel="noopener"><span class="material-icons-outlined">menu_book</span> Manual</a>
           <button id="shortcutsBtn" class="btn-ghost"><span class="material-icons-outlined">keyboard</span> Shortcuts</button>
@@ -384,6 +382,45 @@
     </div>
     <ul id="paletteList" class="palette-list" role="listbox" aria-label="Results"></ul>
     <p class="muted small palette-hint">Up/Down navigate · Enter run · Esc close</p>
+  </div>
+</div>
+<div id="accountScrim" class="modal-scrim hidden">
+  <div class="modal account-modal" role="dialog" aria-modal="true" aria-label="Account and sync">
+    <h3>Account &amp; Sync</h3>
+    <p id="accountEmail" class="muted small">Not signed in.</p>
+    <p id="accountLast" class="muted small"></p>
+    <div id="accountSetup" class="setup-box hidden">
+      <p class="small"><strong>One-time setup:</strong> create a Google OAuth client ID, then paste it below. It stays in this browser.</p>
+      <ol class="small">
+        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud → Credentials</a> → Create → OAuth client ID → Web application.</li>
+        <li>Authorized JavaScript origins: add <code>https://arazgray.github.io</code> (plus <code>http://localhost:8000</code> for local testing).</li>
+        <li>Enable the <strong>Google Drive API</strong> for the project. Paste the client ID here.</li>
+      </ol>
+      <div class="setup-row">
+        <input id="clientIdInput" type="text" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" aria-label="Google OAuth client ID" dir="ltr" />
+        <button type="button" id="clientIdSave" class="btn-primary">Save</button>
+      </div>
+    </div>
+    <div class="modal-actions account-actions">
+      <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
+      <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
+      <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
+    </div>
+    <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
+    <div class="sidebar-divider"></div>
+    <div class="io-row import-row">
+      <select id="importMode" aria-label="Import source">
+        <option value="auto">Auto-detect</option>
+        <option value="doto">DoTo backup</option>
+        <option value="google">Google Tasks</option>
+      </select>
+      <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
+      <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
+    </div>
+    <p class="muted small">Synced copy lives in your Drive's hidden app folder — only you can see it. This device always works offline; sync merges changes per item.</p>
+    <div class="modal-actions">
+      <button type="button" id="accountClose" class="btn-primary">Done</button>
+    </div>
   </div>
 </div>
 <div id="helpScrim" class="modal-scrim hidden">

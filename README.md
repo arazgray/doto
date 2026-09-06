@@ -4,7 +4,7 @@ A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
 
-**Live app: <https://arazgray.github.io/doto/>**
+**Live app: <https://arazgray.github.io/doto/>** 
 **Manual: [MANUAL.md](MANUAL.md)** (also readable in-app via sidebar → Manual,
 or on the [GitHub wiki](https://github.com/arazgray/doto/wiki)).
 
@@ -16,8 +16,20 @@ Open `index.html` directly in a browser, or serve the folder:
 python3 -m http.server
 ```
 
-## Install as app (PWA)
+## Account & Sync (Google Drive, no backend)
 
+Local-first + Drive merge: sign in from the blue **Account & Sync** button
+(sidebar bottom) or the navbar status pill. Synced file lives in Drive's
+hidden `appDataFolder`. Per-item three-way merge against the last synced
+snapshot (`doto-sync` in localStorage); both-sides-edited items resolve
+newest-wins with a toast. Auto-push (8s debounce) + pull on load, focus and
+reconnect. Details in [MANUAL.md](MANUAL.md#account-and-sync).
+
+Requires a Google OAuth client ID (Drive API enabled, origin
+`https://arazgray.github.io`): paste it once in the Account dialog, or set
+`GOOGLE_CLIENT_ID` in `app.js`.
+
+## Install as app (PWA)
 Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
 installable and works offline:
 

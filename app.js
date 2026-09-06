@@ -65,6 +65,7 @@ function migrate(s) {
   s.tasks.forEach((t) => { if (legacyColor[t.color]) t.color = legacyColor[t.color]; else if (!validColors.has(t.color)) t.color = 'default'; });
   if (s.filters && s.filters.color && !validColors.has(s.filters.color)) s.filters.color = '';
   if (!Array.isArray(s.times)) s.times = [];
+  if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
   return s;
 }
@@ -90,6 +91,7 @@ function load() {
 let quotaWarned = false;
 function save() {
   try {
+    state.dirtyAt = Date.now();
     localStorage.setItem(LS_KEY, JSON.stringify(state));
   } catch (err) {
     if (err && err.name === 'QuotaExceededError' && !quotaWarned) {
@@ -97,6 +99,7 @@ function save() {
       try { toast('Browser storage is full — export a JSON backup to be safe'); } catch {}
     }
   }
+  try { schedulePush(); } catch {}
 }
 
 // Last-resort error surface: never die silently, never spam.
@@ -301,10 +304,10 @@ function bindShortcuts() {
     if (row) { ui.selectedId = row.dataset.id; paintSelection(false); }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closePalette(); closeHelp(); clearTimeout(pendingG); pendingG = 0; return; }
+    if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); clearTimeout(pendingG); pendingG = 0; return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? closePalette() : openPalette(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (typingNow() || paletteOpen() || helpOpen() || !$('#modalScrim').classList.contains('hidden')) return;
+    if (typingNow() || paletteOpen() || helpOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
     if (pendingG) {
       clearTimeout(pendingG); pendingG = 0;
       const gk = e.key.toLowerCase();
@@ -1855,9 +1858,9 @@ function importTimes(arr, taskIdMap) {
   });
   return n;
 }
-function detectAndImport(parsed, fileName) {
+function detectAndImport(parsed, fileName, mode = 'auto') {
   // 1. DoTo native export
-  if (parsed && Array.isArray(parsed.lists) && Array.isArray(parsed.tasks)) {
+  if ((mode === 'auto' || mode === 'doto') && parsed && Array.isArray(parsed.lists) && Array.isArray(parsed.tasks)) {
     const idMap = new Map();
     parsed.lists.forEach((l) => { const nid = uid(); idMap.set(l.id, nid); state.lists.push({ id: nid, name: String(l.name || 'Imported').slice(0, 60), createdAt: l.createdAt || Date.now() }); });
     const taskIdMap = new Map();
@@ -1874,6 +1877,7 @@ function detectAndImport(parsed, fileName) {
     });
     return { lists: parsed.lists.length, tasks: parsed.tasks.length, times: importTimes(parsed.times, taskIdMap) };
   }
+  if (mode === 'doto') throw new Error('Not a DoTo backup — switch the source to Google Tasks or Auto-detect');
   const base = (fileName || 'Imported').replace(/\.json$/i, '').split('/').pop() || 'Imported';
   const niceBase = base === 'Tasks' ? 'My Tasks' : base;
   // 2. Full Takeout backup: one file holding many lists
@@ -1906,15 +1910,17 @@ function detectAndImport(parsed, fileName) {
     state.lists.push(list); state.tasks.push(...tasks);
     return { lists: 1, tasks: tasks.length };
   }
-  throw new Error('Unrecognized JSON — expected DoTo export or Google Takeout Tasks file');
+  throw new Error(mode === 'google'
+    ? 'Not a Google Tasks file — switch the source to DoTo backup or Auto-detect'
+    : 'Unrecognized JSON — expected DoTo export or Google Takeout Tasks file');
 }
-async function importFiles(files) {
+async function importFiles(files, mode = 'auto') {
   let L = 0, T = 0, TM = 0; const errors = [];
   for (const f of files) {
     try {
       const text = await f.text();
       const parsed = JSON.parse(text);
-      const r = detectAndImport(parsed, f.name);
+      const r = detectAndImport(parsed, f.name, mode);
       L += r.lists; T += r.tasks; TM += r.times || 0;
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
@@ -1930,6 +1936,316 @@ function renderAll() {
   applySizes(); renderNav(); renderCurrentView(); if (ui.detailId) renderDetail();
   if (ui.selectedId && !getTask(ui.selectedId)) ui.selectedId = null;
   paintSelection(false);
+}
+
+/* ---------- Google Drive sync (Account & Sync, no backend) ----------
+   Local-first: this device always works offline. When signed in, changes
+   push to Drive's hidden app folder (debounced) and pull on launch,
+   focus and reconnect. Merge is per-item, three-way against the last
+   synced snapshot; both-sides-edited items resolve newest-wins. */
+const GOOGLE_CLIENT_ID = ''; // default; per-browser override in the Account dialog
+const DRIVE_FILE = 'doto-state.json';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
+const SYNC_KEY = 'doto-sync';
+const CLIENT_KEY = 'doto-google-client-id';
+
+function googleClientId() {
+  try { return localStorage.getItem(CLIENT_KEY) || GOOGLE_CLIENT_ID; } catch { return GOOGLE_CLIENT_ID; }
+}
+function loadSyncMeta() {
+  try {
+    const m = JSON.parse(localStorage.getItem(SYNC_KEY));
+    if (m && typeof m === 'object') return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, ...m };
+  } catch {}
+  return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null };
+}
+let syncMeta = loadSyncMeta();
+let syncStatus = 'signedout'; // setup|signedout|syncing|ok|error
+function saveSyncMeta() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncMeta)); } catch {} }
+function setSync(s) { syncStatus = s; paintSync(); }
+
+function fmtAgo(ts) {
+  const d = Date.now() - ts;
+  if (d < 10000) return 'just now';
+  if (d < 60000) return Math.floor(d / 1000) + 's ago';
+  if (d < 3600e3) return Math.floor(d / 60000) + 'm ago';
+  if (d < 864e5) return Math.floor(d / 3600e3) + 'h ago';
+  return new Date(ts).toLocaleDateString();
+}
+function syncLabel() {
+  if (!googleClientId()) return ['Setup needed', 'warn'];
+  if (!navigator.onLine) return ['Offline', 'warn'];
+  if (syncStatus === 'syncing') return ['Syncing…', 'busy'];
+  if (syncStatus === 'error') return ['Sync failed — retry', 'err'];
+  if (syncStatus === 'ok') return [syncMeta.lastSyncedAt ? 'Synced ' + fmtAgo(syncMeta.lastSyncedAt) : 'Synced', 'ok'];
+  return [syncMeta.lastSyncedAt ? 'Sign in to sync' : 'Not synced yet', syncMeta.lastSyncedAt ? 'warn' : ''];
+}
+function paintSync() {
+  const pair = syncLabel(), label = pair[0], cls = pair[1];
+  const pill = $('#syncPill'), txt = $('#syncPillText');
+  if (pill) pill.className = 'sync-pill' + (cls ? ' ' + cls : '');
+  if (txt) txt.textContent = label;
+  const st = $('#accountState');
+  if (st) st.textContent = syncMeta.email ? (syncStatus === 'ok' && syncMeta.lastSyncedAt ? fmtAgo(syncMeta.lastSyncedAt) : label) : '';
+  const em = $('#accountEmail');
+  if (em) em.textContent = syncMeta.email ? 'Signed in as ' + syncMeta.email : 'Not signed in.';
+  const last = $('#accountLast');
+  if (last) last.textContent = syncMeta.lastSyncedAt ? 'Last synced: ' + new Date(syncMeta.lastSyncedAt).toLocaleString() : '';
+  const si = $('#signInBtn'), so = $('#signOutBtn');
+  if (si) si.classList.toggle('hidden', !!syncMeta.email);
+  if (so) so.classList.toggle('hidden', !syncMeta.email);
+  const at = $('#autoSyncToggle');
+  if (at && document.activeElement !== at) at.checked = !!syncMeta.auto;
+  const setup = $('#accountSetup');
+  if (setup) setup.classList.toggle('hidden', !!googleClientId());
+}
+
+/* ----- Google auth (GIS token flow, client-side only) ----- */
+let gisReady = null, tokenClient = null;
+function gisLoad() {
+  if (gisReady) return gisReady;
+  gisReady = new Promise((res, rej) => {
+    if (window.google && google.accounts && google.accounts.oauth2) return res();
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client';
+    sc.async = true; sc.defer = true;
+    sc.onload = () => res();
+    sc.onerror = () => rej(new Error('net'));
+    document.head.appendChild(sc);
+  });
+  return gisReady;
+}
+function tokenValid() {
+  const t = syncMeta.token;
+  return !!(t && t.access_token && t.expires_at - Date.now() > 60000);
+}
+async function ensureToken(mode) {
+  if (tokenValid()) return syncMeta.token.access_token;
+  await gisLoad();
+  const cid = googleClientId();
+  if (!cid) throw new Error('setup');
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cid, scope: DRIVE_SCOPE, callback: () => {} });
+  }
+  const attempt = (prompt) => new Promise((resolve) => {
+    tokenClient.callback = (r) => resolve(r);
+    try { tokenClient.requestAccessToken({ prompt }); } catch { resolve(null); }
+  });
+  let tok = await attempt('');
+  if ((!tok || !tok.access_token) && mode === 'popup') tok = await attempt('consent');
+  if (!tok || !tok.access_token) throw new Error('auth');
+  syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000 };
+  saveSyncMeta();
+  fetchEmail().catch(() => {});
+  return syncMeta.token.access_token;
+}
+async function fetchEmail() {
+  if (!syncMeta.token) return;
+  const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + syncMeta.token.access_token } });
+  if (!r.ok) throw new Error('email');
+  const j = await r.json();
+  if (j.email && j.email !== syncMeta.email) { syncMeta.email = j.email; saveSyncMeta(); paintSync(); }
+}
+
+/* ----- Drive appDataFolder API ----- */
+async function driveFetch(url, opts = {}, mode = 'silent') {
+  const at = await ensureToken(mode);
+  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at } });
+  if (r.status === 401 || r.status === 403) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  return r;
+}
+async function driveFind(mode) {
+  const q = encodeURIComponent(`'appDataFolder' in parents and name = '${DRIVE_FILE}' and trashed = false`);
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&fields=files(id,modifiedTime)`, {}, mode);
+  if (!r.ok) throw new Error('drive');
+  const j = await r.json();
+  return (j.files && j.files[0]) || null;
+}
+async function driveDownload(id, mode) {
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {}, mode);
+  if (!r.ok) throw new Error('drive');
+  return r.json();
+}
+async function driveUpload(data, mode) {
+  const body = JSON.stringify(data);
+  if (syncMeta.fileId) {
+    const r = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${syncMeta.fileId}?uploadType=media`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body,
+    }, mode);
+    if (!r.ok) throw new Error('drive');
+    return r.json();
+  }
+  const meta = { name: DRIVE_FILE, parents: ['appDataFolder'] };
+  const boundary = 'doto' + Date.now();
+  const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+  const r = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipart,
+  }, mode);
+  if (!r.ok) throw new Error('drive');
+  const j = await r.json();
+  syncMeta.fileId = j.id;
+  return j;
+}
+
+/* ----- three-way merge (base = last synced snapshot) ----- */
+function snapState(s) {
+  return JSON.parse(JSON.stringify({ lists: s.lists || [], tasks: s.tasks || [], times: s.times || [], timer: s.timer || null }));
+}
+const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function mergeArrays(base, local, remote, takeRemote) {
+  const bi = new Map(base.map((x) => [x.id, x]));
+  const li = new Map(local.map((x) => [x.id, x]));
+  const ri = new Map(remote.map((x) => [x.id, x]));
+  const out = [];
+  let conflicts = 0, fromRemote = 0;
+  new Set([...bi.keys(), ...li.keys(), ...ri.keys()]).forEach((id) => {
+    const b = bi.get(id), l = li.get(id), r = ri.get(id);
+    if (!b) { // created on one side (ids are unique, both-sides-create is a no-op tie)
+      if (l && r && !recEq(l, r)) conflicts++;
+      out.push(l || r);
+      if (r && !l) fromRemote++;
+      return;
+    }
+    const dl = !l || !recEq(l, b); // deleted counts as changed
+    const dr = !r || !recEq(r, b);
+    if (!dl && !dr) { out.push(l); return; }
+    if (dl && !dr) { if (l) out.push(l); return; } // kept local edit / local delete wins
+    if (!dl && dr) { if (r) { out.push(r); fromRemote++; } return; } // remote edit / remote delete wins
+    conflicts++; // edited on both sides: newest file wins
+    if (l && r) { if (takeRemote) { out.push(r); fromRemote++; } else out.push(l); }
+    else if (r) { out.push(r); fromRemote++; }
+    else if (l) out.push(l);
+  });
+  return { arr: out, conflicts, fromRemote };
+}
+function applyRemote(remote, remoteTime) {
+  if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null };
+  const takeRemote = remoteTime >= (state.dirtyAt || 0);
+  const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote);
+  const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote);
+  const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote);
+  let timer = state.timer, tConflict = 0;
+  const bt = base.timer || null, rt = remote.timer || null;
+  if (!recEq(timer, bt) && !recEq(rt, bt) && takeRemote) { timer = rt; tConflict = 1; }
+  else if (recEq(timer, bt)) timer = rt;
+  state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
+  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict;
+  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote;
+  save(); renderAll();
+  syncMeta.base = snapState(state);
+  syncMeta.lastSyncedAt = Date.now();
+  saveSyncMeta();
+  return { conflicts, fresh };
+}
+
+let syncing = false, lastPullAt = 0, pushTimer = 0;
+function schedulePush() {
+  if (!syncMeta.auto) return;
+  if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { pushNow('silent').catch(() => {}); }, 8000);
+}
+async function pushNow(mode) {
+  if (syncing || !navigator.onLine || !googleClientId()) return;
+  if (!syncMeta.auto && mode === 'silent') return;
+  if (!syncMeta.email && !syncMeta.token) return;
+  syncing = true; setSync('syncing');
+  try {
+    await driveUpload(state, mode);
+    syncMeta.base = snapState(state);
+    syncMeta.lastSyncedAt = Date.now();
+    saveSyncMeta();
+    setSync('ok');
+  } catch (e) {
+    setSync(e && (e.message === 'auth' || e.message === 'setup') ? 'signedout' : 'error');
+  } finally { syncing = false; paintSync(); }
+}
+async function pullNow(mode) {
+  if (syncing || !navigator.onLine || !googleClientId()) return;
+  if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
+  syncing = true; lastPullAt = Date.now(); setSync('syncing');
+  try {
+    const found = await driveFind(mode);
+    if (!found) {
+      if (state.lists.length || state.tasks.length || syncMeta.fileId) await driveUpload(state, mode);
+      syncMeta.base = snapState(state);
+      syncMeta.lastSyncedAt = Date.now();
+      saveSyncMeta();
+    } else {
+      syncMeta.fileId = found.id;
+      const remoteTime = Date.parse(found.modifiedTime) || 0;
+      if (remoteTime > (syncMeta.lastSyncedAt || 0) || !syncMeta.base) {
+        const remote = await driveDownload(found.id, mode);
+        const res = applyRemote(remote, remoteTime);
+        // converge the other side immediately when local had its own changes
+        const merged = snapState(state);
+        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null };
+        if (!recEq(merged, rsnap)) await driveUpload(state, mode);
+        syncMeta.lastSyncedAt = Date.now();
+        saveSyncMeta();
+        if (res.conflicts) toast(`Sync: ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
+        else if (res.fresh) toast(`Sync: ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
+      } else {
+        syncMeta.base = snapState(state);
+        syncMeta.lastSyncedAt = Date.now();
+        saveSyncMeta();
+      }
+    }
+    setSync('ok');
+  } catch (e) {
+    setSync(e && (e.message === 'auth' || e.message === 'setup') ? 'signedout' : 'error');
+  } finally { syncing = false; paintSync(); }
+}
+async function syncNowFlow() {
+  if (!googleClientId()) { openAccount(); return; }
+  if (!syncMeta.email && !tokenValid()) {
+    try { await ensureToken('popup'); await fetchEmail(); }
+    catch (e) { setSync(e && e.message === 'setup' ? 'setup' : 'signedout'); paintSync(); return; }
+  }
+  await pullNow('popup');
+}
+
+function openAccount() { paintSync(); $('#accountScrim').classList.remove('hidden'); }
+function closeAccount() { $('#accountScrim').classList.add('hidden'); }
+function bindSync() {
+  $('#syncPill').onclick = openAccount;
+  $('#accountBtn').onclick = openAccount;
+  $('#accountClose').onclick = closeAccount;
+  $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
+  $('#signInBtn').onclick = async () => {
+    try { await ensureToken('popup'); await fetchEmail(); await pullNow('popup'); }
+    catch (e) { setSync(!googleClientId() ? 'setup' : 'signedout'); paintSync(); }
+  };
+  $('#signOutBtn').onclick = () => {
+    if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.token) {
+      try { google.accounts.oauth2.revoke(syncMeta.token.access_token, () => {}); } catch {}
+    }
+    syncMeta.token = null; syncMeta.email = '';
+    saveSyncMeta(); setSync('signedout'); paintSync();
+    toast('Signed out — this device keeps its own copy');
+  };
+  $('#syncNowBtn').onclick = () => { syncNowFlow().catch(() => {}); };
+  $('#autoSyncToggle').onchange = (e) => {
+    syncMeta.auto = e.target.checked; saveSyncMeta(); paintSync();
+    if (syncMeta.auto) schedulePush();
+  };
+  $('#clientIdSave').onclick = () => {
+    const v = $('#clientIdInput').value.trim();
+    if (!v) return;
+    try { localStorage.setItem(CLIENT_KEY, v); } catch {}
+    $('#clientIdInput').value = '';
+    paintSync();
+    toast('Client ID saved — sign in to start syncing');
+  };
+  window.addEventListener('online', () => { paintSync(); pullNow('silent').catch(() => {}); });
+  window.addEventListener('offline', () => paintSync());
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
+  });
+  window.addEventListener('load', () => { pullNow('silent').catch(() => {}); });
+  setInterval(paintSync, 5000);
+  paintSync();
 }
 
 function bind() {
@@ -2024,7 +2340,7 @@ function bind() {
   $('#exportBtn2').onclick = exportJSON;
   const pick = () => $('#importFile').click();
   $('#importBtn2').onclick = pick;
-  $('#importFile').onchange = (e) => { if (e.target.files.length) importFiles([...e.target.files]); e.target.value = ''; };
+  $('#importFile').onchange = (e) => { if (e.target.files.length) importFiles([...e.target.files], ($('#importMode') || {}).value || 'auto'); e.target.value = ''; };
 
   // search (onsearch covers the native × clear button of type=search)
   const s = $('#searchInput');
@@ -2101,7 +2417,7 @@ function bind() {
 
   // detail bindings
   $('#detailBack').onclick = closeDetail; $('#detailClose').onclick = closeDetail;
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderNav(); renderCurrentView(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
   $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };
@@ -2126,6 +2442,9 @@ function bind() {
 
   // keyboard shortcuts + command palette
   bindShortcuts();
+
+  // Google Drive sync
+  bindSync();
 
   // resizers (desktop)
   makeResizable($('#sideResizer'), (ev) => {    state.prefs.sideW = Math.min(420, Math.max(220, ev.clientX));
