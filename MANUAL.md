@@ -81,7 +81,9 @@ Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
 - **Rename inline**: double-click the title.
 - **Color**: tap the color dot on the row. Colors carry your own labels, and
   you can add fully custom colors too (Sync & Settings → Color labels, e.g.
-  red for Home, blue for Work, a new teal for Side projects). Custom colors
+  red for Home, blue for Work, a new teal for Side projects). Any color can
+  be deleted when no task uses it (otherwise the app tells you to recolor
+  those tasks first); built-ins can be restored with Reset. Custom colors
   and labels sync, export and import alongside everything else.
   **Weight / Importance**: tap the badges on the row.
 - **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.

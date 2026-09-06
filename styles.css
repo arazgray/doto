@@ -822,16 +822,16 @@ a.btn-ghost{text-decoration:none}
 .set-group{margin:6px 0}
 .set-group .d-label{margin-bottom:10px}
 .color-names{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 10px}
-.color-row{display:flex;align-items:center;gap:8px;min-width:0}
+.color-row{display:flex;align-items:center;gap:4px;min-width:0}
 .color-row .dot{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 1px var(--line)}
-.color-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;outline:0;min-width:0;background:var(--bg)}
+.color-row input{flex:1;border:1px solid var(--line);border-left:3px solid var(--c-dot, var(--line));border-radius:8px;padding:6px 10px;font-size:13px;outline:0;min-width:0;background:var(--bg)}
 .color-row input:focus{border-color:var(--blue)}
-.color-row .icon-btn.sm{width:26px;height:26px;flex:none}
-.color-add-row{margin-top:8px;gap:6px}
-.color-add-row input[type="color"]{width:30px;height:30px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:none;cursor:pointer}
+.color-row .icon-btn.sm{width:20px;height:20px;flex:none}
+.color-row .icon-btn.sm .material-icons-outlined{font-size:15px}
+.color-add-row{margin-top:8px;gap:6px;align-items:center}
+.color-add-row input[type="color"]{width:28px;height:28px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:none;cursor:pointer}
 .color-add-row #customColorName{padding:6px 10px;font-size:13px}
-.color-add-row #customColorAdd{padding:7px 12px;font-size:13px}
-.color-add-row input[type="color"]{width:42px;height:42px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--bg);flex:none;cursor:pointer}
+.color-add-row #customColorAdd{padding:6px 10px;font-size:13px}
 .sync-err{color:var(--danger);font-size:13px;margin:6px 0 0}
 .account-actions{justify-content:flex-start;flex-wrap:wrap}
 
