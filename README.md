@@ -1,16 +1,14 @@
 # DoTo — Task Manager, Simple.
-
 *Yet another todo app? Really? No — this is what I needed, and I wrote it for myself. Use it or leave it, it's up to you.*
-- Made by someone who actully uses a ToDo app.
+
+**- Simple, fast, powerful, privacy-first and offline — hosted on GitHub, synced with your own Google Drive.**
+**- Made by someone who actully uses a ToDo app.**
 
 ![DoTo screenshot](screenshot.png)
 
 A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
-
-**Simple, fast, powerful, privacy-first and offline — hosted on GitHub, synced
-with your own Google Drive.**
 
 **Live app: <https://arazgray.github.io/doto/>**
 
