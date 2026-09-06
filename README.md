@@ -12,6 +12,20 @@ Open `index.html` directly in a browser, or serve the folder:
 python3 -m http.server
 ```
 
+## Install as app (PWA)
+
+Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
+installable and works offline:
+
+- **Desktop Chrome / Edge** — open the site, then *Install DoTo…* from the
+  address bar (or ⋮ menu → *Save and share → Install*).
+- **Android Chrome** — ⋮ menu → *Add to Home screen* / *Install app*.
+- **iPhone / iPad** — Share → *Add to Home Screen* (uses the touch icon +
+  standalone display; requires hosting over `http(s)`, not `file://`).
+
+Installability is provided by `manifest.webmanifest` + `sw.js` (offline app
+shell). Plain `file://` usage still works, minus install/offline.
+
 ## Features
 
 **Views**
@@ -87,6 +101,7 @@ ipapi.co; nothing else ever leaves the browser.
 index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, modal, toast
 styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark
 app.js       — all logic (~1900 lines), vanilla JS
+manifest.webmanifest + sw.js + icon-*.png — PWA install (Chrome/desktop/mobile, iOS Add to Home) + offline shell
 ```
 
 Conventions: no emojis in code, no `prompt()`/`confirm()` (in-app modal

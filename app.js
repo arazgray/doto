@@ -1928,3 +1928,10 @@ renderAll();
     toast(`Removed ${removed.length} duplicate recurring tasks`, () => { state.tasks.push(...removed); save(); renderAll(); });
   }
 })();
+
+// PWA: offline + installable (Chrome/Edge desktop & Android, iOS Add to Home)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
