@@ -13,24 +13,30 @@ with full touch + mouse parity.
 
 ## How it compares
 
-| | **DoTo** | **Google Tasks** | **Microsoft To Do** | **Todoist** | **Any.do** |
-|---|---|---|---|---|---|
-| Price | Free, no account needed | Free (Google account) | Free (MS account) | Freemium (~$48/yr Pro) | Freemium (~$60/yr Premium) |
-| Sync | DIY via your Google Drive | Native Google cloud | Native MS cloud | Native cloud, fastest | Native cloud |
-| Offline | Excellent (local-first PWA) | Good | Good | Good | OK |
-| Platforms | Any browser (PWA install) | Web, Android, iOS | Web, Win, Mac, Android, iOS | Everything + wearables | Web, Android, iOS, Mac |
-| Subtasks | 1 level, inline preview + progress | 1 level, bare | Steps with files | Unlimited nesting | Subtasks + notes |
-| Recurrence | Strong (custom every-N, weekday picker) | Basic (needs Calendar) | Basic–medium | Excellent + natural language | Good |
-| Priorities | Weight × importance × color, all filterable | Starred only | Important / My Day | P1–P4 + labels | Priority + tags |
-| Views | Home digest, list, board, calendar, time tracker | Lists only | Lists, My Day, Planned | List, board, calendar | List, board, calendar, moments |
-| Time tracking | Built-in stopwatch + history | None | None | Via integrations | Via integrations |
-| Search & filters | Good (search + 3 filters + chips) | Basic search | Basic | Best in class (query filters) | Good |
-| Collaboration | None | Minimal | List sharing | Teams, comments, roles | Sharing, chat, assignment |
-| Natural-language input | No | No | No (presets) | Yes, best in class | Partial |
-| Keyboard-first use | Good (palette, shortcuts) | Poor | Medium | Excellent | Medium |
-| Push notifications & reminders | In Progress | Yes | Yes | Yes | Yes |
-| Privacy | Best: local by default | Google-profiled | MS-profiled | Cloud-profiled | Cloud-profiled |
-| Open source | Yes (MIT) | No | No | No | No |
+<!-- Good = light green, not-so-good = light gray (bgcolor for GitHub, style for other renderers). -->
+<table>
+<thead>
+<tr><th></th><th><strong>DoTo</strong></th><th><strong>Google Tasks</strong></th><th><strong>Microsoft To Do</strong></th><th><strong>Todoist</strong></th><th><strong>Any.do</strong></th></tr>
+</thead>
+<tbody>
+<tr><td>Price</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Free, no account needed</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Free (Google account)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Free (MS account)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Freemium (~$48/yr Pro)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Freemium (~$60/yr Premium)</td></tr>
+<tr><td>Sync</td><td bgcolor="#d4edda" style="background-color:#d4edda;">DIY via your Google Drive</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Native Google cloud</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Native MS cloud</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Native cloud, fastest</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Native cloud</td></tr>
+<tr><td>Offline</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Excellent (local-first PWA)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">OK</td></tr>
+<tr><td>Platforms</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Any browser (PWA install)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Web, Android, iOS</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Web, Win, Mac, Android, iOS</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Everything + wearables</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Web, Android, iOS, Mac</td></tr>
+<tr><td>Subtasks</td><td bgcolor="#d4edda" style="background-color:#d4edda;">1 level, inline preview + progress</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">1 level, bare</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Steps with files</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Unlimited nesting</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Subtasks + notes</td></tr>
+<tr><td>Recurrence</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Strong (custom every-N, weekday picker)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Basic (needs Calendar)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Basic–medium</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Excellent + natural language</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good</td></tr>
+<tr><td>Priorities</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Weight × importance × color, all filterable</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Starred only</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Important / My Day</td><td bgcolor="#d4edda" style="background-color:#d4edda;">P1–P4 + labels</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Priority + tags</td></tr>
+<tr><td>Views</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Home digest, list, board, calendar, time tracker</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">List, board, calendar, moments</td></tr>
+<tr><td>Time tracking</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Built-in stopwatch + history</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Via integrations</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Via integrations</td></tr>
+<tr><td>Search &amp; filters</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good (search + 3 filters + chips)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Basic search</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Basic</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Best in class (query filters)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good</td></tr>
+<tr><td>Collaboration</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Minimal</td><td bgcolor="#d4edda" style="background-color:#d4edda;">List sharing</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Teams, comments, roles</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Sharing, chat, assignment</td></tr>
+<tr><td>Natural-language input</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No (presets)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes, best in class</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Partial</td></tr>
+<tr><td>Keyboard-first use</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Good (palette, shortcuts)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Poor</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Medium</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Excellent</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Medium</td></tr>
+<tr><td>Push notifications &amp; reminders</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">In Progress</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes</td></tr>
+<tr><td>Privacy</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Best: local by default</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Google-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">MS-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Cloud-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">Cloud-profiled</td></tr>
+<tr><td>Open source</td><td bgcolor="#d4edda" style="background-color:#d4edda;">Yes (MIT)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">No</td></tr>
+</tbody>
+</table>
 
 ## Run it
 

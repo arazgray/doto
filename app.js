@@ -1319,8 +1319,10 @@ function renderCalendar() {
   const tIso = todayIso(), sel = calDaySel();
   $('#calTitle').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const dow = $('#calDow'); dow.innerHTML = '';
-  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((d) => {
-    const s = document.createElement('span'); s.textContent = d; dow.appendChild(s);
+  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((d, idx) => {
+    const s = document.createElement('span'); s.textContent = d;
+    if (idx >= 5) s.classList.add('weekend');
+    dow.appendChild(s);
   });
   const dated = allFiltered().filter((t) => t.date && (!t.done || state.showCompleted));
   const byDay = new Map();
@@ -1343,6 +1345,7 @@ function renderCalendar() {
     const iso = `${Y}-${String(M).padStart(2, '0')}-${String(dn).padStart(2, '0')}`;
     const list = (byDay.get(iso) || []).sort(sortFn());
     const openN = list.filter((t) => !t.done).length;
+    if ((i % 7) >= 5) cell.classList.add('weekend');
     if (iso === tIso) cell.classList.add('today');
     if (iso === sel) cell.classList.add('selected');
     if (openN && iso < tIso) cell.classList.add('has-overdue');

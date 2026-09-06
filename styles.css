@@ -503,16 +503,20 @@ body.view-cal{
 .cal-dow{
   display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;
   & span{text-align:center;font-size:11px;font-weight:500;color:var(--muted);padding:4px 0}
+  & span.weekend{background:#e9ecef;border-radius:6px}
 }
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal-cell{
   aspect-ratio:1/1;min-height:76px;border:1px solid var(--line-soft);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--bg);cursor:pointer;
   &.out{border:0;background:transparent;cursor:default}
+  &.weekend{background:#e9ecef}
   &.today{border-color:var(--blue)}
   &.selected{box-shadow:0 0 0 2px var(--blue)}
   &.has-overdue .cal-num{color:var(--danger)}
   &.drop-target{outline:2px dashed var(--blue);outline-offset:-2px}
 }
+body.dark .cal-dow span.weekend{background:#2a2b2e}
+body.dark .cal-cell.weekend{background:#232527}
 @keyframes calZoomOut{from{transform:scale(1.06);opacity:0}to{transform:none;opacity:1}}
 @keyframes calZoomIn{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
 @keyframes calSlideL{from{transform:translateX(28px);opacity:.3}to{transform:none;opacity:1}}
