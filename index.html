@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788721017" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788723073" />
 </head>
 <body>
 <header class="topbar">
@@ -90,13 +90,10 @@
     <!-- HOME / SUMMARY VIEW -->
     <section id="viewHome" class="view">
       <div class="home-hero">
-        <div class="home-hero-top">
-          <div>
-            <h1 id="homeGreet">Good day 👋</h1>
-            <p class="eyebrow" id="homeDate"></p>
-            <p class="muted" id="homeSub"></p>
-          </div>
-          <div id="homeClock" class="home-clock" title="Current time"><span id="clockH">--</span><span id="clockColon">:</span><span id="clockM">--</span> <span id="clockAP"></span></div>
+        <div>
+          <h1 id="homeGreet">Good day 👋</h1>
+          <p class="eyebrow" id="homeDate"></p>
+          <p class="muted" id="homeSub"></p>
         </div>
         <div class="home-hero-actions">
           <button id="homeBoardBtn" class="btn-ghost"><span class="material-icons-outlined">view_column</span> Board</button>
@@ -402,7 +399,6 @@
     <p id="accountLast" class="muted small"></p>
     <p id="accountError" class="sync-err hidden"></p>
     <div class="set-group">
-      <p class="d-label">Display</p>
       <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed tasks</label>
       <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
     </div>
@@ -481,6 +477,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788721017"></script>
+<script src="app.js?v=1.0-1788723073"></script>
 </body>
 </html>

@@ -1,5 +1,4 @@
 # DoTo — Task Manager, Simple.
-*Yet another todo app? Really? No — this is what I needed, and I wrote it for myself. Use it or leave it, it's up to you.*
 
 **- Simple, fast, powerful, privacy-first and offline — hosted on GitHub, synced with your own Google Drive.**
 **- Made by someone who actully uses a ToDo app.**
@@ -205,3 +204,6 @@ instead), mobile-first CSS (compact rules ≤600px, breakpoints 700px / 1024px),
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Dev Note
+*Yet another todo app? Really? No — this is what I needed, and I wrote it for myself. Use it or leave it, it's up to you.*

@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788721017'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788723073'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1156,7 +1156,12 @@ function renderHome() {
   const heavy = open.filter((x) => x.weight === 'heavy').sort(sortFn()).slice(0, 8);
   const doneCount = state.tasks.filter((x) => x.done).length;
 
-  $('#homeDate').textContent = 'Today is ' + new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  $('#homeDate').innerHTML = '';
+  $('#homeDate').append(
+    document.createTextNode('Today is ' + new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + ' · '),
+    (() => { const st = document.createElement('strong'); st.id = 'dateClock'; st.innerHTML = '<span id="clockH">--</span><span id="clockColon">:</span><span id="clockM">--</span> <span id="clockAP"></span>'; return st; })()
+  );
+  paintHomeClock();
   const h = new Date().getHours();
   const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
   const nm = (state.userName || '').trim();

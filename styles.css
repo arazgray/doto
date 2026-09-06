@@ -87,7 +87,7 @@ input,select,textarea{font:inherit;color:inherit}
   & + .sidebar-head{margin-top:14px}
 }
 .list-item{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:0 24px 24px 0;text-align:left;width:100%;
+  display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:0 24px 24px 0;text-align:left;width:100%;
   & .material-icons-outlined{color:var(--muted)}
   &.active{
     background:var(--blue-soft);font-weight:500;
@@ -216,11 +216,7 @@ input,select,textarea{font:inherit;color:inherit}
   #homeAddBtn .short-t{display:inline}
 }
 .eyebrow{margin:0 0 8px;color:var(--muted);font-size:14px}
-.home-hero-top{display:flex;align-items:center;gap:16px}
-.home-hero-top > div:first-child{flex:1;min-width:0}
-.home-clock{flex:none;font-size:clamp(26px,7vw,38px);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;white-space:nowrap}
-.home-clock #clockAP{font-size:.42em;font-weight:500;color:var(--muted);letter-spacing:2px}
-#clockColon{transition:opacity .12s}
+.eyebrow strong{color:var(--text)}
 .home-meta{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;align-items:stretch}
 .weather{
   display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line-soft);border-radius:14px;padding:10px 16px;
