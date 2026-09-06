@@ -1,6 +1,7 @@
 # DoTo — Task Manager, Simple.
 
 *Yet another todo app? Really? No — this is what I needed, and I wrote it for myself. Use it or leave it, it's up to you.*
+- Made by someone who actully uses a ToDo app.
 
 ![DoTo screenshot](screenshot.png)
 
@@ -8,7 +9,10 @@ A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
 
-**Live app: <https://arazgray.github.io/doto/>** 
+**Simple, fast, powerful, privacy-first and offline — hosted on GitHub, synced
+with your own Google Drive.**
+
+**Live app: <https://arazgray.github.io/doto/>**
 
 ## Run it
 
@@ -18,14 +22,14 @@ Open `index.html` directly in a browser, or serve the folder:
 python3 -m http.server
 ```
 
-## Account & Sync (Google Drive, no backend)
+## Sync & Settings (Google Drive, no backend)
 
-Local-first + Drive merge: sign in from the blue **Account & Sync** button
+Local-first + Drive merge: sign in from the blue **Sync & Settings** button
 (sidebar bottom) or the navbar status pill. Synced file lives in Drive's
 hidden `appDataFolder`. Per-item three-way merge against the last synced
 snapshot (`doto-sync` in localStorage); both-sides-edited items resolve
 newest-wins with a toast. Auto-push (8s debounce) + pull on load, focus and
-reconnect. Details in [MANUAL.md](MANUAL.md#account-and-sync).
+reconnect. Details in [MANUAL.md](MANUAL.md#sync-and-settings).
 
 Ships with the app's own Google OAuth client ID — just press Sign in.
 (Repo forks need their own ID: set `GOOGLE_CLIENT_ID` in `app.js`, with the
@@ -48,7 +52,8 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 **Views**
 
-- **Home** — greeting, stat cards (open / overdue / due today / completed /
+- **Home** — action toolbar (Board / Calendar / Time / New), personalized
+  greeting, stat cards (open / overdue / due today / completed /
   tracked today), live weather + daily quote, and sections: Overdue, Today's
   tasks, Most important first, Heavy lifting.
 - **List** — a single category with an add bar, quick-add presets (due date,
@@ -64,7 +69,8 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 **Tasks**
 
-- Colors (7), Weight (light / medium / heavy), Importance (low / medium / high)
+- Colors (7) with renameable labels (Sync & Settings → Color labels),
+  Weight (light / medium / heavy), Importance (low / medium / high)
   — all inline-editable from the row via popups, and filterable.
 - Due date + time with overdue / today badges; recurrence (daily, weekly with
   weekday picker, monthly, yearly, or custom "every N") — completing a dated
@@ -80,7 +86,12 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 - Search + color/weight/importance filters apply across all views, with clear
   chips shown on every view. Sort by My order / Date / Importance & weight / Title.
-- Light & dark theme (persisted).
+- Light & dark theme (persisted; toggled in Sync & Settings, `d` key, or palette).
+- Sync & Settings dialog: Google account, your name (used in greetings),
+  display toggles, color labels, Import/Export, sync history log.
+- Forced updates: sidebar → Update wipes the offline cache and reloads the
+  newest release; the app also auto-detects new releases (`version.json`)
+  and offers a one-tap Update.
 - Resizable sidebar and details panel on desktop (persisted).
 - Undo toasts for destructive actions (delete task/list, clear completed,
   time-record delete, duplicate cleanup).
@@ -103,7 +114,7 @@ app). The highlights:
 
 ## Import / Export
 
-- **Export** — sidebar → *Export JSON*: `doto-export-YYYY-MM-DD.json` including
+- **Export** — Sync & Settings → *Export*: `doto-export-YYYY-MM-DD.json` including
   lists, tasks, and time records.
 - **Import** — multi-select `.json`, accepts:
   - DoTo native exports (appended as new lists)
@@ -116,17 +127,23 @@ app). The highlights:
 
 ## Data & persistence
 
-Everything lives in `localStorage` — no server, no accounts:
+Local-first in `localStorage` — no DoTo server. Optional Google Drive sync
+(see above) keeps an encrypted-in-transit copy in Drive's hidden app folder:
 
-- `doto-v1` — app state: `{ lists, tasks, activeView, showCompleted, filters, prefs, times, timer }`
+- `doto-v1` — app state: `{ lists, tasks, times, timer, activeView,
+  showCompleted, filters, colorNames, userName, prefs, dirtyAt }`
+- `doto-sync` — sync metadata: `{ fileId, base, lastSyncedAt, auto, email, token }`
+- `doto-sync-log` — recent sync events (max 50)
 - `doto-theme` — `'dark' | 'light'`
 - `doto-loc` — weather coordinates (7-day TTL)
+- `doto-google-client-id` — per-browser OAuth client override (only for forks)
 
 Task fields: `{ id, listId, title, notes, date, time, extRef, color, weight,
-importance, recur, done, completedAt, order, createdAt, subtasks }`.
+importance, recur, recId, done, completedAt, order, createdAt, subtasks }`.
 
 Privacy note: the Home weather card fetches from Open-Meteo / BigDataCloud /
-ipapi.co; nothing else ever leaves the browser.
+ipapi.co; Google sign-in loads Google Identity Services and, when syncing,
+talks to the Drive API. Nothing else ever leaves the browser.
 
 Corrupted saves are detected on load: the raw data is stashed under a
 `doto-v1-corrupt-<timestamp>` key and the app starts fresh instead of breaking.
@@ -137,28 +154,34 @@ Corrupted saves are detected on load: the raw data is stashed under a
   [`manual.html`](https://arazgray.github.io/doto/manual.html) (sidebar →
   **Manual**).
 - It is also published on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
-  After editing `MANUAL.md`, re-publish with:
+  After editing `MANUAL.md`, re-publish from the nested clone:
   ```
-  cp MANUAL.md /tmp/doto.wiki/Home.md
-  cd /tmp/doto.wiki && git add Home.md && git commit -m "Update manual" && git push
+  cp MANUAL.md doto.wiki/Home.md
+  git -C doto.wiki add Home.md && git -C doto.wiki commit -m "Update manual" && git -C doto.wiki push
   ```
-  (First-time setup: enable **Wikis** under
-  <https://github.com/arazgray/doto/settings>, then
-  `git clone git@github.com:arazgray/doto.wiki.git /tmp/doto.wiki`.)
   The sidebar Manual button points at the in-app page, which never 404s.
 
 ## Project layout
 
 ```
-index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, modal, toast
-styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark
-app.js       — all logic (~1900 lines), vanilla JS
-assets/manifest.webmanifest + sw.js + assets/icon-*.png — PWA install (Chrome/desktop/mobile, iOS Add to Home) + offline shell
+index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, dialogs
+               (palette, shortcuts help, sync & settings, sync history), toast.
+               Assets carry `?v=1.0-<ts>` cache-busters (bump on every release).
+styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark.
+               Mobile compact rules live last in file (equal-specificity overrides).
+app.js       — all logic (~2700 lines), vanilla JS. Release trio: ?v= stamps,
+               APP_VERSION, version.json — always the same `1.0-<ts>`.
+sw.js        — offline shell + update detector bypass for version.json (stays in
+               root: SW scope is limited to its own directory)
+assets/      — manifest.webmanifest + icon-*.png/svg (PWA install assets)
 MANUAL.md + manual.html — user manual (Markdown source + offline reader, linked from sidebar)
+doto-demo.json — screenshot/demo dataset (dates go stale; regenerate on demand)
+version.json — release marker polled by the in-app update detector
 ```
 
 Conventions: no emojis in code, no `prompt()`/`confirm()` (in-app modal
-instead), mobile-first CSS (breakpoints 700px / 1024px), plain asset filenames.
+instead), mobile-first CSS (compact rules ≤600px, breakpoints 700px / 1024px),
+`?v=1.0-<ts>` asset stamps bumped on every release (see trio above).
 
 ## License
 

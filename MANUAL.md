@@ -8,7 +8,7 @@
 ## Contents
 
 - [Getting started](#getting-started)
-- [Account and sync](#account-and-sync)
+- [Sync and settings](#sync-and-settings)
 - [Views](#views)
 - [Tasks](#tasks)
 - [Search, filters and sorting](#search-filters-and-sorting)
@@ -29,16 +29,16 @@
 
 Everything is saved automatically in your browser as you type.
 
-## Account and sync
+## Sync and settings
 
-By default your data lives only in this browser. **Account & Sync** (blue
+By default your data lives only in this browser. **Sync & Settings** (blue
 button at the bottom of the sidebar, or the status pill in the top bar)
 connects your Google Drive for multi-device sync — still with no DoTo server:
 
-1. Open Account & Sync and press **Sign in with Google** (the app ships with
-   its own client ID — no setup needed; only repo forks need their own).
-2. **Sign in with Google**, then **Sync now**.
-3. From then on: changes upload automatically a few seconds after you make
+1. Open Sync & Settings and press **Sign in with Google** (the app ships with
+   its own client ID — no setup needed; only repo forks need their own),
+   then **Sync now**.
+2. From then on: changes upload automatically a few seconds after you make
    them, and the app pulls on launch, when the tab regains focus, and when
    you come back online.
 
@@ -52,8 +52,10 @@ How it works and what to expect:
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
 - Signing out keeps a full copy on that device; signing back in merges it.
-- Account dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
-- Import / Export moved into the Account dialog (same JSON backup as before).
+- Sync dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
+- Import / Export live in the Sync dialog (same JSON backup as before).
+- The dialog also holds **Display** settings (show completed, dark mode),
+  **Color labels**, and your **name** (used in the Home greeting).
 
 ## Views
 
@@ -69,12 +71,13 @@ Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
 
 ## Tasks
 
-- **Create**: the add bar, the `+` button (mobile), the `n` key, or the command palette (`Ctrl+K`).
+- **Create**: the add bar (or per-column / agenda boxes), the Home **New**
+  button, the `n` key, or the command palette (`Ctrl+K`).
 - **Complete**: the circle on the row, or select it and press `x`. Deleted or completed-by-mistake items can be undone from the toast popup.
 - **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, color, weight, importance, external reference (URL or ticket number), list assignment and subtasks.
 - **Rename inline**: double-click the title.
-- **Color**: tap the color dot on the row. **Weight / Importance**: tap the badges on the row.
-- **Move**: drag onto another task, board column, sidebar list or the empty list area — or use the move button on the row, or the List selector in details.
+- **Color**: tap the color dot on the row. Colors carry your own labels (Sync & Settings → Color labels, e.g. red for Home, blue for Work). **Weight / Importance**: tap the badges on the row.
+- **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.
 - **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Completing a dated repeating task schedules the next occurrence and resets its subtasks.
 - **Subtasks**: in the details panel, with a `done/total` progress badge on the row.
 
@@ -121,14 +124,16 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing 
 ## Time tracker
 
 1. Pick a task from the searchable list (each shows its total tracked time).
+   (On desktop, the timer button on a task row jumps here pre-selecting it.)
 2. Press play. Pause holds the clock, stop saves a record.
 3. Records group under Today / Previously and can be deleted (undoable).
+   Today's records have a copy button producing e.g. `5h - Write report`.
 4. The running timer keeps going across page reloads — the total on Home counts it live.
 
 ## Import and export
 
-- **Export JSON** (sidebar): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks and time records. Back these up — your data lives only in this browser.
-- **Import** (Account dialog, multi-select): pick the source — **Auto-detect**,
+- **Export** (Sync dialog → Export): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks and time records. Back these up — your data lives in this browser plus, if enabled, your Drive sync copy.
+- **Import** (Sync dialog, multi-select): pick the source — **Auto-detect**,
   **DoTo backup**, or **Google Tasks** — then choose files. Accepts DoTo exports
   (appended as new lists) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
 
@@ -144,17 +149,17 @@ Installing requires the hosted `https://` address — it does not work from a do
 
 ## Data and privacy
 
-- All data stays in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters and panel sizes. Theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately.
+- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, color labels, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
 - If a save ever fails validation (corrupted data), the app keeps a timestamped backup copy in your browser and starts fresh instead of breaking.
-- The only network requests the app itself makes: Google Fonts, and the Home weather card (Open-Meteo, BigDataCloud, ipapi.co for location fallback). Nothing else ever leaves your device.
+- The network requests the app itself makes: Google Fonts, Google Identity Services + Drive API (only when you use sync), and the Home weather card (Open-Meteo, BigDataCloud, ipapi.co for location fallback). Nothing else ever leaves your device.
 
 ## FAQ
 
 **I lost my tasks after clearing browser data — can I get them back?**
-Only from a JSON export (sidebar → Export JSON). Export regularly; there is no cloud copy.
+Only from a JSON export or your Drive sync copy (re-sign-in re-pulls it). Export regularly.
 
 **Does it sync between phone and desktop?**
-Yes — via Account & Sync (Google Drive). Sign in on each device and both stay merged.
+Yes — via Sync & Settings (Google Drive). Sign in on each device and both stay merged.
 
 **Can I share a list with someone?**
 Not yet — export the JSON and send them the file; they can import it.
@@ -165,17 +170,16 @@ Most common cause: the Google Drive API is not enabled for your Cloud project
 make sure you ticked the Drive checkbox on Google's consent screen and that
 sign-in popups are not blocked. If the Google window opens and closes with
 nothing happening, allow popups for this site and try again — the exact
-reason is recorded under Account → History.
+reason is recorded under Sync → History.
 
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.
 
 **My phone shows an old version of the app.**
 Open the app with internet — it checks for updates on launch and shows an
-**Update** button when one is ready. If it stays stuck (iOS has no
-hard-refresh), remove the home-screen icon and re-add it. You can also force it:
-sidebar → **Update** next to Account & Sync wipes the offline cache and
-reloads the newest version.
+**Update** button when one is ready. To force it any time: sidebar bottom row
+→ **Update** wipes the offline cache and reloads the newest version. If it
+stays stuck (iOS has no hard-refresh), remove the home-screen icon and re-add it.
 
 **Where do I report a bug or ask for a feature?**
 Open an issue at <https://github.com/arazgray/doto/issues>.

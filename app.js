@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788689239'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788691655'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -18,7 +18,10 @@ const COLORS = [
   { id: 'purple', name: 'Purple', hex: '#9334e6' },
 ];
 const colorHex = (id) => (COLORS.find((c) => c.id === id) || COLORS[0]).hex;
-const colorName = (id) => (COLORS.find((c) => c.id === id) || COLORS[0]).name;
+const colorName = (id) => {
+  const c = COLORS.find((x) => x.id === id) || COLORS[0];
+  return (state.colorNames && state.colorNames[c.id]) || c.name;
+};
 
 const WEIGHTS = { light: { label: 'Light', icon: 'arrow_downward' }, medium: { label: 'Medium', icon: 'remove' }, heavy: { label: 'Heavy', icon: 'arrow_upward' } };
 const IMPORTANCE = { low: { label: 'Low', icon: 'arrow_downward' }, medium: { label: 'Med', icon: 'remove' }, high: { label: 'High', icon: 'arrow_upward' } };
@@ -38,6 +41,7 @@ function seed() {
     activeView: HOME,
     showCompleted: true,
     filters: { color: '', weight: '', importance: '' },
+    colorNames: {},
     prefs: { sideW: 280, detailW: 440 },
     times: [],
     timer: null,
@@ -74,6 +78,7 @@ function migrate(s) {
   if (!Array.isArray(s.times)) s.times = [];
   if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
   if (typeof s.userName !== 'string') s.userName = '';
+  if (!s.colorNames || typeof s.colorNames !== 'object') s.colorNames = {};
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
   return s;
 }
@@ -243,7 +248,7 @@ function paletteCommands() {
     { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
     { icon: 'add', label: 'New task', run: () => focusComposer() },
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
-    { icon: 'dark_mode', label: 'Toggle dark mode', run: () => $('#themeBtn').click() },
+    { icon: 'dark_mode', label: 'Toggle dark mode', run: () => toggleTheme() },
     { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
     { icon: 'swap_vert', label: 'Sort by My order', run: () => { ui.sort = 'order'; renderAll(); } },
     { icon: 'event', label: 'Sort by Date', run: () => { ui.sort = 'date'; renderAll(); } },
@@ -383,7 +388,7 @@ function bindShortcuts() {
     if (k === 'x' || k === 'X') { const t = selectedTask(); if (t) toggleDone(t.id); return; }
     if (k === 'Delete' || k === 'Backspace') { const t = selectedTask(); if (t) { e.preventDefault(); ui.selectedId = null; deleteTask(t.id); } return; }
     if (k === 'u' || k === 'U') { toggleShowCompleted(); return; }
-    if (k === 'd' || k === 'D') { $('#themeBtn').click(); return; }
+    if (k === 'd' || k === 'D') { toggleTheme(); return; }
   });
 }
 
@@ -461,7 +466,7 @@ function renderNav() {
   COLORS.forEach((c) => {
     const b = document.createElement('button');
     b.className = 'f-dot' + (state.filters.color === c.id ? ' selected' : '');
-    b.style.background = c.hex; b.title = c.name; b.setAttribute('aria-label', 'Filter by ' + c.name);
+    b.style.background = c.hex; b.title = colorName(c.id); b.setAttribute('aria-label', 'Filter by ' + colorName(c.id));
     b.onclick = () => { state.filters.color = state.filters.color === c.id ? '' : c.id; save(); renderAll(); };
     fc.appendChild(b);
   });
@@ -1357,6 +1362,26 @@ function fmtDur(sec) {
   if (m) return s ? `${m}m ${s}s` : `${m}m`;
   return `${s}s`;
 }
+function fmtDurShort(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+  if (h) return m ? `${h}h ${m}m` : `${h}h`;
+  if (m) return `${m}m`;
+  return `${sec}s`;
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    } catch { return false; }
+  }
+}
 function timerElapsed() {
   const tm = state.timer; if (!tm) return 0;
   return (tm.acc || 0) + (tm.running ? (Date.now() - tm.startedAt) / 1000 : 0);
@@ -1444,7 +1469,7 @@ function renderTime() {
     const p = document.createElement('p'); p.className = 'mini-empty'; p.textContent = 'No time logged yet — start the tracker.';
     ul.appendChild(p);
   }
-  const timeRecRow = (r) => {
+  const timeRecRow = (r, withCopy) => {
     const li = document.createElement('li'); li.className = 'time-rec';
     const d = new Date(r.startedAt);
     const when = isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -1467,6 +1492,17 @@ function renderTime() {
       save(); renderAll();
       toast('Record deleted', () => { state.times.unshift(r); save(); renderAll(); });
     };
+    if (withCopy) {
+      const cp = document.createElement('button');
+      cp.className = 'icon-btn sm'; cp.title = 'Copy to clipboard';
+      cp.innerHTML = '<span class="material-icons-outlined">content_copy</span>';
+      cp.onclick = async (e) => {
+        e.stopPropagation();
+        const ok = await copyText(`${fmtDurShort(r.seconds)} - ${r.title || '(untitled)'}`);
+        toast(ok ? 'Copied to clipboard' : 'Copy failed');
+      };
+      li.append(cp);
+    }
     li.append(open, del);
     li.onclick = () => { if (getTask(r.taskId)) { ui.timeTaskId = r.taskId; renderAll(); } };
     return li;
@@ -1477,8 +1513,8 @@ function renderTime() {
   };
   const todayRs = state.times.filter((r) => recDay(r) === todayIso()).slice(0, 30);
   const prevRs = state.times.filter((r) => recDay(r) !== todayIso()).slice(0, 30);
-  if (todayRs.length) { dayHead('Today'); todayRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
-  if (prevRs.length) { dayHead('Previously'); prevRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
+  if (todayRs.length) { dayHead('Today'); todayRs.forEach((r) => ul.appendChild(timeRecRow(r, true))); }
+  if (prevRs.length) { dayHead('Previously'); prevRs.forEach((r) => ul.appendChild(timeRecRow(r, false))); }
   // middle: searchable tasks with totals
   const q = (ui.timeQuery || '').trim().toLowerCase();
   const tasks = state.tasks
@@ -1672,7 +1708,7 @@ function renderDetail() {
   COLORS.forEach((c) => {
     const b = document.createElement('button');
     b.className = 'swatch' + (t.color === c.id ? ' selected' : '');
-    b.style.background = c.hex; b.title = c.name; b.setAttribute('aria-label', c.name);
+    b.style.background = c.hex; b.title = colorName(c.id); b.setAttribute('aria-label', colorName(c.id));
     b.onclick = () => { t.color = c.id; save(); renderAll(); };
     pal.appendChild(b);
   });
@@ -1713,7 +1749,11 @@ function openColorPop(anchor, taskId, mini) {
   pop.classList.toggle('mini', !!mini);
   COLORS.forEach((c) => {
     const b = document.createElement('button');
-    b.className = 'swatch'; b.style.background = c.hex; b.title = c.name;
+    b.className = 'swatch-wrap'; b.style.background = c.hex; b.title = colorName(c.id);
+    b.setAttribute('aria-label', colorName(c.id));
+    const lb = document.createElement('span');
+    lb.className = 'swatch-label'; lb.textContent = colorName(c.id);
+    b.appendChild(lb);
     b.onclick = (e) => { e.stopPropagation(); const t = getTask(taskId); if (t) { t.color = c.id; save(); renderAll(); } closeColorPop(); };
     pop.appendChild(b);
   });
@@ -1997,7 +2037,7 @@ function renderAll() {
   paintSelection(false);
 }
 
-/* ---------- Google Drive sync (Account & Sync, no backend) ----------
+/* ---------- Google Drive sync (Sync & Settings, no backend) ----------
    Local-first: this device always works offline. When signed in, changes
    push to Drive's hidden app folder (debounced) and pull on launch,
    focus and reconnect. Merge is per-item, three-way against the last
@@ -2358,7 +2398,13 @@ async function syncNowFlow() {
   await pullNow('popup');
 }
 
-function openAccount() { paintSync(); const ni = $('#userNameInput'); if (ni && document.activeElement !== ni) ni.value = state.userName || ''; $('#accountScrim').classList.remove('hidden'); }
+function openAccount() {
+  paintSync();
+  const ni = $('#userNameInput');
+  if (ni && document.activeElement !== ni) ni.value = state.userName || '';
+  $$('#colorNames input').forEach((inp) => { if (document.activeElement !== inp) inp.value = (state.colorNames && state.colorNames[inp.dataset.color]) || ''; });
+  $('#accountScrim').classList.remove('hidden');
+}
 function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
   $('#syncPill').onclick = openAccount;
@@ -2403,6 +2449,27 @@ function bindSync() {
     state.userName = e.target.value.slice(0, 40);
     save(); renderCurrentView();
   };
+  const cnHost = $('#colorNames');
+  if (cnHost && !cnHost.children.length) {
+    COLORS.forEach((c) => {
+      const row = document.createElement('div');
+      row.className = 'color-row';
+      const dot = document.createElement('span');
+      dot.className = 'dot'; dot.style.background = c.hex;
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.maxLength = 24; inp.dataset.color = c.id;
+      inp.placeholder = c.name; inp.dir = 'auto';
+      inp.setAttribute('aria-label', 'Label for ' + c.name + ' color');
+      inp.oninput = () => {
+        const v = inp.value.trim().slice(0, 24);
+        if (v && v !== c.name) state.colorNames[c.id] = v;
+        else delete state.colorNames[c.id];
+        save(); renderNav(); renderCurrentView();
+      };
+      row.append(dot, inp);
+      cnHost.appendChild(row);
+    });
+  }
   window.addEventListener('online', () => { paintSync(); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
   document.addEventListener('visibilitychange', () => {
@@ -2412,6 +2479,14 @@ function bindSync() {
   setInterval(paintSync, 5000);
   paintSync();
 }
+
+function setTheme(dark) {
+  document.body.classList.toggle('dark', !!dark);
+  const t = $('#darkModeToggle');
+  if (t && document.activeElement !== t) t.checked = !!dark;
+  try { localStorage.setItem('doto-theme', dark ? 'dark' : 'light'); } catch {}
+}
+function toggleTheme() { setTheme(!document.body.classList.contains('dark')); }
 
 function bind() {
   $('#menuBtn').onclick = () => {
@@ -2489,19 +2564,10 @@ function bind() {
     if (!e.target.closest('#movePop')) closeMovePop();
   });
 
-  function setTheme(dark) {
-    document.body.classList.toggle('dark', !!dark);
-    const btn = $('#themeBtn');
-    btn.classList.toggle('active', !!dark);
-    btn.querySelector('.material-icons-outlined').textContent = dark ? 'light_mode' : 'dark_mode';
-    btn.title = dark ? 'Light mode' : 'Dark mode';
-    btn.setAttribute('aria-pressed', String(!!dark));
-    try { localStorage.setItem('doto-theme', dark ? 'dark' : 'light'); } catch {}
-  }
-  $('#themeBtn').onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); setTheme(!document.body.classList.contains('dark')); };
   try { setTheme(localStorage.getItem('doto-theme') === 'dark'); } catch { setTheme(false); }
+  $('#darkModeToggle').onchange = (e) => setTheme(e.target.checked);
 
-  // import / export (sidebar buttons; navbar keeps sort + theme only)
+  // import / export (now inside the Sync & Settings dialog)
   $('#exportBtn2').onclick = exportJSON;
   const pick = () => $('#importFile').click();
   $('#importBtn2').onclick = pick;
@@ -2552,7 +2618,7 @@ function bind() {
   COLORS.forEach((c) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'f-dot'; b.style.background = c.hex;
-    b.title = c.name; b.setAttribute('aria-label', 'Color ' + c.name);
+    b.title = colorName(c.id); b.setAttribute('aria-label', 'Color ' + colorName(c.id));
     b.onclick = () => {
       ui.quick.color = ui.quick.color === c.id ? undefined : c.id;
       $$('#qaColors .f-dot').forEach((x) => x.classList.toggle('selected', x === b && !!ui.quick.color));
