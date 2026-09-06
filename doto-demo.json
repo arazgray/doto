@@ -1,0 +1,310 @@
+{
+  "app": "DoTo",
+  "version": 2,
+  "exportedAt": "2026-09-06T11:22:37.572870",
+  "lists": [
+    {
+      "id": "demo-l-work",
+      "name": "Work",
+      "createdAt": 1788682957572
+    },
+    {
+      "id": "demo-l-personal",
+      "name": "Personal",
+      "createdAt": 1788682957572
+    },
+    {
+      "id": "demo-l-shopping",
+      "name": "Shopping",
+      "createdAt": 1788682957572
+    }
+  ],
+  "tasks": [
+    {
+      "id": "demo-t-report",
+      "listId": "demo-l-work",
+      "title": "Finish Q3 report draft",
+      "notes": "Revenue, churn and hiring sections. Charts go in the appendix.",
+      "date": "2026-09-06",
+      "time": "17:00",
+      "extRef": "https://example.com/q3-draft",
+      "color": "blue",
+      "weight": "heavy",
+      "importance": "high",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 0,
+      "createdAt": 1788682957572,
+      "subtasks": [
+        {
+          "id": "demo-s-1",
+          "title": "Write outline",
+          "done": true
+        },
+        {
+          "id": "demo-s-2",
+          "title": "Build charts",
+          "done": false
+        },
+        {
+          "id": "demo-s-3",
+          "title": "Proofread",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "demo-t-bug",
+      "listId": "demo-l-work",
+      "title": "Fix login bug #4821",
+      "notes": "Users locked out after password reset.",
+      "date": "2026-09-05",
+      "time": "",
+      "extRef": "PROJ-4821",
+      "color": "red",
+      "weight": "heavy",
+      "importance": "high",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 1,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-standup",
+      "listId": "demo-l-work",
+      "title": "Team standup",
+      "notes": "",
+      "date": "2026-09-06",
+      "time": "09:30",
+      "extRef": "",
+      "color": "green",
+      "weight": "light",
+      "importance": "medium",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 2,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-retro",
+      "listId": "demo-l-work",
+      "title": "Plan sprint retro",
+      "notes": "",
+      "date": "2026-09-07",
+      "time": "",
+      "extRef": "",
+      "color": "purple",
+      "weight": "medium",
+      "importance": "medium",
+      "recur": {
+        "freq": "weekly",
+        "interval": 1,
+        "days": [
+          5
+        ]
+      },
+      "done": false,
+      "completedAt": 0,
+      "order": 3,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-inbox",
+      "listId": "demo-l-work",
+      "title": "Inbox zero",
+      "notes": "",
+      "date": "",
+      "time": "",
+      "extRef": "",
+      "color": "default",
+      "weight": "light",
+      "importance": "low",
+      "recur": null,
+      "done": true,
+      "completedAt": 1788682957572,
+      "order": 4,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-run",
+      "listId": "demo-l-personal",
+      "title": "Morning run",
+      "notes": "",
+      "date": "2026-09-06",
+      "time": "07:00",
+      "extRef": "",
+      "color": "green",
+      "weight": "medium",
+      "importance": "medium",
+      "recur": {
+        "freq": "daily",
+        "interval": 1
+      },
+      "done": false,
+      "completedAt": 0,
+      "order": 0,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-dentist",
+      "listId": "demo-l-personal",
+      "title": "Call dentist",
+      "notes": "Ask about Thursday openings.",
+      "date": "2026-09-07",
+      "time": "12:00",
+      "extRef": "",
+      "color": "orange",
+      "weight": "light",
+      "importance": "high",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 1,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-plants",
+      "listId": "demo-l-personal",
+      "title": "Water plants",
+      "notes": "",
+      "date": "2026-09-04",
+      "time": "",
+      "extRef": "",
+      "color": "green",
+      "weight": "light",
+      "importance": "low",
+      "recur": {
+        "freq": "weekly",
+        "interval": 1,
+        "days": [
+          3
+        ]
+      },
+      "done": false,
+      "completedAt": 0,
+      "order": 2,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-read",
+      "listId": "demo-l-personal",
+      "title": "Read 20 pages",
+      "notes": "",
+      "date": "",
+      "time": "",
+      "extRef": "",
+      "color": "purple",
+      "weight": "light",
+      "importance": "low",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 3,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-flights",
+      "listId": "demo-l-personal",
+      "title": "Book flights for conference",
+      "notes": "",
+      "date": "2026-09-13",
+      "time": "",
+      "extRef": "https://example.com/flights",
+      "color": "blue",
+      "weight": "medium",
+      "importance": "high",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 4,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    },
+    {
+      "id": "demo-t-groceries",
+      "listId": "demo-l-shopping",
+      "title": "Weekly groceries",
+      "notes": "",
+      "date": "2026-09-06",
+      "time": "",
+      "extRef": "",
+      "color": "green",
+      "weight": "medium",
+      "importance": "medium",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 0,
+      "createdAt": 1788682957572,
+      "subtasks": [
+        {
+          "id": "demo-s-4",
+          "title": "Oat milk",
+          "done": true
+        },
+        {
+          "id": "demo-s-5",
+          "title": "Eggs",
+          "done": false
+        },
+        {
+          "id": "demo-s-6",
+          "title": "Sourdough",
+          "done": false
+        },
+        {
+          "id": "demo-s-7",
+          "title": "Coffee beans",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "demo-t-gift",
+      "listId": "demo-l-shopping",
+      "title": "Buy birthday gift for Sara",
+      "notes": "She likes ceramics. Budget $40.",
+      "date": "2026-09-11",
+      "time": "",
+      "extRef": "",
+      "color": "purple",
+      "weight": "light",
+      "importance": "high",
+      "recur": null,
+      "done": false,
+      "completedAt": 0,
+      "order": 1,
+      "createdAt": 1788682957572,
+      "subtasks": []
+    }
+  ],
+  "times": [
+    {
+      "id": "demo-r-1",
+      "taskId": "demo-t-report",
+      "title": "Finish Q3 report draft",
+      "listName": "Work",
+      "startedAt": 1788596557572,
+      "seconds": 5400
+    },
+    {
+      "id": "demo-r-2",
+      "taskId": "demo-t-run",
+      "title": "Morning run",
+      "listName": "Personal",
+      "startedAt": 1788682957572,
+      "seconds": 1800
+    }
+  ]
+}

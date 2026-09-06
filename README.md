@@ -1,5 +1,9 @@
 # DoTo — Task Manager, Simple.
 
+*Yet another todo app? Really? No — this is what I needed, and I wrote it for myself. Use it or leave it, it's up to you.*
+
+![DoTo screenshot](screenshot.png)
+
 A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.

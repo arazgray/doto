@@ -71,6 +71,7 @@ function migrate(s) {
   if (s.filters && s.filters.color && !validColors.has(s.filters.color)) s.filters.color = '';
   if (!Array.isArray(s.times)) s.times = [];
   if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
+  if (typeof s.userName !== 'string') s.userName = '';
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
   return s;
 }
@@ -1027,7 +1028,9 @@ function renderHome() {
 
   $('#homeDate').textContent = 'Today is ' + new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const h = new Date().getHours();
-  $('#homeGreet').textContent = `Good ${h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'} 👋`;
+  const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+  const nm = (state.userName || '').trim();
+  $('#homeGreet').textContent = nm ? `Good ${part}, ${nm} 👋` : `Good ${part} 👋`;
   $('#homeSub').textContent = open.length
     ? `You have ${open.length} open task${open.length === 1 ? '' : 's'}, ${overdue.length} overdue, ${today.length} due today.`
     : 'Everything is done. Enjoy your day!';
@@ -2285,7 +2288,7 @@ async function syncNowFlow() {
   await pullNow('popup');
 }
 
-function openAccount() { paintSync(); $('#accountScrim').classList.remove('hidden'); }
+function openAccount() { paintSync(); const ni = $('#userNameInput'); if (ni && document.activeElement !== ni) ni.value = state.userName || ''; $('#accountScrim').classList.remove('hidden'); }
 function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
   $('#syncPill').onclick = openAccount;
@@ -2324,6 +2327,10 @@ function bindSync() {
     $('#clientIdInput').value = '';
     paintSync();
     toast('Client ID saved — sign in to start syncing');
+  };
+  $('#userNameInput').oninput = (e) => {
+    state.userName = e.target.value.slice(0, 40);
+    save(); renderCurrentView();
   };
   window.addEventListener('online', () => { paintSync(); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
