@@ -12,6 +12,27 @@ with full touch + mouse parity.
 
 **Live app: <https://arazgray.github.io/doto/>**
 
+## How it compares
+
+| | **DoTo** | **Google Tasks** | **Microsoft To Do** | **Todoist** | **Any.do** |
+|---|---|---|---|---|---|
+| Price | Free, no account needed | Free (Google account) | Free (MS account) | Freemium (~$48/yr Pro) | Freemium (~$60/yr Premium) |
+| Sync | DIY via your Google Drive | Native Google cloud | Native MS cloud | Native cloud, fastest | Native cloud |
+| Offline | Excellent (local-first PWA) | Good | Good | Good | OK |
+| Platforms | Any browser (PWA install) | Web, Android, iOS | Web, Win, Mac, Android, iOS | Everything + wearables | Web, Android, iOS, Mac |
+| Subtasks | 1 level, inline preview + progress | 1 level, bare | Steps with files | Unlimited nesting | Subtasks + notes |
+| Recurrence | Strong (custom every-N, weekday picker) | Basic (needs Calendar) | Basic–medium | Excellent + natural language | Good |
+| Priorities | Weight × importance × color, all filterable | Starred only | Important / My Day | P1–P4 + labels | Priority + tags |
+| Views | Home digest, list, board, calendar, time tracker | Lists only | Lists, My Day, Planned | List, board, calendar | List, board, calendar, moments |
+| Time tracking | Built-in stopwatch + history | None | None | Via integrations | Via integrations |
+| Search & filters | Good (search + 3 filters + chips) | Basic search | Basic | Best in class (query filters) | Good |
+| Collaboration | None | Minimal | List sharing | Teams, comments, roles | Sharing, chat, assignment |
+| Natural-language input | No | No | No (presets) | Yes, best in class | Partial |
+| Keyboard-first use | Good (palette, shortcuts) | Poor | Medium | Excellent | Medium |
+| Push notifications & reminders | In Progress | Yes | Yes | Yes | Yes |
+| Privacy | Best: local by default | Google-profiled | MS-profiled | Cloud-profiled | Cloud-profiled |
+| Open source | Yes (MIT) | No | No | No | No |
+
 ## Run it
 
 Open `index.html` directly in a browser, or serve the folder:

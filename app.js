@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788718955'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788721017'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -181,6 +181,19 @@ function hideToast() { $('#toast').classList.add('hidden'); }
 function sessNum(k) { try { return parseInt(sessionStorage.getItem(k) || '0', 10) || 0; } catch { return 0; } }
 function sessSet(k, v) { try { sessionStorage.setItem(k, v); } catch {} }
 function sessDel(k) { try { sessionStorage.removeItem(k); } catch {} }
+async function updateEnv() {
+  let sw = 'sw: n/a', cachesN = 'caches: n/a';
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      sw = !reg ? 'sw: none'
+        : 'sw: ' + [reg.installing && 'installing', reg.waiting && 'waiting', reg.active && 'active'].filter(Boolean).join('/')
+        + (navigator.serviceWorker.controller ? '+controlled' : '+uncontrolled');
+    }
+    if ('caches' in window) cachesN = 'caches: ' + (await caches.keys()).length;
+  } catch {}
+  return `[${sw}, ${cachesN}]`;
+}
 async function checkForUpdate() {
   if (!navigator.onLine) return;
   try {
@@ -190,7 +203,7 @@ async function checkForUpdate() {
     if (j && j.version && j.version !== APP_VERSION && j.version !== updateNotified) {
       updateNotified = j.version;
       const tries = sessNum('doto-update-tries');
-      slog('info', `Update available: ${j.version} (running ${APP_VERSION}, attempt ${tries + 1})`);
+      slog('info', `Update available: ${j.version} (running ${APP_VERSION}, attempt ${tries + 1}) ${await updateEnv()}`);
       if (tries >= 2) {
         toast('Update is stuck — tap for a full refresh', () => { sessDel('doto-update-tries'); forceUpdate(); }, 'Full refresh');
       } else {
@@ -199,7 +212,7 @@ async function checkForUpdate() {
     } else if (j && j.version && j.version === APP_VERSION) {
       let wasUpdating = false;
       try { wasUpdating = sessNum('doto-update-tries') > 0 || !!sessionStorage.getItem('doto-updating'); } catch {}
-      if (wasUpdating) slog('ok', `Updated to ${APP_VERSION}`);
+      if (wasUpdating) slog('ok', `Updated to ${APP_VERSION} ${await updateEnv()}`);
       sessDel('doto-update-tries'); sessDel('doto-updating');
     }
   } catch {}
@@ -399,10 +412,10 @@ function bindShortcuts() {
     if (row) { ui.selectedId = row.dataset.id; paintSelection(false); }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); closeLog(); clearTimeout(pendingG); pendingG = 0; return; }
+    if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); closeLog(); closeConflict(); clearTimeout(pendingG); pendingG = 0; return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? closePalette() : openPalette(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (typingNow() || paletteOpen() || helpOpen() || isLogOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
+    if (typingNow() || paletteOpen() || helpOpen() || isLogOpen() || isConflictOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
     if (pendingG) {
       clearTimeout(pendingG); pendingG = 0;
       const gk = e.key.toLowerCase();
@@ -1508,6 +1521,17 @@ function timeStop() {
   save(); renderAll();
   toast(`Saved ${fmtDur(secs)}`, () => { state.times = state.times.filter((r) => r.id !== rec.id); save(); renderAll(); });
 }
+function paintHomeClock() {
+  if (!isHome()) return;
+  const hEl = $('#clockH'), mEl = $('#clockM'), apEl = $('#clockAP'), cEl = $('#clockColon');
+  if (!hEl || !mEl) return;
+  const d = new Date();
+  let h = d.getHours();
+  if (apEl) apEl.textContent = h >= 12 ? 'PM' : 'AM';
+  hEl.textContent = String(h % 12 || 12).padStart(2, '0');
+  mEl.textContent = String(d.getMinutes()).padStart(2, '0');
+  if (cEl) cEl.style.opacity = Math.floor(Date.now() / 500) % 2 ? '1' : '0.2';
+}
 function tickTime() {
   if (!state.timer || !state.timer.running) return;
   const el = $('#timeDisplay');
@@ -2230,6 +2254,7 @@ function slog(kind, msg) {
   if (isLogOpen()) paintLog();
 }
 function isLogOpen() { const s = $('#logScrim'); return !!s && !s.classList.contains('hidden'); }
+function isConflictOpen() { const s = $('#conflictScrim'); return !!s && !s.classList.contains('hidden'); }
 function diagLines() {
   const t = syncMeta.token;
   let texp = 'none';
@@ -2427,7 +2452,7 @@ function snapState(s) {
   }));
 }
 const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-function mergeArrays(base, local, remote, takeRemote) {
+function mergeArrays(base, local, remote, takeRemote, collect, coll, labelOf) {
   const bi = new Map(base.map((x) => [x.id, x]));
   const li = new Map(local.map((x) => [x.id, x]));
   const ri = new Map(remote.map((x) => [x.id, x]));
@@ -2446,8 +2471,11 @@ function mergeArrays(base, local, remote, takeRemote) {
     if (!dl && !dr) { out.push(l); return; }
     if (dl && !dr) { if (l) out.push(l); return; } // kept local edit / local delete wins
     if (!dl && dr) { if (r) { out.push(r); fromRemote++; } return; } // remote edit / remote delete wins
-    conflicts++; // edited on both sides: newest file wins
-    if (l && r) { if (takeRemote) { out.push(r); fromRemote++; } else out.push(l); }
+    conflicts++; // edited on both sides: newest file wins interim, user can override
+    if (l && r) {
+      if (collect) collect.push({ coll, id, label: labelOf(l, r), local: l, remote: r });
+      if (takeRemote) { out.push(r); fromRemote++; } else out.push(l);
+    }
     else if (r) { out.push(r); fromRemote++; }
     else if (l) out.push(l);
   });
@@ -2476,8 +2504,9 @@ function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
   const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null, colorNames: {}, customColors: [], userName: '', deletedColors: [] };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
-  const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote);
-  const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote);
+  const freshConflicts = [];
+  const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote, freshConflicts, 'lists', (l) => l.name || '(untitled)');
+  const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote, freshConflicts, 'tasks', (l) => l.title || '(untitled)');
   const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote);
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
   const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote);
@@ -2502,7 +2531,76 @@ function applyRemote(remote, remoteTime) {
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
   saveSyncMeta();
-  return { conflicts, fresh };
+  pendingConflicts.push(...freshConflicts);
+  return { conflicts: freshConflicts.length, fresh };
+}
+
+/* ----- per-conflict resolution dialog ----- */
+let pendingConflicts = [];
+const CONFLICT_FIELDS = {
+  title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
+  done: 'Completed', color: 'Color', weight: 'Weight', importance: 'Importance',
+  listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
+};
+function conflictVal(kind, t, k) {
+  const v = t[k];
+  if (v === undefined || v === null || v === '') return '—';
+  if (k === 'done') return v ? 'Yes' : 'No';
+  if (k === 'listId') return listName(v);
+  if (k === 'color') return colorName(v);
+  if (k === 'recur') return (v && v.freq ? recurLabel(v) : '—');
+  if (k === 'subtasks') return Array.isArray(v) ? `${v.filter((s) => s.done).length}/${v.length} done` : '—';
+  const s = String(v);
+  return s.length > 42 ? s.slice(0, 42) + '…' : s;
+}
+function conflictDiff(c) {
+  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId']);
+  const rows = [];
+  new Set([...Object.keys(c.local), ...Object.keys(c.remote)]).forEach((k) => {
+    if (skip.has(k)) return;
+    if (JSON.stringify(c.local[k] ?? null) !== JSON.stringify(c.remote[k] ?? null)) {
+      rows.push([CONFLICT_FIELDS[k] || k, conflictVal(c.coll, c.local, k), conflictVal(c.coll, c.remote, k)]);
+    }
+  });
+  return rows.slice(0, 8);
+}
+function pumpConflicts() {
+  if (!pendingConflicts.length || document.hidden) return;
+  if (!$('#conflictScrim').classList.contains('hidden')) return;
+  const c = pendingConflicts[0];
+  const arr = c.coll === 'lists' ? state.lists : state.tasks;
+  if (!arr.some((x) => x.id === c.id)) { pendingConflicts.shift(); return pumpConflicts(); }
+  $('#conflictTitle').textContent = `${c.coll === 'lists' ? 'List' : 'Task'} “${c.label}” changed on both sides`;
+  $('#conflictCount').textContent = pendingConflicts.length > 1 ? `1 of ${pendingConflicts.length} — the rest will follow` : '';
+  const host = $('#conflictDiff');
+  host.innerHTML = '';
+  const head = ['Field', 'This device', 'Drive'];
+  head.forEach((h) => { const s = document.createElement('span'); s.className = 'cd-h'; s.textContent = h; host.appendChild(s); });
+  conflictDiff(c).forEach(([f, a, b]) => {
+    const fEl = document.createElement('span'); fEl.className = 'cd-f'; fEl.textContent = f;
+    const aEl = document.createElement('span'); aEl.textContent = a; aEl.dir = 'auto';
+    const bEl = document.createElement('span'); bEl.textContent = b; bEl.dir = 'auto';
+    host.append(fEl, aEl, bEl);
+  });
+  $('#conflictScrim').classList.remove('hidden');
+}
+function closeConflict() { $('#conflictScrim').classList.add('hidden'); } // defers; pending stay queued
+function resolveConflict(pickRemote) {
+  const c = pendingConflicts.shift();
+  closeConflict();
+  if (c) {
+    const arr = c.coll === 'lists' ? state.lists : state.tasks;
+    const i = arr.findIndex((x) => x.id === c.id);
+    const chosen = pickRemote ? c.remote : c.local;
+    if (i >= 0) arr[i] = chosen; else arr.push(chosen);
+    save(); renderAll();
+    syncMeta.base = snapState(state);
+    syncMeta.lastSyncedAt = Date.now();
+    saveSyncMeta();
+    slog('info', `Conflict resolved for “${c.label}” — kept ${pickRemote ? "Drive's" : 'this device’s'} version`);
+    schedulePush();
+  }
+  pumpConflicts();
 }
 
 /* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
@@ -2585,8 +2683,12 @@ async function pullNow(mode) {
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
-        if (res.conflicts) toast(`Sync: ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
+        if (res.conflicts) {
+          toast('Sync conflict — pick which version to keep', () => pumpConflicts(), 'Review');
+          slog('conflict', `${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} need${res.conflicts === 1 ? 's' : ''} your pick`);
+        }
         else if (res.fresh) toast(`Sync: ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
+        pumpConflicts();
         if (mode !== 'silent' || res.conflicts || res.fresh) {
           if (res.conflicts) slog('conflict', `Pulled with ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
           else if (res.fresh) slog('ok', `Pulled ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
@@ -2714,6 +2816,8 @@ function bindSync() {
   $('#logOpenBtn').onclick = openLog;
   $('#logClose').onclick = closeLog;
   $('#logClear').onclick = () => { syncLog = []; saveSyncLog(); paintLog(); };
+  $('#conflictMine').onclick = () => resolveConflict(false);
+  $('#conflictTheirs').onclick = () => resolveConflict(true);
   $('#diagCopy').onclick = async () => {
     toast(await copyText(diagLines() + '\n\n' + syncLog.slice(-20).map((e) => new Date(e.t).toLocaleString() + ' [' + e.kind + '] ' + e.msg).join('\n')) ? 'Diagnostics copied' : 'Copy failed');
   };
@@ -2738,10 +2842,11 @@ function bindSync() {
   $('#resetColorsBtn').onclick = resetColors;
   window.addEventListener('online', () => { paintSync(); maybeRefreshToken().catch(() => {}); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
-  window.addEventListener('focus', () => { maybeRefreshToken().catch(() => {}); });
+  window.addEventListener('focus', () => { maybeRefreshToken().catch(() => {}); pumpConflicts(); });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       maybeRefreshToken().catch(() => {});
+      pumpConflicts();
       if (Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
     }
   });
@@ -2792,7 +2897,7 @@ function bindEdgeSwipe() {
     if (e.touches.length !== 1 || blocked() || field(e.target)) return;
     const t = e.touches[0], open = sb().classList.contains('open');
     if (!open) {
-      if (t.clientX < 20 || t.clientX > window.innerWidth * 0.45) return;
+      if (t.clientX < 20) return; // system back-gesture strip
       if (t.target && t.target.closest && t.target.closest('#board,.drag')) return;
       mode = 'open';
     } else {
@@ -2903,6 +3008,7 @@ function bind() {
   $('#timePause').onclick = timePause;
   $('#timeStop').onclick = timeStop;
   setInterval(tickTime, 100);
+  setInterval(paintHomeClock, 500); paintHomeClock();
   const shiftCalMonth = (n) => {
     if ((ui.calView || 'month') === 'year') { ui.calYear = (ui.calYear || new Date().getFullYear()) + n; ui.calAnim = n < 0 ? 'prev' : 'next'; renderAll(); return; }
     const [Y, M] = calMonth().split('-').map(Number);
@@ -3040,7 +3146,7 @@ function bind() {
 
   // detail bindings
   $('#detailBack').onclick = closeDetail; $('#detailClose').onclick = closeDetail;
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeLog(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeLog(); closeConflict(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderNav(); renderCurrentView(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
   $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };

@@ -198,7 +198,7 @@ input,select,textarea{font:inherit;color:inherit}
 /* Home / summary */
 .home-hero{
   display:flex;flex-direction:column;gap:14px;margin:8px 0 24px;
-  & h1{margin:0;font-size:clamp(24px,6vw,32px);font-weight:700;letter-spacing:.2px}
+  & h1{margin:0 0 8px;font-size:clamp(24px,6vw,32px);font-weight:700;letter-spacing:.2px}
   & .muted{margin:6px 0 0}
   & .home-hero-actions{
     order:-1;display:flex;gap:8px;width:100%;
@@ -215,7 +215,12 @@ input,select,textarea{font:inherit;color:inherit}
   #homeAddBtn .full-t{display:none}
   #homeAddBtn .short-t{display:inline}
 }
-.eyebrow{margin:4px 0 0;color:var(--muted);font-size:14px}
+.eyebrow{margin:0 0 8px;color:var(--muted);font-size:14px}
+.home-hero-top{display:flex;align-items:center;gap:16px}
+.home-hero-top > div:first-child{flex:1;min-width:0}
+.home-clock{flex:none;font-size:clamp(26px,7vw,38px);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;white-space:nowrap}
+.home-clock #clockAP{font-size:.42em;font-weight:500;color:var(--muted);letter-spacing:2px}
+#clockColon{transition:opacity .12s}
 .home-meta{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;align-items:stretch}
 .weather{
   display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line-soft);border-radius:14px;padding:10px 16px;
@@ -873,6 +878,16 @@ a.btn-ghost{text-decoration:none}
   &.ready .material-icons-outlined{animation:ptrspin 1s linear infinite}
 }
 @keyframes ptrspin{to{transform:rotate(360deg)}}
+
+/* Sync conflict dialog */
+.conflict-modal{width:min(540px,100%);max-height:min(84dvh,640px);display:flex;flex-direction:column}
+.conflict-title{font-weight:500;margin:0}
+#conflictCount:empty{display:none}
+.conflict-diff{display:grid;grid-template-columns:auto 1fr 1fr;gap:5px 12px;font-size:13px;overflow-y:auto;min-height:0;margin:6px 0 4px}
+.conflict-diff .cd-h{font-size:11px;font-weight:500;color:var(--muted)}
+.conflict-diff .cd-f{color:var(--muted);white-space:nowrap}
+.conflict-diff span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.conflict-actions{flex-wrap:wrap}
 
 /* Compact mobile task cards: badges own the full top row, actions sit on the
    title row where the space is. Must stay last in file: equal-specificity

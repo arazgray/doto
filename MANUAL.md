@@ -52,6 +52,9 @@ How it works and what to expect:
   newest version wins and the app tells you.
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
+- If the same task or list was edited on two devices between syncs, the
+  newest version applies immediately — then a dialog shows each conflict
+  with a field-by-field diff so you can keep your version or take Drive's.
 - Signing out keeps a full copy on that device; signing back in merges it.
 - **Pull to refresh**: on touch devices, drag down from the very top of any
   page and release to force a Drive sync.
