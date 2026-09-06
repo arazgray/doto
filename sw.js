@@ -1,7 +1,7 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v2';
+const CACHE = 'doto-v3';
 const CORE = [
   './',
   'index.html',
@@ -9,12 +9,12 @@ const CORE = [
   'app.js',
   'manual.html',
   'MANUAL.md',
-  'manifest.webmanifest',
-  'icon-192.png',
-  'icon-512.png',
-  'icon-maskable-512.png',
-  'icon-180.png',
-  'icon.svg',
+  'assets/manifest.webmanifest',
+  'assets/icon-192.png',
+  'assets/icon-512.png',
+  'assets/icon-maskable-512.png',
+  'assets/icon-180.png',
+  'assets/icon.svg',
 ];
 
 self.addEventListener('install', (e) => {

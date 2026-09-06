@@ -27,7 +27,7 @@ installable and works offline:
 - **iPhone / iPad** — Share → *Add to Home Screen* (uses the touch icon +
   standalone display; requires hosting over `http(s)`, not `file://`).
 
-Installability is provided by `manifest.webmanifest` + `sw.js` (offline app
+Installability is provided by `assets/manifest.webmanifest` + `sw.js` (offline app
 shell). Plain `file://` usage still works, minus install/offline.
 
 ## Features
@@ -139,7 +139,7 @@ Corrupted saves are detected on load: the raw data is stashed under a
 index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, modal, toast
 styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark
 app.js       — all logic (~1900 lines), vanilla JS
-manifest.webmanifest + sw.js + icon-*.png — PWA install (Chrome/desktop/mobile, iOS Add to Home) + offline shell
+assets/manifest.webmanifest + sw.js + assets/icon-*.png — PWA install (Chrome/desktop/mobile, iOS Add to Home) + offline shell
 MANUAL.md + manual.html — user manual (Markdown source + offline reader, linked from sidebar)
 ```
 
