@@ -27,9 +27,9 @@ snapshot (`doto-sync` in localStorage); both-sides-edited items resolve
 newest-wins with a toast. Auto-push (8s debounce) + pull on load, focus and
 reconnect. Details in [MANUAL.md](MANUAL.md#account-and-sync).
 
-Requires a Google OAuth client ID (Drive API enabled, origin
-`https://arazgray.github.io`): paste it once in the Account dialog, or set
-`GOOGLE_CLIENT_ID` in `app.js`.
+Ships with the app's own Google OAuth client ID — just press Sign in.
+(Repo forks need their own ID: set `GOOGLE_CLIENT_ID` in `app.js`, with the
+Drive API enabled and the site's origin added.)
 
 ## Install as app (PWA)
 Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
