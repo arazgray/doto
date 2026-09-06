@@ -173,7 +173,9 @@ It needs location permission (or IP-based fallback) and internet. Everything els
 **My phone shows an old version of the app.**
 Open the app with internet — it checks for updates on launch and shows an
 **Update** button when one is ready. If it stays stuck (iOS has no
-hard-refresh), remove the home-screen icon and re-add it.
+hard-refresh), remove the home-screen icon and re-add it. You can also force it:
+sidebar → **Update** next to Account & Sync wipes the offline cache and
+reloads the newest version.
 
 **Where do I report a bug or ask for a feature?**
 Open an issue at <https://github.com/arazgray/doto/issues>.

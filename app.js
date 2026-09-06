@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788687793'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788689239'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -168,6 +168,22 @@ function forceReload() {
     u.searchParams.set('u', Date.now().toString(36)); // bust the cached shell
     location.href = u.toString();
   } catch { location.reload(); }
+}
+/* Manual nuke: drop service workers + offline caches, then reload newest.
+   Works in browser tab, installed PWA and iOS home-screen app. */
+async function forceUpdate() {
+  toast('Updating to newest version…');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
+    }
+  } catch {}
+  setTimeout(forceReload, 350);
 }
 
 /* ---------- keyboard shortcuts + command palette ---------- */
@@ -610,7 +626,10 @@ function recurLabel(r) {
 }
 
 /* ---------- task rows ---------- */
+const mqCompact = window.matchMedia('(max-width: 600px)');
+if (mqCompact.addEventListener) mqCompact.addEventListener('change', () => renderAll());
 function taskRow(t, opts = {}) {
+  opts = { ...opts, compact: opts.compact || mqCompact.matches };
   const li = document.createElement('li');
   li.className = 'task' + (t.done ? ' done-task' : '');
   li.dataset.id = t.id; li.draggable = true;
@@ -2344,6 +2363,7 @@ function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
   $('#syncPill').onclick = openAccount;
   $('#accountBtn').onclick = openAccount;
+  $('#updateBtn').onclick = () => { forceUpdate().catch(() => forceReload()); };
   $('#accountClose').onclick = closeAccount;
   $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
   $('#signInBtn').onclick = async () => {

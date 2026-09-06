@@ -128,6 +128,9 @@ input,select,textarea{font:inherit;color:inherit}
   &.danger{color:var(--danger)}
 }
 .sidebar-foot{margin-top:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.sidebar-foot .io-row{gap:6px}
+.sidebar-foot .btn-ghost{font-size:12px;padding:8px 6px}
+.sidebar-foot .btn-ghost .material-icons-outlined{font-size:16px}
 .switch-row{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 .io-row{display:flex;gap:8px}
 .btn-ghost{
@@ -820,4 +823,22 @@ a.btn-ghost{text-decoration:none}
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235f6368' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;
   &:focus{border-color:var(--blue)}
+}
+
+/* Compact mobile task cards: badges own the full top row, actions sit on the
+   title row where the space is. Must stay last in file: equal-specificity
+   overrides of the base task rules. */
+@media (max-width:600px){
+  .task{column-gap:4px;padding:10px 12px}
+  .task-meta{grid-row:1;grid-column:1/-1;justify-content:flex-start}
+  .task-meta .badge{font-size:11px;padding:1px 6px}
+  .task-meta .badge .material-icons-outlined{font-size:13px}
+  .task-actions{grid-row:2;grid-column:4;justify-content:flex-end;gap:2px}
+  .task-actions .icon-btn.sm{width:26px;height:26px}
+  .task-actions .icon-btn.sm .material-icons-outlined{font-size:19px}
+  .task-actions [title="Move to list"],.task-actions [title="Track time on this task"]{display:none}
+  .task-actions .color-dot-btn{width:18px;height:18px}
+  .home-grid{gap:14px}
+  .card{padding:14px}
+  .card h2{margin:0 0 10px}
 }
