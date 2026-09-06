@@ -23,7 +23,7 @@ const IMPORTANCE = { low: { label: 'Low', icon: 'arrow_downward' }, medium: { la
 const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
 
 let state = migrate(load() || seed());
-let ui = { completedOpen: false, boardDone: {}, sort: 'order', detailId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '' };
+let ui = { completedOpen: false, boardDone: {}, sort: 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '' };
 // shared single-click timer: opening any popup cancels a pending details-open
 // so the panel can never ambush a popup tap
 let pendingDetailTimer = 0;
@@ -68,8 +68,47 @@ function migrate(s) {
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
   return s;
 }
-function load() { try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
-function save() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function validState(s) {
+  return !!s && typeof s === 'object' && Array.isArray(s.lists) && Array.isArray(s.tasks)
+    && s.lists.every((l) => l && typeof l.id === 'string' && typeof l.name === 'string')
+    && s.tasks.every((t) => t && typeof t.id === 'string' && typeof t.listId === 'string' && typeof t.title === 'string');
+}
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(LS_KEY); } catch { return null; }
+  if (!raw) return null;
+  try {
+    const s = JSON.parse(raw);
+    if (validState(s)) return s;
+  } catch { /* fall through to recovery */ }
+  // Corrupted save: stash it for forensics, then start fresh instead of dying.
+  try { localStorage.setItem(LS_KEY + '-corrupt-' + Date.now(), String(raw).slice(0, 500000)); } catch {}
+  try { localStorage.removeItem(LS_KEY); } catch {}
+  setTimeout(() => { try { toast('Saved data was corrupted — started fresh (a backup was kept in this browser)'); } catch {} }, 600);
+  return null;
+}
+let quotaWarned = false;
+function save() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  } catch (err) {
+    if (err && err.name === 'QuotaExceededError' && !quotaWarned) {
+      quotaWarned = true;
+      try { toast('Browser storage is full — export a JSON backup to be safe'); } catch {}
+    }
+  }
+}
+
+// Last-resort error surface: never die silently, never spam.
+let lastErrToast = 0;
+function reportCrash() {
+  const n = Date.now();
+  if (n - lastErrToast < 8000) return;
+  lastErrToast = n;
+  try { toast('Something went wrong — your lists are saved, try reloading'); } catch {}
+}
+window.addEventListener('error', reportCrash);
+window.addEventListener('unhandledrejection', reportCrash);
 
 function isHome() { return state.activeView === HOME; }
 function isAll() { return state.activeView === ALL; }
@@ -96,6 +135,207 @@ function toast(msg, undoFn) {
   toastTimer = setTimeout(hideToast, 4200);
 }
 function hideToast() { $('#toast').classList.add('hidden'); }
+
+/* ---------- keyboard shortcuts + command palette ---------- */
+const SHORTCUTS = [
+  { keys: ['Ctrl', 'K'], desc: 'Command palette (works everywhere)' },
+  { keys: ['/'], desc: 'Focus search' },
+  { keys: ['n'], desc: 'New task' },
+  { keys: ['j', 'k'], desc: 'Select next / previous task' },
+  { keys: ['Up', 'Down'], desc: 'Select previous / next task (once a task is selected)' },
+  { keys: ['Enter'], desc: 'Open selected task' },
+  { keys: ['x'], desc: 'Complete / reopen selected task' },
+  { keys: ['Del'], desc: 'Delete selected task (undoable)' },
+  { keys: ['g', 'then', 'h'], desc: 'Go to Home' },
+  { keys: ['g', 'then', 'b'], desc: 'Go to Board' },
+  { keys: ['g', 'then', 'c'], desc: 'Go to Calendar' },
+  { keys: ['g', 'then', 't'], desc: 'Go to Time tracker' },
+  { keys: ['g', 'then', '1-9'], desc: 'Jump to list by position' },
+  { keys: ['u'], desc: 'Show / hide completed tasks' },
+  { keys: ['d'], desc: 'Toggle dark mode' },
+  { keys: ['?'], desc: 'This help' },
+  { keys: ['Esc'], desc: 'Close panel / dialog' },
+];
+
+function typingNow() {
+  const el = document.activeElement;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+}
+function visibleTaskRows() { return $$('#main .task[data-id]'); }
+function paintSelection(scroll) {
+  $$('#main .task.kb-selected').forEach((x) => x.classList.remove('kb-selected'));
+  if (!ui.selectedId) return;
+  const row = document.querySelector(`#main .task[data-id="${ui.selectedId}"]`);
+  if (row) { row.classList.add('kb-selected'); if (scroll) row.scrollIntoView({ block: 'nearest' }); }
+}
+function selectStep(dir) {
+  const rows = visibleTaskRows();
+  if (!rows.length) return;
+  let i = rows.findIndex((r) => r.dataset.id === ui.selectedId);
+  i = i < 0 ? (dir > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, i + dir));
+  ui.selectedId = rows[i].dataset.id;
+  paintSelection(true);
+}
+function selectedTask() { return ui.selectedId ? getTask(ui.selectedId) : null; }
+function toggleShowCompleted() {
+  state.showCompleted = !state.showCompleted;
+  const t = $('#showCompletedToggle');
+  if (t) t.checked = state.showCompleted;
+  save(); renderAll();
+}
+
+let paletteIdx = 0, paletteItems = [];
+function paletteCommands() {
+  return [
+    { icon: 'home', label: 'Go to Home', run: () => go(HOME) },
+    { icon: 'view_column', label: 'Go to Board', run: () => go(ALL) },
+    { icon: 'calendar_month', label: 'Go to Calendar', run: () => go(CAL) },
+    { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
+    { icon: 'add', label: 'New task', run: () => $('#fab').click() },
+    { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
+    { icon: 'dark_mode', label: 'Toggle dark mode', run: () => $('#themeBtn').click() },
+    { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
+    { icon: 'swap_vert', label: 'Sort by My order', run: () => { ui.sort = 'order'; renderAll(); } },
+    { icon: 'event', label: 'Sort by Date', run: () => { ui.sort = 'date'; renderAll(); } },
+    { icon: 'flag', label: 'Sort by Importance and weight', run: () => { ui.sort = 'priority'; renderAll(); } },
+    { icon: 'sort_by_alpha', label: 'Sort by Title', run: () => { ui.sort = 'title'; renderAll(); } },
+    { icon: 'upload', label: 'Import JSON', run: () => $('#importFile').click() },
+    { icon: 'download', label: 'Export JSON', run: () => exportJSON() },
+    { icon: 'keyboard', label: 'Keyboard shortcuts', run: () => openHelp() },
+    { icon: 'menu_book', label: 'Open Manual', run: () => window.open('manual.html', '_blank', 'noopener') },
+  ];
+}
+function fuzzy(hay, needle) {
+  hay = (hay || '').toLowerCase(); needle = (needle || '').toLowerCase();
+  let i = 0;
+  for (const ch of needle) { i = hay.indexOf(ch, i); if (i < 0) return false; i++; }
+  return true;
+}
+function paletteOpen() { return !$('#paletteScrim').classList.contains('hidden'); }
+function openPalette() {
+  $('#paletteScrim').classList.remove('hidden');
+  const inp = $('#paletteInput');
+  inp.value = '';
+  renderPalette('');
+  setTimeout(() => inp.focus(), 30);
+}
+function closePalette() { $('#paletteScrim').classList.add('hidden'); const i = $('#paletteInput'); if (i) i.blur(); }
+function renderPalette(q) {
+  q = (q || '').trim();
+  const cmds = paletteCommands().filter((c) => !q || fuzzy(c.label, q));
+  const lists = q
+    ? state.lists.filter((l) => fuzzy(l.name, q)).map((l) => ({ icon: 'list', label: l.name, hint: 'List', run: () => go(l.id) }))
+    : [];
+  const tasks = q
+    ? allFiltered().filter((t) => fuzzy(t.title || '(untitled)', q)).slice(0, 20)
+      .map((t) => ({ icon: 'check_circle', label: t.title || '(untitled)', hint: listName(t.listId), run: () => { ui.selectedId = t.id; openDetail(t.id); } }))
+    : [];
+  paletteItems = [...cmds, ...lists, ...tasks];
+  paletteIdx = 0;
+  const ul = $('#paletteList');
+  ul.innerHTML = '';
+  if (!paletteItems.length) { ul.innerHTML = '<li class="palette-empty">No matches</li>'; return; }
+  paletteItems.forEach((it, i) => {
+    const li = document.createElement('li');
+    li.className = 'palette-item' + (i === paletteIdx ? ' selected' : '');
+    li.setAttribute('role', 'option');
+    const ic = document.createElement('span');
+    ic.className = 'material-icons-outlined'; ic.textContent = it.icon;
+    const lb = document.createElement('span');
+    lb.textContent = it.label; lb.dir = 'auto';
+    li.append(ic, lb);
+    if (it.hint) { const h = document.createElement('span'); h.className = 'hint'; h.textContent = it.hint; li.appendChild(h); }
+    li.onclick = () => { closePalette(); it.run(); };
+    li.onmousemove = () => { if (paletteIdx !== i) { paletteIdx = i; paintPaletteSel(); } };
+    ul.appendChild(li);
+  });
+  ul.scrollTop = 0;
+}
+function paintPaletteSel() {
+  $$('#paletteList .palette-item').forEach((li, i) => li.classList.toggle('selected', i === paletteIdx));
+  const sel = $('#paletteList .palette-item.selected');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+function runPalette() {
+  const it = paletteItems[paletteIdx];
+  closePalette();
+  if (it) it.run();
+}
+function helpOpen() { return !$('#helpScrim').classList.contains('hidden'); }
+function openHelp() {
+  const host = $('#helpTable');
+  host.innerHTML = '';
+  SHORTCUTS.forEach((s) => {
+    const row = document.createElement('div');
+    row.className = 'help-row';
+    const keys = document.createElement('span');
+    keys.className = 'help-keys';
+    s.keys.forEach((k) => { const c = document.createElement('kbd'); c.textContent = k; keys.appendChild(c); });
+    const d = document.createElement('span');
+    d.textContent = s.desc;
+    row.append(keys, d);
+    host.appendChild(row);
+  });
+  $('#helpScrim').classList.remove('hidden');
+}
+function closeHelp() { $('#helpScrim').classList.add('hidden'); }
+
+let pendingG = 0;
+function bindShortcuts() {
+  $('#shortcutsBtn').onclick = openHelp;
+  $('#helpClose').onclick = closeHelp;
+  $('#helpScrim').onclick = (e) => { if (e.target === $('#helpScrim')) closeHelp(); };
+  $('#paletteScrim').onclick = (e) => { if (e.target === $('#paletteScrim')) closePalette(); };
+  const inp = $('#paletteInput');
+  inp.oninput = () => renderPalette(inp.value);
+  inp.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (paletteItems.length) { paletteIdx = (paletteIdx + 1) % paletteItems.length; paintPaletteSel(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (paletteItems.length) { paletteIdx = (paletteIdx - 1 + paletteItems.length) % paletteItems.length; paintPaletteSel(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); runPalette(); }
+    else if (e.key === 'Escape') closePalette();
+  };
+  // clicking a row arms it for keyboard actions (x / Enter / Del)
+  document.addEventListener('click', (e) => {
+    const row = e.target && e.target.closest ? e.target.closest('#main .task[data-id]') : null;
+    if (row) { ui.selectedId = row.dataset.id; paintSelection(false); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closePalette(); closeHelp(); clearTimeout(pendingG); pendingG = 0; return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? closePalette() : openPalette(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (typingNow() || paletteOpen() || helpOpen() || !$('#modalScrim').classList.contains('hidden')) return;
+    if (pendingG) {
+      clearTimeout(pendingG); pendingG = 0;
+      const gk = e.key.toLowerCase();
+      if (gk === 'h') return go(HOME);
+      if (gk === 'b') return go(ALL);
+      if (gk === 'c') return go(CAL);
+      if (gk === 't') return go(TIME);
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9 && state.lists[n - 1]) return go(state.lists[n - 1].id);
+      return;
+    }
+    const k = e.key;
+    if (k === 'g' || k === 'G') { pendingG = setTimeout(() => { pendingG = 0; }, 900); return; }
+    if (k === '/') { e.preventDefault(); const s = $('#searchInput'); s.focus(); s.select(); return; }
+    if (k === '?') { openHelp(); return; }
+    if (k === 'n' || k === 'N') { $('#fab').click(); return; }
+    if (k === 'j' || k === 'J') { e.preventDefault(); selectStep(1); return; }
+    if (k === 'k' || k === 'K') { e.preventDefault(); selectStep(-1); return; }
+    if (k === 'ArrowDown' || k === 'ArrowUp') {
+      if (!ui.selectedId) return; // plain scrolling still works until a task is selected
+      e.preventDefault();
+      selectStep(k === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+    if (k === 'Enter') { const t = selectedTask(); if (t) openDetail(t.id); return; }
+    if (k === 'x' || k === 'X') { const t = selectedTask(); if (t) toggleDone(t.id); return; }
+    if (k === 'Delete' || k === 'Backspace') { const t = selectedTask(); if (t) { e.preventDefault(); ui.selectedId = null; deleteTask(t.id); } return; }
+    if (k === 'u' || k === 'U') { toggleShowCompleted(); return; }
+    if (k === 'd' || k === 'D') { $('#themeBtn').click(); return; }
+  });
+}
 
 /* ---------- filtering / sorting ---------- */
 function sortFn() {
@@ -1686,7 +1926,11 @@ async function importFiles(files) {
 }
 
 /* ---------- events ---------- */
-function renderAll() { applySizes(); renderNav(); renderCurrentView(); if (ui.detailId) renderDetail(); }
+function renderAll() {
+  applySizes(); renderNav(); renderCurrentView(); if (ui.detailId) renderDetail();
+  if (ui.selectedId && !getTask(ui.selectedId)) ui.selectedId = null;
+  paintSelection(false);
+}
 
 function bind() {
   $('#menuBtn').onclick = () => {
@@ -1880,9 +2124,11 @@ function bind() {
   $('#detailDelete').onclick = () => { if (ui.detailId) deleteTask(ui.detailId); };
   $('#dDoneToggle').onclick = () => { if (ui.detailId) toggleDone(ui.detailId); };
 
+  // keyboard shortcuts + command palette
+  bindShortcuts();
+
   // resizers (desktop)
-  makeResizable($('#sideResizer'), (ev) => {
-    state.prefs.sideW = Math.min(420, Math.max(220, ev.clientX));
+  makeResizable($('#sideResizer'), (ev) => {    state.prefs.sideW = Math.min(420, Math.max(220, ev.clientX));
     applySizes();
   });
   makeResizable($('#detailResizer'), (ev) => {

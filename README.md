@@ -4,6 +4,11 @@ A Google Tasks-style task manager with superpowers. 100% vanilla HTML/CSS/JS —
 no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
 
+**Live app: <https://arazgray.github.io/doto/>**
+**Manual: [MANUAL.md](MANUAL.md)** (also readable in-app via sidebar → Manual,
+or on the [GitHub wiki](https://github.com/arazgray/doto/wiki) once enabled —
+see below).
+
 ## Run it
 
 Open `index.html` directly in a browser, or serve the folder:
@@ -68,6 +73,21 @@ shell). Plain `file://` usage still works, minus install/offline.
   time-record delete, duplicate cleanup).
 - RTL-friendly: all user text uses `dir="auto"`.
 
+## Keyboard shortcuts
+
+Full map in [MANUAL.md](MANUAL.md#keyboard-shortcuts) (or press `?` in the
+app). The highlights:
+
+| Keys | Action |
+| ---- | ------ |
+| `Ctrl+K` / `Cmd+K` | Command palette (commands, lists, tasks) |
+| `/` | Focus search |
+| `n` | New task |
+| `j` / `k`, `Enter`, `x`, `Del` | Select, open, complete, delete |
+| `g` then `h` / `b` / `c` / `t` | Go Home / Board / Calendar / Time |
+| `g` then `1`–`9` | Jump to list by position |
+| `u`, `d`, `?`, `Esc` | Completed visibility, dark mode, help, close |
+
 ## Import / Export
 
 - **Export** — sidebar → *Export JSON*: `doto-export-YYYY-MM-DD.json` including
@@ -95,6 +115,26 @@ importance, recur, done, completedAt, order, createdAt, subtasks }`.
 Privacy note: the Home weather card fetches from Open-Meteo / BigDataCloud /
 ipapi.co; nothing else ever leaves the browser.
 
+Corrupted saves are detected on load: the raw data is stashed under a
+`doto-v1-corrupt-<timestamp>` key and the app starts fresh instead of breaking.
+
+## Manual & wiki
+
+- The user manual lives in [MANUAL.md](MANUAL.md) and is rendered in-app at
+  [`manual.html`](https://arazgray.github.io/doto/manual.html) (sidebar →
+  **Manual**).
+- To also publish it on the **GitHub wiki** (one-time):
+  1. Open <https://github.com/arazgray/doto/settings> → check
+     **Wikis** under Features (this creates the wiki repo).
+  2. Then run:
+     ```
+     git clone git@github.com:arazgray/doto.wiki.git /tmp/doto.wiki
+     cp MANUAL.md "/tmp/doto.wiki/Home.md"
+     cd /tmp/doto.wiki && git add Home.md && git commit -m "Publish manual" && git push
+     ```
+  The sidebar Manual button points at the in-app page, which never 404s;
+  link to the wiki from the manual once it exists.
+
 ## Project layout
 
 ```
@@ -102,6 +142,7 @@ index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, modal, t
 styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark
 app.js       — all logic (~1900 lines), vanilla JS
 manifest.webmanifest + sw.js + icon-*.png — PWA install (Chrome/desktop/mobile, iOS Add to Home) + offline shell
+MANUAL.md + manual.html — user manual (Markdown source + offline reader, linked from sidebar)
 ```
 
 Conventions: no emojis in code, no `prompt()`/`confirm()` (in-app modal

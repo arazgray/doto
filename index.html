@@ -80,6 +80,10 @@
           <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
           <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
         </div>
+        <div class="io-row">
+          <a id="manualBtn" class="btn-ghost" href="manual.html" target="_blank" rel="noopener"><span class="material-icons-outlined">menu_book</span> Manual</a>
+          <button id="shortcutsBtn" class="btn-ghost"><span class="material-icons-outlined">keyboard</span> Shortcuts</button>
+        </div>
       </div>
     </div>
     <div id="sideResizer" class="resizer resizer-side" title="Drag to resize lists panel"></div>
@@ -372,6 +376,25 @@
 <div id="weightPop" class="menu hidden"></div>
 <div id="importancePop" class="menu hidden"></div>
 <div id="movePop" class="menu hidden"></div>
+<div id="paletteScrim" class="modal-scrim hidden">
+  <div id="paletteBox" class="palette-box" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette-input-wrap">
+      <span class="material-icons-outlined">search</span>
+      <input id="paletteInput" type="text" placeholder="Type a command or search tasks…" autocomplete="off" aria-label="Command palette" dir="auto" />
+    </div>
+    <ul id="paletteList" class="palette-list" role="listbox" aria-label="Results"></ul>
+    <p class="muted small palette-hint">Up/Down navigate · Enter run · Esc close</p>
+  </div>
+</div>
+<div id="helpScrim" class="modal-scrim hidden">
+  <div class="modal help-modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <h3>Keyboard shortcuts</h3>
+    <div id="helpTable" class="help-table"></div>
+    <div class="modal-actions">
+      <button type="button" id="helpClose" class="btn-primary">Done</button>
+    </div>
+  </div>
+</div>
 <div id="modalScrim" class="modal-scrim hidden">
   <form id="modalBox" class="modal" role="dialog" aria-modal="true" autocomplete="off">
     <h3 id="modalTitle"></h3>

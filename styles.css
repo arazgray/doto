@@ -715,3 +715,43 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   .board{overflow-x:auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* Command palette */
+.palette-box{
+  background:var(--bg);border-radius:16px;box-shadow:var(--shadow-lg);
+  width:min(560px,100%);max-height:min(70dvh,560px);display:flex;flex-direction:column;overflow:hidden;
+  align-self:flex-start;margin-top:12dvh;
+}
+.palette-input-wrap{
+  display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line-soft);
+  & .material-icons-outlined{color:var(--muted)}
+  & input{flex:1;border:0;outline:0;background:transparent;font-size:16px;min-width:0}
+}
+.palette-list{list-style:none;margin:0;padding:6px;overflow-y:auto;min-height:0}
+.palette-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;
+  & .material-icons-outlined{color:var(--muted);flex:none}
+  & .hint{margin-left:auto;font-size:12px;color:var(--muted);flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%}
+  &.selected{background:var(--blue-soft)}
+  &.selected .material-icons-outlined{color:var(--blue)}
+}
+.palette-empty{color:var(--muted);font-size:14px;padding:14px;text-align:center}
+.palette-hint{margin:0;padding:8px 14px;border-top:1px solid var(--line-soft)}
+
+/* Shortcuts help */
+.help-modal{width:min(520px,100%);max-height:min(80dvh,640px);display:flex;flex-direction:column}
+#helpTable{overflow-y:auto;min-height:0}
+.help-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line-soft);font-size:14px}
+.help-row:last-child{border-bottom:0}
+.help-keys{display:flex;gap:4px;flex:none;min-width:130px;flex-wrap:wrap}
+kbd{
+  font-family:inherit;font-size:12px;background:var(--bg2);border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:6px;padding:2px 7px;white-space:nowrap;
+}
+
+/* Keyboard selection ring on task rows */
+.task.kb-selected{outline:2px solid var(--blue);outline-offset:-2px}
+
+/* Sidebar ghost links + even button rows */
+a.btn-ghost{text-decoration:none}
+.io-row .btn-ghost{flex:1;justify-content:center}
