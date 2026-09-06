@@ -29,13 +29,10 @@ let ui = { completedOpen: false, boardDone: {}, sort: 'order', detailId: null, s
 let pendingDetailTimer = 0;
 
 function seed() {
-  const l1 = { id: uid(), name: 'My Tasks', createdAt: Date.now() };
-  const l2 = { id: uid(), name: 'Shopping', createdAt: Date.now() };
-  const t = (o) => Object.assign({ id: uid(), listId: l1.id, title: '', notes: '', date: '', time: '', extRef: '', color: 'default', weight: 'medium', importance: 'medium', recur: null, done: false, completedAt: 0, order: 0, createdAt: Date.now(), subtasks: [] }, o);
+  const l1 = { id: uid(), name: 'General', createdAt: Date.now() };
   const today = new Date(); const iso = (d) => d.toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 864e5);
   return {
-    lists: [l1, l2],
+    lists: [l1],
     activeView: HOME,
     showCompleted: true,
     filters: { color: '', weight: '', importance: '' },
@@ -43,10 +40,18 @@ function seed() {
     times: [],
     timer: null,
     tasks: [
-      t({ title: 'Welcome to DoTo — start from Home summary', notes: 'Home shows Today + most important first. All shows every category as columns.', color: 'blue', weight: 'light', importance: 'high', date: iso(today), order: 0, subtasks: [{ id: uid(), title: 'Try the color dot in the list', done: true }, { id: uid(), title: 'Drag me to another list', done: false }] }),
-      t({ title: 'Design mobile-first layout', extRef: 'https://example.com/spec', color: 'purple', weight: 'heavy', importance: 'high', date: iso(today), order: 1 }),
-      t({ title: 'Buy groceries', listId: l2.id, color: 'green', weight: 'medium', importance: 'medium', date: iso(tomorrow), order: 0, subtasks: [{ id: uid(), title: 'Oat milk', done: false }] }),
-      t({ title: 'Read 10 pages (light task)', color: 'green', weight: 'light', importance: 'low', order: 2 }),
+      {
+        id: uid(), listId: l1.id, title: 'Example Task',
+        notes: 'This is a sample task showing every field. Open its details, then delete it when ready.',
+        date: iso(today), time: '09:00', extRef: 'https://example.com',
+        color: 'blue', weight: 'heavy', importance: 'high',
+        recur: { freq: 'weekly', interval: 1, days: [1] },
+        done: false, completedAt: 0, order: 0, createdAt: Date.now(),
+        subtasks: [
+          { id: uid(), title: 'Completed subtask', done: true },
+          { id: uid(), title: 'Open subtask', done: false },
+        ],
+      },
     ],
   };
 }
@@ -1879,7 +1884,7 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
   }
   if (mode === 'doto') throw new Error('Not a DoTo backup — switch the source to Google Tasks or Auto-detect');
   const base = (fileName || 'Imported').replace(/\.json$/i, '').split('/').pop() || 'Imported';
-  const niceBase = base === 'Tasks' ? 'My Tasks' : base;
+  const niceBase = base === 'Tasks' ? 'General' : base;
   // 2. Full Takeout backup: one file holding many lists
   if (parsed && parsed.kind === 'tasks#taskLists' && Array.isArray(parsed.items)) {
     let T = 0;
@@ -1924,7 +1929,7 @@ async function importFiles(files, mode = 'auto') {
       L += r.lists; T += r.tasks; TM += r.times || 0;
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
-  if (!fallbackList()) state.lists.push({ id: uid(), name: 'My Tasks', createdAt: Date.now() });
+  if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
   if (state.activeView !== HOME && state.activeView !== ALL && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
   if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : ''));

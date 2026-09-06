@@ -23,7 +23,7 @@
 ## Getting started
 
 1. Open <https://arazgray.github.io/doto/> in any modern browser.
-2. You start with two lists: **My Tasks** and **Shopping**, plus a few example tasks.
+2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar, then **Create new list** for your own categories.
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
