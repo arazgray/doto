@@ -5,8 +5,6 @@ no dependencies, no build step, no framework. Mobile-first and fully responsive,
 with full touch + mouse parity.
 
 **Live app: <https://arazgray.github.io/doto/>** 
-**Manual: [MANUAL.md](MANUAL.md)** (also readable in-app via sidebar → Manual,
-or on the [GitHub wiki](https://github.com/arazgray/doto/wiki)).
 
 ## Run it
 
