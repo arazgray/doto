@@ -785,6 +785,20 @@ a.btn-ghost{text-decoration:none}
 
 /* Account dialog */
 .account-modal{width:min(460px,100%);max-height:min(86dvh,700px);overflow-y:auto}
+.sync-err{color:var(--danger);font-size:13px;margin:6px 0 0}
+.full-btn{width:100%;justify-content:center;margin-top:8px}
+.api-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.api-note .btn-ghost{font-size:13px;padding:7px 12px}
+.api-note .btn-ghost .material-icons-outlined{font-size:17px}
+
+/* Sync history log */
+.log-modal{width:min(480px,100%);max-height:min(80dvh,600px);display:flex;flex-direction:column}
+.sync-log{list-style:none;margin:0 0 6px;padding:0;overflow-y:auto;min-height:0}
+.log-row{display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line-soft);font-size:13px}
+.log-row:last-child{border-bottom:0}
+.log-t{color:var(--muted);font-size:12px;flex:none;min-width:150px}
+.log-row.error{color:var(--danger)}
+.log-row.conflict{color:#b06000}
 .account-actions{justify-content:flex-start;flex-wrap:wrap}
 .account-actions .btn-ghost .material-icons-outlined{font-size:18px}
 .setup-box{

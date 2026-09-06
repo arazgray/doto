@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788682818" />
 </head>
 <body>
 <header class="topbar">
@@ -389,13 +389,15 @@
     <h3>Account &amp; Sync</h3>
     <p id="accountEmail" class="muted small">Not signed in.</p>
     <p id="accountLast" class="muted small"></p>
+    <p id="accountError" class="sync-err hidden"></p>
     <div id="accountSetup" class="setup-box hidden">
       <p class="small"><strong>One-time setup:</strong> create a Google OAuth client ID, then paste it below. It stays in this browser.</p>
       <ol class="small">
         <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud → Credentials</a> → Create → OAuth client ID → Web application.</li>
         <li>Authorized JavaScript origins: add <code>https://arazgray.github.io</code> (plus <code>http://localhost:8000</code> for local testing).</li>
-        <li>Enable the <strong>Google Drive API</strong> for the project. Paste the client ID here.</li>
+        <li>Enable the <strong>Google Drive API</strong> for the project (button below). Paste the client ID here.</li>
       </ol>
+      <a class="btn-ghost full-btn" href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener"><span class="material-icons-outlined">open_in_new</span> Enable Drive API</a>
       <div class="setup-row">
         <input id="clientIdInput" type="text" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" aria-label="Google OAuth client ID" dir="ltr" />
         <button type="button" id="clientIdSave" class="btn-primary">Save</button>
@@ -405,6 +407,7 @@
       <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
       <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
       <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
+      <button type="button" id="logOpenBtn" class="btn-ghost"><span class="material-icons-outlined">history</span> History</button>
     </div>
     <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
     <div class="sidebar-divider"></div>
@@ -418,8 +421,22 @@
       <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export JSON</button>
     </div>
     <p class="muted small">Synced copy lives in your Drive's hidden app folder — only you can see it. This device always works offline; sync merges changes per item.</p>
+    <div class="api-note">
+      <span class="muted small">Sync needs the <strong>Drive API</strong> enabled for your Cloud project.</span>
+      <a class="btn-ghost" href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener"><span class="material-icons-outlined">open_in_new</span> Enable Drive API</a>
+    </div>
     <div class="modal-actions">
       <button type="button" id="accountClose" class="btn-primary">Done</button>
+    </div>
+  </div>
+</div>
+<div id="logScrim" class="modal-scrim hidden">
+  <div class="modal log-modal" role="dialog" aria-modal="true" aria-label="Sync history">
+    <h3>Sync history</h3>
+    <ul id="syncLogList" class="sync-log"></ul>
+    <div class="modal-actions">
+      <button type="button" id="logClear" class="btn-ghost">Clear</button>
+      <button type="button" id="logClose" class="btn-primary">Done</button>
     </div>
   </div>
 </div>
@@ -446,6 +463,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js"></script>
+<script src="app.js?v=1.0-1788682818"></script>
 </body>
 </html>

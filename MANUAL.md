@@ -52,6 +52,7 @@ How it works and what to expect:
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
 - Signing out keeps a full copy on that device; signing back in merges it.
+- Account dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
 - Import / Export moved into the Account dialog (same JSON backup as before).
 
 ## Views
@@ -157,6 +158,12 @@ Yes — via Account & Sync (Google Drive). Sign in on each device and both stay 
 
 **Can I share a list with someone?**
 Not yet — export the JSON and send them the file; they can import it.
+
+**Sync keeps asking me to sign in, or says "Sync failed".**
+Most common cause: the Google Drive API is not enabled for your Cloud project
+(Drive answers 403) — enable it under APIs & Services, then Sync now. Also
+make sure you ticked the Drive checkbox on Google's consent screen and that
+sign-in popups are not blocked.
 
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.

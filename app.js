@@ -309,10 +309,10 @@ function bindShortcuts() {
     if (row) { ui.selectedId = row.dataset.id; paintSelection(false); }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); clearTimeout(pendingG); pendingG = 0; return; }
+    if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); closeLog(); clearTimeout(pendingG); pendingG = 0; return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? closePalette() : openPalette(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (typingNow() || paletteOpen() || helpOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
+    if (typingNow() || paletteOpen() || helpOpen() || isLogOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
     if (pendingG) {
       clearTimeout(pendingG); pendingG = 0;
       const gk = e.key.toLowerCase();
@@ -1966,8 +1966,60 @@ function loadSyncMeta() {
 }
 let syncMeta = loadSyncMeta();
 let syncStatus = 'signedout'; // setup|signedout|syncing|ok|error
+let lastSyncError = '';
 function saveSyncMeta() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncMeta)); } catch {} }
-function setSync(s) { syncStatus = s; paintSync(); }
+function setSync(s) { syncStatus = s; if (s === 'ok') lastSyncError = ''; paintSync(); }
+function friendlySyncError(e) {
+  const m = (e && e.message) || '';
+  if (m === 'forbidden') return 'Drive refused access (403). Enable the Drive API for your Cloud project and grant access when asked.' + (e.detail ? ' Google says: ' + e.detail : '');
+  if (m === 'net') return 'Could not reach Google — check connection or ad-blocker.';
+  if (m.indexOf('drive') === 0) return 'Drive request failed (' + m + ').';
+  return 'Sync failed — retry.';
+}
+function handleSyncFailure(e, mode, prev) {
+  const m = (e && e.message) || '';
+  if (m === 'auth' || m === 'setup') { setSync('signedout'); return; }
+  if (mode === 'silent') { syncStatus = prev; paintSync(); return; } // background stays quiet
+  lastSyncError = friendlySyncError(e);
+  slog('error', lastSyncError);
+  setSync('error');
+  try { toast(lastSyncError); } catch {}
+}
+
+/* ----- sync history log (persisted ring buffer) ----- */
+const SYNC_LOG_KEY = 'doto-sync-log';
+let syncLog = (() => {
+  try {
+    const a = JSON.parse(localStorage.getItem(SYNC_LOG_KEY));
+    return Array.isArray(a) ? a.filter((e) => e && e.t && e.msg).slice(-50) : [];
+  } catch { return []; }
+})();
+function saveSyncLog() { try { localStorage.setItem(SYNC_LOG_KEY, JSON.stringify(syncLog.slice(-50))); } catch {} }
+function slog(kind, msg) {
+  syncLog.push({ t: Date.now(), kind, msg: String(msg).slice(0, 200) });
+  syncLog = syncLog.slice(-50);
+  saveSyncLog();
+  if (isLogOpen()) paintLog();
+}
+function isLogOpen() { const s = $('#logScrim'); return !!s && !s.classList.contains('hidden'); }
+function paintLog() {
+  const ul = $('#syncLogList');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!syncLog.length) { ul.innerHTML = '<li class="palette-empty">No sync events yet.</li>'; return; }
+  [...syncLog].reverse().forEach((e) => {
+    const li = document.createElement('li');
+    li.className = 'log-row ' + (e.kind === 'ok' || e.kind === 'info' ? '' : e.kind);
+    const t = document.createElement('span');
+    t.className = 'log-t'; t.textContent = new Date(e.t).toLocaleString();
+    const m = document.createElement('span');
+    m.textContent = e.msg;
+    li.append(t, m);
+    ul.appendChild(li);
+  });
+}
+function openLog() { paintLog(); $('#logScrim').classList.remove('hidden'); }
+function closeLog() { $('#logScrim').classList.add('hidden'); }
 
 function fmtAgo(ts) {
   const d = Date.now() - ts;
@@ -1996,6 +2048,12 @@ function paintSync() {
   if (em) em.textContent = syncMeta.email ? 'Signed in as ' + syncMeta.email : 'Not signed in.';
   const last = $('#accountLast');
   if (last) last.textContent = syncMeta.lastSyncedAt ? 'Last synced: ' + new Date(syncMeta.lastSyncedAt).toLocaleString() : '';
+  const ae = $('#accountError');
+  if (ae) {
+    const show = syncStatus === 'error' && !!lastSyncError;
+    ae.classList.toggle('hidden', !show);
+    if (show) ae.textContent = lastSyncError;
+  }
   const si = $('#signInBtn'), so = $('#signOutBtn');
   if (si) si.classList.toggle('hidden', !!syncMeta.email);
   if (so) so.classList.toggle('hidden', !syncMeta.email);
@@ -2036,7 +2094,8 @@ async function ensureToken(mode) {
     tokenClient.callback = (r) => resolve(r);
     try { tokenClient.requestAccessToken({ prompt }); } catch { resolve(null); }
   });
-  let tok = await attempt('');
+  // 'none' never shows UI (silent); consent popup only as explicit fallback
+  let tok = await attempt('none');
   if ((!tok || !tok.access_token) && mode === 'popup') tok = await attempt('consent');
   if (!tok || !tok.access_token) throw new Error('auth');
   syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000 };
@@ -2056,37 +2115,43 @@ async function fetchEmail() {
 async function driveFetch(url, opts = {}, mode = 'silent') {
   const at = await ensureToken(mode);
   const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at } });
-  if (r.status === 401 || r.status === 403) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  // Only 401 means the token died. 403 (API disabled, scope denied, …) must
+  // NOT wipe the token — otherwise every retry re-opens the sign-in popup.
+  if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
   return r;
+}
+async function driveOk(r) {
+  if (r.ok) return r;
+  let detail = '';
+  try { detail = (await r.clone().text()).slice(0, 200); } catch {}
+  const err = new Error(r.status === 403 ? 'forbidden' : 'drive' + r.status);
+  err.detail = detail; err.status = r.status;
+  throw err;
 }
 async function driveFind(mode) {
   const q = encodeURIComponent(`'appDataFolder' in parents and name = '${DRIVE_FILE}' and trashed = false`);
-  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&fields=files(id,modifiedTime)`, {}, mode);
-  if (!r.ok) throw new Error('drive');
+  const r = await driveOk(await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&fields=files(id,modifiedTime)`, {}, mode));
   const j = await r.json();
   return (j.files && j.files[0]) || null;
 }
 async function driveDownload(id, mode) {
-  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {}, mode);
-  if (!r.ok) throw new Error('drive');
+  const r = await driveOk(await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {}, mode));
   return r.json();
 }
 async function driveUpload(data, mode) {
   const body = JSON.stringify(data);
   if (syncMeta.fileId) {
-    const r = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${syncMeta.fileId}?uploadType=media`, {
+    const r = await driveOk(await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${syncMeta.fileId}?uploadType=media`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body,
-    }, mode);
-    if (!r.ok) throw new Error('drive');
+    }, mode));
     return r.json();
   }
   const meta = { name: DRIVE_FILE, parents: ['appDataFolder'] };
   const boundary = 'doto' + Date.now();
   const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-  const r = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const r = await driveOk(await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
     method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipart,
-  }, mode);
-  if (!r.ok) throw new Error('drive');
+  }, mode));
   const j = await r.json();
   syncMeta.fileId = j.id;
   return j;
@@ -2161,22 +2226,26 @@ async function pushNow(mode) {
     syncMeta.base = snapState(state);
     syncMeta.lastSyncedAt = Date.now();
     saveSyncMeta();
+    if (mode !== 'silent') slog('ok', `Pushed to Drive (${state.tasks.length} tasks, ${state.lists.length} lists)`);
     setSync('ok');
   } catch (e) {
-    setSync(e && (e.message === 'auth' || e.message === 'setup') ? 'signedout' : 'error');
+    handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout');
   } finally { syncing = false; paintSync(); }
 }
 async function pullNow(mode) {
   if (syncing || !navigator.onLine || !googleClientId()) return;
   if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
+  const prev = syncStatus;
   syncing = true; lastPullAt = Date.now(); setSync('syncing');
   try {
     const found = await driveFind(mode);
     if (!found) {
-      if (state.lists.length || state.tasks.length || syncMeta.fileId) await driveUpload(state, mode);
+      const uploaded = state.lists.length || state.tasks.length || syncMeta.fileId;
+      if (uploaded) await driveUpload(state, mode);
       syncMeta.base = snapState(state);
       syncMeta.lastSyncedAt = Date.now();
       saveSyncMeta();
+      if (mode !== 'silent') slog('ok', uploaded ? 'Uploaded first copy to Drive' : 'Connected — nothing to sync yet');
     } else {
       syncMeta.fileId = found.id;
       const remoteTime = Date.parse(found.modifiedTime) || 0;
@@ -2191,6 +2260,11 @@ async function pullNow(mode) {
         saveSyncMeta();
         if (res.conflicts) toast(`Sync: ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
         else if (res.fresh) toast(`Sync: ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
+        if (mode !== 'silent' || res.conflicts || res.fresh) {
+          if (res.conflicts) slog('conflict', `Pulled with ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
+          else if (res.fresh) slog('ok', `Pulled ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
+          else slog('ok', 'Pulled — already up to date');
+        }
       } else {
         syncMeta.base = snapState(state);
         syncMeta.lastSyncedAt = Date.now();
@@ -2199,7 +2273,7 @@ async function pullNow(mode) {
     }
     setSync('ok');
   } catch (e) {
-    setSync(e && (e.message === 'auth' || e.message === 'setup') ? 'signedout' : 'error');
+    handleSyncFailure(e, mode, prev);
   } finally { syncing = false; paintSync(); }
 }
 async function syncNowFlow() {
@@ -2219,8 +2293,11 @@ function bindSync() {
   $('#accountClose').onclick = closeAccount;
   $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
   $('#signInBtn').onclick = async () => {
-    try { await ensureToken('popup'); await fetchEmail(); await pullNow('popup'); }
-    catch (e) { setSync(!googleClientId() ? 'setup' : 'signedout'); paintSync(); }
+    try { await ensureToken('popup'); }
+    catch (e) { setSync(!googleClientId() ? 'setup' : 'signedout'); paintSync(); return; }
+    try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
+    slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
+    await pullNow('popup');
   };
   $('#signOutBtn').onclick = () => {
     if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.token) {
@@ -2228,9 +2305,14 @@ function bindSync() {
     }
     syncMeta.token = null; syncMeta.email = '';
     saveSyncMeta(); setSync('signedout'); paintSync();
+    slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');
   };
   $('#syncNowBtn').onclick = () => { syncNowFlow().catch(() => {}); };
+  $('#logOpenBtn').onclick = openLog;
+  $('#logClose').onclick = closeLog;
+  $('#logClear').onclick = () => { syncLog = []; saveSyncLog(); paintLog(); };
+  $('#logScrim').onclick = (e) => { if (e.target === $('#logScrim')) closeLog(); };
   $('#autoSyncToggle').onchange = (e) => {
     syncMeta.auto = e.target.checked; saveSyncMeta(); paintSync();
     if (syncMeta.auto) schedulePush();
@@ -2422,7 +2504,7 @@ function bind() {
 
   // detail bindings
   $('#detailBack').onclick = closeDetail; $('#detailClose').onclick = closeDetail;
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeLog(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderNav(); renderCurrentView(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
   $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };
