@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788797169'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788798713'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2489,6 +2489,7 @@ function renderAll() {
 const GOOGLE_CLIENT_ID = '555553216011-6bsgaeq6mp075agej6paup0bn3r1t2cl.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events'; // one sign-in covers Drive sync + Calendar reminders
+const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const SYNC_KEY = 'doto-sync';
 const CLIENT_KEY = 'doto-google-client-id';
 
@@ -2498,9 +2499,17 @@ function googleClientId() {
 function loadSyncMeta() {
   try {
     const m = JSON.parse(localStorage.getItem(SYNC_KEY));
-    if (m && typeof m === 'object') return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, ...m };
+    if (m && typeof m === 'object') {
+      const out = { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false, ...m };
+      // Old installs predate explicit calendar-grant tracking: their stored
+      // token claims the calendar scope even when Google never granted it
+      // (GIS does not reliably return granted scopes). Force one verified
+      // re-consent instead of trusting the stored string forever.
+      if (typeof m.calGranted !== 'boolean') out.calGranted = false;
+      return out;
+    }
   } catch {}
-  return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null };
+  return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false };
 }
 let syncMeta = loadSyncMeta();
 let syncStatus = 'signedout'; // setup|signedout|checking|syncing|ok|error
@@ -2567,6 +2576,8 @@ function diagLines() {
     'status: ' + syncStatus,
     'email: ' + (syncMeta.email || 'none'),
     'token: ' + (t && t.access_token ? 'present' : 'none') + ' (' + texp + ')',
+    'calGrant: ' + (syncMeta.calGranted === true ? 'verified' : syncMeta.calGranted === false ? 'missing — Sync now re-asks' : 'unknown'),
+    'calError: ' + (lastCalError || 'none'),
     'fileId: ' + (syncMeta.fileId ? 'set' : 'none'),
     'base: ' + (syncMeta.base ? 'set' : 'none'),
     'lastSynced: ' + (syncMeta.lastSyncedAt ? new Date(syncMeta.lastSyncedAt).toLocaleString() : 'never'),
@@ -2624,9 +2635,10 @@ function paintSync() {
   if (last) last.textContent = syncMeta.lastSyncedAt ? 'Last synced: ' + new Date(syncMeta.lastSyncedAt).toLocaleString() : '';
   const ae = $('#accountError');
   if (ae) {
-    const show = syncStatus === 'error' && !!lastSyncError;
+    const calMsg = syncMeta.email ? lastCalError : '';
+    const show = (syncStatus === 'error' && !!lastSyncError) || !!calMsg;
     ae.classList.toggle('hidden', !show);
-    if (show) ae.textContent = lastSyncError;
+    if (show) ae.textContent = calMsg && (!lastSyncError || syncStatus !== 'error') ? calMsg : (lastSyncError + (calMsg && lastSyncError !== calMsg ? ' ' + calMsg : ''));
   }
   const si = $('#signInBtn'), so = $('#signOutBtn');
   if (si) si.classList.toggle('hidden', !!syncMeta.email);
@@ -2663,11 +2675,11 @@ function gisAttempt(tc, prompt, ms) {
     catch { if (!done) { done = true; clearTimeout(to); resolve({ error: 'popup_failed' }); } }
   });
 }
-async function ensureToken(mode) {
-  // A still-valid token is reused — EXCEPT an explicit popup when it predates
-  // the calendar scope. Otherwise the old Drive-only token would be returned
-  // forever and no consent popup could ever grant the missing scope.
-  if (tokenValid() && (mode !== 'popup' || tokenHasCal())) return syncMeta.token.access_token;
+async function ensureToken(mode, needCal) {
+  // Drive callers reuse any valid token; only calendar callers force a
+  // re-consent popup when the calendar grant is unverified. (Forcing it for
+  // Drive too caused double popups and still never retried the calendar.)
+  if (tokenValid() && (mode !== 'popup' || !needCal || tokenHasCal())) return syncMeta.token.access_token;
   await gisLoad();
   const cid = googleClientId();
   if (!cid) throw new Error('setup');
@@ -2688,13 +2700,20 @@ async function ensureToken(mode) {
     throw err;
   }
   syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000, scope: tok.scope || DRIVE_SCOPE };
+  // GIS rarely echoes granted scopes: optimistically trust a fresh popup,
+  // then verify on the first real Calendar call (failure clears it again).
+  if (mode === 'popup') {
+    syncMeta.calGranted = tok.scope ? tok.scope.indexOf('calendar.events') >= 0 : true;
+  }
   saveSyncMeta();
   fetchEmail().catch(() => {});
   return syncMeta.token.access_token;
 }
-/* old stored tokens predate the calendar scope: anything without it recorded
-   needs one re-consent popup before calendar calls will succeed */
+/* Calendar grant is tracked explicitly (verified by a real API call), not by
+   trusting the stored scope string — old Drive-only tokens claim it falsely. */
 function tokenHasCal() {
+  if (syncMeta.calGranted === true) return true;
+  if (syncMeta.calGranted === false) return false;
   const t = syncMeta.token;
   return !!(t && t.access_token && typeof t.scope === 'string' && t.scope.indexOf('calendar.events') >= 0);
 }
@@ -3060,7 +3079,7 @@ function queueCalDelete(eventId) {
 function calConnected() { return !!syncMeta.email; }
 let lastCalError = '';
 async function calFetch(path, opts = {}, mode = 'silent') {
-  const at = await ensureToken(mode);
+  const at = await ensureToken(mode, true);
   const r = await fetch('https://www.googleapis.com/calendar/v3' + path, {
     ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
   });
@@ -3219,9 +3238,16 @@ async function calendarReconcile(mode) {
     }
     if (changed) { clearTimeout(calSyncTimer); save(); renderAll(); }
     lastCalError = '';
+    // A real Calendar round-trip proves the grant — trust it from here on.
+    if (syncMeta.calGranted !== true) { syncMeta.calGranted = true; saveSyncMeta(); }
     const n = state.tasks.filter(needsCalEvent).length;
     const placed = state.tasks.filter((t) => t.calEventId && needsCalEvent(t)).length;
-    slog('ok', `Reminders synced (${placed}/${n})`);
+    const s = calStore();
+    const where = s.calendarId ? (s.kind === 'primary' ? 'your main Google Calendar' : 'the “DoTo” Google calendar') : 'Google Calendar';
+    slog('ok', n ? `Reminders synced (${placed}/${n} in ${where})` : 'Reminders synced — no reminders set yet (pick Reminder per task)');
+    if (mode !== 'silent') {
+      try { toast(n ? (placed === n ? `Calendar synced — ${n} reminder${n === 1 ? '' : 's'} in ${where}` : `Calendar partly synced (${placed}/${n}) — see History`) : 'Calendar synced — set a Reminder on a task to see it in Google Calendar'); } catch {}
+    }
   } catch (e) { handleCalError(e, mode); }
   finally {
     calSyncing = false; if (ui.detailId) { try { renderDetail(); } catch {} }
@@ -3231,15 +3257,25 @@ async function calendarReconcile(mode) {
 function handleCalError(e, mode) {
   const m = (e && e.message) || '';
   const detail = (e && e.detail) || '';
+  const scopeDenied = detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0;
   let msg = 'Calendar sync failed — retry.';
   if (m === 'auth' || m === 'setup') msg = m === 'setup' ? 'Set a Google client ID first' : 'Google session ended — sign in again';
   else if (e && e.gis) msg = 'Calendar sign-in failed (' + e.gis + '). Allow popups and try again.';
-  else if (detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0)
-    msg = 'Calendar needs its permission — tap Sync now (Drive) to re-grant it.';
+  else if (scopeDenied)
+    msg = 'Calendar needs its permission — tap Sync now to re-grant it.';
   else if (detail.indexOf('accessNotConfigured') >= 0)
     msg = 'Google Calendar API is off for your Cloud project — enable it, then retry.';
+  if (scopeDenied) {
+    // Stored token is Drive-only in reality: force one consent popup next time
+    // instead of silently reusing it forever (the old "nothing happens" loop).
+    syncMeta.calGranted = false;
+    if (syncMeta.token) syncMeta.token.scope = String(syncMeta.token.scope || '').replace(CAL_SCOPE, '').trim();
+    saveSyncMeta();
+  }
   lastCalError = msg + (detail && msg.indexOf('failed') >= 0 ? ' ' + detail.slice(0, 80) : '');
   slog('error', lastCalError);
+  if (mode !== 'silent') { try { toast(msg); } catch {} }
+  try { paintSync(); } catch {}
 }
 /* drop the linked event when a reminder no longer needs one (reminder cleared,
    done, delete). Async delete is queued; ids cleared immediately so a
@@ -3260,9 +3296,9 @@ function paintReminderUI(t) {
   const when = fmtRemind(triggerTs(t));
   const timeNote = t.time ? '' : ' (due time defaults to 9:00 AM)';
   if (!syncMeta.email) hint.textContent = `Notify ${when}${timeNote} — sign in to turn reminders on.`;
-  else if (lastCalError) hint.textContent = `Notify ${when}${timeNote}.`;
+  else if (lastCalError) hint.textContent = `Notify ${when}${timeNote} — ${lastCalError}`;
   else hint.textContent = t.calEventId
-    ? `Notify ${when}${timeNote}.`
+    ? `Notify ${when}${timeNote} — in Google Calendar.`
     : `Notify ${when}${timeNote} — saving…`;
 }
 
@@ -3405,7 +3441,9 @@ async function pullNow(mode) {
 }
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
-  if (!syncMeta.email || !tokenValid() || !tokenHasCal()) {
+  // Drive sign-in first (no forced calendar popup here — that caused double
+  // popups). The calendar step below re-consents on its own when needed.
+  if (!syncMeta.email || !tokenValid()) {
     try { await ensureToken('popup'); await fetchEmail(); }
     catch (e) {
       lastSyncError = e && e.gis
@@ -3418,6 +3456,11 @@ async function syncNowFlow() {
   }
   await pullNow('popup');
   await pushNow('popup');
+  // ...then Calendar in popup mode so a missing scope actually shows the
+  // consent window instead of failing silently in the background.
+  try { await calendarReconcile('popup'); }
+  catch {}
+  paintSync();
 }
 
 function openAccount() {
@@ -3512,6 +3555,7 @@ function bindSync() {
     }
     syncMeta.token = null; syncMeta.email = '';
     syncMeta.fileId = ''; syncMeta.base = null;
+    syncMeta.calGranted = false; lastCalError = '';
     saveSyncMeta(); setSync('signedout'); paintSync();
     slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');

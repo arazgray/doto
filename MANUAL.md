@@ -249,6 +249,15 @@ reason is recorded under Sync → History. That History page also has a
 needed while the dialog shows you signed in), open it right after the failure
 and send the text — it shows token state, last sync and recent events.
 
+**Calendar says "needs its permission" and Sync now does nothing / nothing appears in Google Calendar.**
+Only tasks with Details → Reminder set create events (in the "DoTo" Google
+calendar, or your main calendar if creation is not allowed) — dateless tasks
+need a due date first. If you signed in before the Calendar scope was added,
+tap Sync now once to re-grant it (allow the popup and tick the Calendar
+checkbox). "Google Calendar API is off" means enabling the API in your Cloud
+project, then Sync now. Calendar errors also show inside Sync & Settings and
+under Sync → History.
+
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.
 

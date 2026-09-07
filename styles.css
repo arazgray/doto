@@ -19,7 +19,7 @@
   --side-w:280px; --detail-w:440px;
 }
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) var(--scroll-track)}
-html,body{height:100%;overflow-x:hidden}
+html,body{height:100%;overflow-x:hidden;overflow-x:clip}
 body{
   margin:0; font-family:Roboto,"Google Sans",Arial,sans-serif; color:var(--text);
   background:var(--bg); -webkit-tap-highlight-color:transparent;
@@ -75,8 +75,10 @@ input,select,textarea{font:inherit;color:inherit}
   &.active{color:var(--blue);background:var(--blue-soft)}
 }
 
-/* Layout */
-.app{display:flex;min-height:calc(100dvh - var(--topbar-h));position:relative;align-items:stretch;overflow-x:hidden}
+/* Layout — overflow-x:clip (not hidden): clip does NOT create a scroll
+   container, so desktop `position:sticky` panels (sidebar, cal-side, time
+   tracker) keep sticking. `hidden` would make them scroll away with the page. */
+.app{display:flex;min-height:calc(100dvh - var(--topbar-h));position:relative;align-items:stretch;overflow-x:hidden;overflow-x:clip}
 .scrim{position:fixed;inset:var(--topbar-h) 0 0 0;background:rgba(0,0,0,.35);z-index:30;transition:opacity .22s ease}
 
 /* Sidebar drawer on mobile */
@@ -595,8 +597,8 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   container-type:inline-size;container-name:detail;min-width:0;
   &:not(.hidden){animation:detailIn .2s ease}
 }
-/* 0.2s open animation. Overflow is clipped on .app so the slide cannot
-   flash a horizontal scrollbar (that used to collapse board padding). */
+/* 0.2s open animation. Overflow is clipped (clip, not hidden) on .app so the
+   slide cannot flash a horizontal scrollbar without breaking sticky panels. */
 @keyframes detailIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media (min-width:1024px){
   @keyframes detailIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
