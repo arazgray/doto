@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <strong>Task Manager, Simple. Ridiculously fast, lightweight, privacy-first and offline-first<br>Hosted on Github & Synced with your own Google Drive.</strong> <strong>Version 1.0</strong><br>
+  <strong>Personal Task Manager. Ridiculously fast, lightweight, privacy-first and offline-first.<br>Hosted on GitHub & Synced with your own Google Drive.</strong> - <strong>Version 1.0</strong><br>
   <a href="https://arazgray.github.io/doto/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
 </p>
 
