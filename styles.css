@@ -624,10 +624,9 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
 }
 .d-row{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;
-  & input[type="date"],& input[type="time"],& input[type="datetime-local"]{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0;flex:1}
+  & input[type="date"],& input[type="time"]{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0;flex:1}
   & input[type="time"]{flex:0 1 128px}
   & input[type="date"]{flex:1 1 170px;min-width:0}
-  & input[type="datetime-local"]{flex:1 1 200px;min-width:0}
   & select{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0}
 }
 #dRecurN{
@@ -884,11 +883,17 @@ a.btn-ghost{text-decoration:none}
 }
 @keyframes ptrspin{to{transform:rotate(360deg)}}
 
-/* Sync conflict dialog */
+/* Sync conflict dialog (batched review: one modal for all conflicts) */
 .conflict-modal{width:min(540px,100%);max-height:min(84dvh,640px);display:flex;flex-direction:column}
 .conflict-title{font-weight:500;margin:0}
 #conflictCount:empty{display:none}
-.conflict-diff{display:grid;grid-template-columns:auto 1fr 1fr;gap:5px 12px;font-size:13px;overflow-y:auto;min-height:0;margin:6px 0 4px}
+.conflict-list{overflow-y:auto;min-height:0;margin:6px 0 4px;display:flex;flex-direction:column;gap:12px}
+.conflict-item{border-top:1px solid var(--line-soft);padding-top:10px}
+.conflict-item:first-child{border-top:0;padding-top:0}
+.conflict-item-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.conflict-item-title{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conflict-pick{margin-top:8px}
+.conflict-diff{display:grid;grid-template-columns:auto 1fr 1fr;gap:5px 12px;font-size:13px;min-height:0}
 .conflict-diff .cd-h{font-size:11px;font-weight:500;color:var(--muted)}
 .conflict-diff .cd-f{color:var(--muted);white-space:nowrap}
 .conflict-diff span{min-width:0;overflow:hidden;text-overflow:ellipsis}

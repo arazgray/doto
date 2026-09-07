@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788782214'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788787134'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -34,6 +34,7 @@ const colorName = (id) => {
 
 const WEIGHTS = { light: { label: 'Light', icon: 'arrow_downward' }, medium: { label: 'Medium', icon: 'remove' }, heavy: { label: 'Heavy', icon: 'arrow_upward' } };
 const IMPORTANCE = { low: { label: 'Low', icon: 'arrow_downward' }, medium: { label: 'Med', icon: 'remove' }, high: { label: 'High', icon: 'arrow_upward' } };
+const REMIND_OFFSETS = [1, 5, 30, 60, 180, 1440]; // minutes before due; '' = off
 const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
 
 let state = migrate(load() || seed());
@@ -82,10 +83,26 @@ function migrate(s) {
   if (s.prefs.detailW === 360) s.prefs.detailW = 440;
   s.tasks.forEach((t) => { if (!t.weight) t.weight = 'medium'; if (!t.importance) t.importance = 'medium'; if (!t.color) t.color = 'default'; if (!Array.isArray(t.subtasks)) t.subtasks = []; if (!('recId' in t)) t.recId = ''; if (!('recur' in t)) t.recur = null; if (t.recur && !['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) t.recur = null; });
   // reminders: keep only well-formed values; unknown shapes reset to off
+  // reminders are due-based offsets now; convert the short-lived explicit-time
+  // model (remindAt) once, then drop its fields
   s.tasks.forEach((t) => {
-    if (t.remindAt && (typeof t.remindAt !== 'string' || isNaN(Date.parse(t.remindAt)))) t.remindAt = '';
-    if (t.remindVia !== 'calendar' && t.remindVia !== 'app') t.remindVia = t.remindAt ? 'app' : '';
-    if ('lastRemindedAt' in t && typeof t.lastRemindedAt !== 'number') t.lastRemindedAt = 0;
+    if (t.remindAt && typeof t.date === 'string' && t.date && typeof t.remindBefore !== 'number') {
+      const diff = Math.round((dueTs({ date: t.date, time: t.time }) - Date.parse(t.remindAt)) / 60000);
+      if (!isNaN(diff) && diff >= 0) {
+        let best = REMIND_OFFSETS[0], bd = Math.abs(diff - best);
+        REMIND_OFFSETS.forEach((o) => { const d = Math.abs(diff - o); if (d < bd) { bd = d; best = o; } });
+        t.remindBefore = best;
+        t.calRev = ''; // force re-sync: new event shape (popup offset at due time)
+      }
+    }
+    delete t.remindAt; delete t.remindVia; delete t.lastRemindedAt;
+    if (typeof t.remindBefore !== 'number' || !REMIND_OFFSETS.includes(t.remindBefore)) {
+      if (typeof t.remindBefore === 'number') {
+        let best = REMIND_OFFSETS[0], bd = Math.abs(t.remindBefore - best);
+        REMIND_OFFSETS.forEach((o) => { const d = Math.abs(t.remindBefore - o); if (d < bd) { bd = d; best = o; } });
+        t.remindBefore = best;
+      } else t.remindBefore = '';
+    }
     if ('calEventId' in t && typeof t.calEventId !== 'string') t.calEventId = '';
     if ('calRev' in t && typeof t.calRev !== 'string') t.calRev = '';
   });
@@ -1727,12 +1744,8 @@ function toggleDone(id) {
         recId: t.recId || '', done: false, completedAt: 0, order: 1e9, createdAt: Date.now(),
         subtasks: t.subtasks.map((s) => ({ id: uid(), title: s.title, done: false })),
       };
-      // an "at due time" reminder follows the repeat; a custom one was one-shot
-      if (t.remindAt && t.date && t.remindAt === t.date + 'T' + (t.time || '00:00')) {
-        spawned.remindAt = nd + 'T' + (t.time || '00:00');
-        spawned.remindVia = t.remindVia === 'calendar' ? 'calendar' : 'app';
-        // no calEventId copy: the reconcile pass creates a fresh event
-      }
+      // the reminder offset follows the repeat; the calendar event is re-created
+      if (typeof t.remindBefore === 'number') spawned.remindBefore = t.remindBefore;
       state.tasks.push(spawned);
     }
   }
@@ -2216,7 +2229,6 @@ function renderAll() {
   applySizes(); renderNav(); renderCurrentView(); if (ui.detailId) renderDetail();
   if (ui.selectedId && !getTask(ui.selectedId)) ui.selectedId = null;
   paintSelection(false);
-  try { paintBadge(); } catch {}
   restoreScroll(sc);
 }
 
@@ -2227,7 +2239,7 @@ function renderAll() {
    synced snapshot; both-sides-edited items resolve newest-wins. */
 const GOOGLE_CLIENT_ID = '555553216011-6bsgaeq6mp075agej6paup0bn3r1t2cl.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events'; // one sign-in covers Drive sync + Calendar reminders
 const SYNC_KEY = 'doto-sync';
 const CLIENT_KEY = 'doto-google-client-id';
 
@@ -2368,7 +2380,7 @@ function paintSync() {
 }
 
 /* ----- Google auth (GIS token flow, client-side only) ----- */
-let gisReady = null, tokenClient = null, tokenClientId = '';
+let gisReady = null, tokenClient = null, tokenClientId = '', tokenClientScope = '';
 function gisLoad() {
   if (gisReady) return gisReady;
   gisReady = new Promise((res, rej) => {
@@ -2400,9 +2412,9 @@ async function ensureToken(mode) {
   await gisLoad();
   const cid = googleClientId();
   if (!cid) throw new Error('setup');
-  if (!tokenClient || tokenClientId !== cid) {
+  if (!tokenClient || tokenClientId !== cid || tokenClientScope !== DRIVE_SCOPE) {
     tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cid, scope: DRIVE_SCOPE, callback: () => {} });
-    tokenClientId = cid;
+    tokenClientId = cid; tokenClientScope = DRIVE_SCOPE;
   }
   // Explicit sign-in: ONE consent popup (a silent-first attempt would burn the
   // click's popup permission and flash a window that auto-closes).
@@ -2416,10 +2428,16 @@ async function ensureToken(mode) {
     err.gis = String(code);
     throw err;
   }
-  syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000 };
+  syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000, scope: DRIVE_SCOPE };
   saveSyncMeta();
   fetchEmail().catch(() => {});
   return syncMeta.token.access_token;
+}
+/* old stored tokens predate the calendar scope: anything without it recorded
+   needs one re-consent popup before calendar calls will succeed */
+function tokenHasCal() {
+  const t = syncMeta.token;
+  return !!(t && t.access_token && typeof t.scope === 'string' && t.scope.indexOf('calendar.events') >= 0);
 }
 async function fetchEmail() {
   if (!syncMeta.token) return;
@@ -2574,14 +2592,13 @@ const CONFLICT_FIELDS = {
   title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
   done: 'Completed', color: 'Color', weight: 'Weight', importance: 'Importance',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
-  remindAt: 'Reminder', remindVia: 'Reminder via',
+  remindBefore: 'Reminder',
 };
 function conflictVal(kind, t, k) {
   const v = t[k];
   if (v === undefined || v === null || v === '') return '—';
   if (k === 'done') return v ? 'Yes' : 'No';
-  if (k === 'remindAt') return fmtRemind(v);
-  if (k === 'remindVia') return v === 'calendar' ? 'Calendar' : 'App';
+  if (k === 'remindBefore') return typeof v === 'number' ? fmtOffset(v) : '—';
   if (k === 'listId') return listName(v);
   if (k === 'color') return colorName(v);
   if (k === 'recur') return (v && v.freq ? recurLabel(v) : '—');
@@ -2590,7 +2607,7 @@ function conflictVal(kind, t, k) {
   return s.length > 42 ? s.slice(0, 42) + '…' : s;
 }
 function conflictDiff(c) {
-  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'lastRemindedAt', 'calEventId', 'calRev']);
+  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'calEventId', 'calRev']);
   const rows = [];
   new Set([...Object.keys(c.local), ...Object.keys(c.remote)]).forEach((k) => {
     if (skip.has(k)) return;
@@ -2600,59 +2617,116 @@ function conflictDiff(c) {
   });
   return rows.slice(0, 8);
 }
+function liveConflicts() {
+  // entries whose item vanished (deleted after queueing) resolve themselves
+  pendingConflicts = pendingConflicts.filter((c) => {
+    const arr = c.coll === 'lists' ? state.lists : state.tasks;
+    return arr.some((x) => x.id === c.id);
+  });
+  return pendingConflicts;
+}
 function pumpConflicts() {
   if (!pendingConflicts.length || document.hidden) return;
   if (!$('#conflictScrim').classList.contains('hidden')) return;
-  const c = pendingConflicts[0];
-  const arr = c.coll === 'lists' ? state.lists : state.tasks;
-  if (!arr.some((x) => x.id === c.id)) { pendingConflicts.shift(); return pumpConflicts(); }
-  $('#conflictTitle').textContent = `${c.coll === 'lists' ? 'List' : 'Task'} “${c.label}” changed on both sides`;
-  $('#conflictCount').textContent = pendingConflicts.length > 1 ? `1 of ${pendingConflicts.length} — the rest will follow` : '';
-  const host = $('#conflictDiff');
-  host.innerHTML = '';
-  const head = ['Field', 'This device', 'Drive'];
-  head.forEach((h) => { const s = document.createElement('span'); s.className = 'cd-h'; s.textContent = h; host.appendChild(s); });
-  conflictDiff(c).forEach(([f, a, b]) => {
-    const fEl = document.createElement('span'); fEl.className = 'cd-f'; fEl.textContent = f;
-    const aEl = document.createElement('span'); aEl.textContent = a; aEl.dir = 'auto';
-    const bEl = document.createElement('span'); bEl.textContent = b; bEl.dir = 'auto';
-    host.append(fEl, aEl, bEl);
-  });
+  liveConflicts();
+  if (!pendingConflicts.length) return;
+  renderConflictList();
   $('#conflictScrim').classList.remove('hidden');
 }
+function paintConflictPick(pick, v) {
+  [...pick.querySelectorAll('button')].forEach((b) => b.classList.toggle('selected', b.dataset.v === v));
+}
+function renderConflictList() {
+  const list = $('#conflictList'); if (!list) return;
+  list.innerHTML = '';
+  $('#conflictTitle').textContent = `Sync conflicts (${pendingConflicts.length})`;
+  $('#conflictCount').textContent = 'Changed on this device and in Drive. Pick a winner per row, then Apply — or take one side for everything.';
+  pendingConflicts.forEach((c) => {
+    const item = document.createElement('div');
+    item.className = 'conflict-item';
+    const head = document.createElement('div');
+    head.className = 'conflict-item-head';
+    const t = document.createElement('span');
+    t.className = 'conflict-item-title'; t.dir = 'auto';
+    t.textContent = `${c.coll === 'lists' ? 'List' : 'Task'} “${c.label}”`;
+    head.appendChild(t);
+    item.appendChild(head);
+    const rows = conflictDiff(c);
+    const dl = document.createElement('div');
+    dl.className = 'conflict-diff';
+    ['Field', 'This device', 'Drive'].forEach((h) => {
+      const s = document.createElement('span'); s.className = 'cd-h'; s.textContent = h; dl.appendChild(s);
+    });
+    const shown = rows.slice(0, 4);
+    shown.forEach(([f, a, b]) => {
+      const fEl = document.createElement('span'); fEl.className = 'cd-f'; fEl.textContent = f;
+      const aEl = document.createElement('span'); aEl.textContent = a; aEl.dir = 'auto';
+      const bEl = document.createElement('span'); bEl.textContent = b; bEl.dir = 'auto';
+      dl.append(fEl, aEl, bEl);
+    });
+    if (rows.length > shown.length) {
+      const m = document.createElement('span'); m.className = 'cd-f muted small'; m.textContent = `+${rows.length - shown.length} more`;
+      dl.append(m, document.createElement('span'), document.createElement('span'));
+    }
+    item.appendChild(dl);
+    const pick = document.createElement('div');
+    pick.className = 'segmented conflict-pick';
+    pick.dataset.cid = `${c.coll}:${c.id}`;
+    [['mine', 'This device'], ['theirs', 'Drive']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.v = v; b.textContent = label;
+      if (v === 'mine') b.classList.add('selected');
+      b.onclick = () => paintConflictPick(pick, v);
+      pick.appendChild(b);
+    });
+    item.appendChild(pick);
+    list.appendChild(item);
+  });
+}
 function closeConflict() { $('#conflictScrim').classList.add('hidden'); } // defers; pending stay queued
-function resolveConflict(pickRemote) {
-  const c = pendingConflicts.shift();
-  closeConflict();
-  if (c) {
+function applyConflicts() {
+  const picks = new Map();
+  [...document.querySelectorAll('#conflictList .conflict-pick')].forEach((p) => {
+    const sel = p.querySelector('button.selected');
+    picks.set(p.dataset.cid, sel && sel.dataset.v === 'theirs');
+  });
+  let mine = 0, theirs = 0;
+  liveConflicts().forEach((c) => {
     const arr = c.coll === 'lists' ? state.lists : state.tasks;
     const i = arr.findIndex((x) => x.id === c.id);
-    const chosen = pickRemote ? c.remote : c.local;
-    if (i >= 0) arr[i] = chosen; else arr.push(chosen);
-    save(); renderAll();
-    syncMeta.base = snapState(state);
-    syncMeta.lastSyncedAt = Date.now();
-    saveSyncMeta();
-    slog('info', `Conflict resolved for “${c.label}” — kept ${pickRemote ? "Drive's" : 'this device’s'} version`);
-    schedulePush();
-  }
-  pumpConflicts();
+    if (i < 0) return;
+    const pickRemote = picks.get(`${c.coll}:${c.id}`) === true;
+    arr[i] = pickRemote ? c.remote : c.local;
+    if (pickRemote) theirs++; else mine++;
+  });
+  const n = mine + theirs;
+  pendingConflicts = [];
+  closeConflict();
+  if (!n) return;
+  save(); renderAll();
+  syncMeta.base = snapState(state);
+  syncMeta.lastSyncedAt = Date.now();
+  saveSyncMeta();
+  slog('info', `Resolved ${n} conflict${n === 1 ? '' : 's'} — kept ${mine} from this device, ${theirs} from Drive`);
+  toast(`Resolved ${n} conflict${n === 1 ? '' : 's'}`);
+  schedulePush();
 }
 
-/* ---------- reminders: app notifications + Google Calendar ----------
-   One reminder state per task:
-     remindAt        local 'YYYY-MM-DDTHH:MM' trigger time ('' = off)
-     remindVia       'app' | 'calendar' (default 'app' once a time is set)
-     lastRemindedAt  epoch ms of the last fired app reminder (0 = never)
-     calEventId/calRev  Google Calendar event link + sync marker
-   Channels are exclusive per task: a 'calendar' task is skipped by the app
-   ticker (Google notifies instead), and whichever channel fires stamps
-   lastRemindedAt so a second device won't refire. Whole-task three-way
-   merge carries these fields automatically; only the dialog labels below
-   needed adding. */
-function dueIso(t) { return t.date ? (t.date + 'T' + (t.time || '00:00')) : ''; }
-function remindTs(t) { const n = Date.parse(t.remindAt || ''); return isNaN(n) ? 0 : n; }
-function remindChannel(t) { return t.remindVia === 'calendar' ? 'calendar' : 'app'; }
+/* ---------- reminders (Google Calendar only) ----------
+   Reminder = due date/time minus `remindBefore` minutes ('' = off).
+   The calendar event sits AT the due time with a Google popup firing
+   `remindBefore` earlier. Calendar is the only channel, so there is nothing
+   that could double-notify — and nothing needs to run on the device at all. */
+/* effective due timestamp; dateless-time tasks default to 9:00 AM */
+function dueTs(t) {
+  if (!t.date) return 0;
+  const n = Date.parse(`${t.date}T${t.time || '09:00'}`);
+  return isNaN(n) ? 0 : n;
+}
+function triggerTs(t) {
+  if (typeof t.remindBefore !== 'number' || !dueTs(t)) return 0;
+  return dueTs(t) - t.remindBefore * 60000;
+}
 function p2(n) { return String(n).padStart(2, '0'); }
 function isoLocal(ms) {
   const d = new Date(ms);
@@ -2662,134 +2736,18 @@ function fmtRemind(v) {
   const n = Date.parse(v || ''); if (isNaN(n)) return '—';
   return new Date(n).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-
-/* ----- Phase 1: local app notifications (foreground only) ----- */
-let remindNudged = new Set(); // per-session "permission denied" toasts, one per task
-function paintBadge() {
-  try {
-    if (!('setAppBadge' in navigator)) return;
-    const today = todayIso();
-    const n = state.tasks.filter((t) => !t.done && t.date && t.date <= today).length;
-    if (n > 0) Promise.resolve(navigator.setAppBadge(n)).catch(() => {});
-    else if ('clearAppBadge' in navigator) Promise.resolve(navigator.clearAppBadge()).catch(() => {});
-  } catch {}
-}
-function dueAppReminders() {
-  const now = Date.now();
-  return state.tasks.filter((t) => !t.done && remindChannel(t) !== 'calendar'
-    && remindTs(t) && remindTs(t) <= now && (t.lastRemindedAt || 0) < remindTs(t));
-}
-async function checkReminders() {
-  try {
-    paintBadge();
-    if (!('Notification' in window)) return;
-    const due = dueAppReminders();
-    if (!due.length) return;
-    if (Notification.permission !== 'granted') {
-      due.forEach((t) => {
-        if (remindNudged.has(t.id)) return;
-        remindNudged.add(t.id);
-        try { toast(`Reminder: ${t.title || '(untitled)'} — enable notifications in Sync & Settings`); } catch {}
-      });
-      return;
-    }
-    for (const t of due) {
-      try { await fireReminder(t); } catch {}
-    }
-  } catch {}
-}
-function remindBody(t) {
-  const bits = [listName(t.listId)];
-  if (t.date) bits.push((t.date < todayIso() ? 'overdue, due ' : 'due ') + t.date + (t.time ? ' ' + t.time : ''));
-  else if (t.time) bits.push(t.time);
-  return bits.join(' • ');
-}
-async function showReminderNotif(t) {
-  const title = t.title || '(untitled)';
-  const opts = {
-    body: remindBody(t), tag: 'doto-remind-' + t.id,
-    icon: 'assets/icon-192.png', badge: 'assets/icon-192.png',
-    data: { taskId: t.id },
-    actions: [{ action: 'done', title: 'Mark done' }, { action: 'snooze', title: 'Snooze 10 min' }],
-  };
-  try {
-    const reg = ('serviceWorker' in navigator) ? await navigator.serviceWorker.getRegistration() : null;
-    if (reg) { await reg.showNotification(title, opts); return; }
-  } catch {}
-  try { new Notification(title, opts); } catch {}
-}
-async function fireReminder(t) {
-  const ts = remindTs(t); if (!ts || t.done) return;
-  await showReminderNotif(t);
-  const cur = getTask(t.id); if (!cur) return;
-  cur.lastRemindedAt = Date.now();
-  save(); paintBadge();
-}
-function snoozeTask(id, minutes) {
-  const t = getTask(id); if (!t || t.done) return;
-  t.remindAt = isoLocal(Date.now() + minutes * 60000);
-  t.lastRemindedAt = 0;
-  save(); renderAll();
-  toast(`Snoozed ${minutes} min`);
-}
-function notifCounts() {
-  let app = 0, cal = 0;
-  state.tasks.forEach((t) => {
-    if (t.done || !remindTs(t)) return;
-    if (remindChannel(t) === 'calendar') cal++; else app++;
-  });
-  return { app, cal };
-}
-function paintNotifSettings() {
-  const st = $('#notifStatus'); if (!st) return;
-  const en = $('#notifEnableBtn'), ts = $('#notifTestBtn');
-  const { app, cal } = notifCounts();
-  const sum = `${app} app reminder${app === 1 ? '' : 's'}, ${cal} via Calendar`;
-  if (!('Notification' in window)) {
-    st.textContent = 'This browser does not support notifications.';
-    if (en) en.classList.add('hidden'); if (ts) ts.classList.add('hidden');
-    return;
-  }
-  const p = Notification.permission;
-  if (p === 'granted') {
-    st.textContent = `App notifications are on (${sum}). Fires while the app is open; closed-phone reminders need the Calendar channel.`;
-    if (en) en.classList.add('hidden'); if (ts) ts.classList.remove('hidden');
-  } else if (p === 'denied') {
-    st.textContent = 'App notifications are blocked — allow them in the browser site settings, then reopen this dialog.';
-    if (en) en.classList.add('hidden'); if (ts) ts.classList.add('hidden');
-  } else {
-    st.textContent = `App notifications are off (${sum}). Enable to get reminded while the app is open.`;
-    if (en) en.classList.remove('hidden'); if (ts) ts.classList.add('hidden');
-  }
-}
-/* intents arriving from notification clicks: SW postMessage when a client is
-   alive, location.hash fallback (#task-|#done-|#snooze-<id>) when one isn't */
-function handleNotifIntent() {
-  let m = null;
-  try { m = /^#(task|done|snooze)-(.+)$/.exec(location.hash || ''); } catch {}
-  if (!m) return;
-  try { history.replaceState(null, '', location.pathname + location.search); } catch {}
-  const t = getTask(m[2]); if (!t) return;
-  if (m[1] === 'task') openDetail(t.id);
-  else if (m[1] === 'done') { if (!t.done) toggleDone(t.id); }
-  else snoozeTask(t.id, 10);
-}
-function bindReminders() {
-  handleNotifIntent();
-  try {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
-      const d = (e && e.data) || {};
-      if (!d || typeof d.type !== 'string' || !d.id) return;
-      if (d.type === 'doto-open-task') { if (getTask(d.id)) openDetail(d.id); }
-      else if (d.type === 'doto-task-done') { const t = getTask(d.id); if (t && !t.done) toggleDone(d.id); }
-      else if (d.type === 'doto-snooze') snoozeTask(d.id, 10);
-    });
-  } catch {}
-  window.addEventListener('hashchange', handleNotifIntent);
+function fmtOffset(min) {
+  if (min === 1) return '1 min before';
+  if (min < 60) return `${min} min before`;
+  if (min < 1440) return `${min / 60} hour${min === 60 ? '' : 's'} before`;
+  return '1 day before';
 }
 
-/* ----- Phase 2: Google Calendar sync (closed-app reminders) ----- */
-const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+/* ----- Calendar reminders (closed-app notifications) -----
+   Reminder = due date/time minus a chosen offset; the event sits AT the due
+   time with a Google popup `remindBefore` minutes earlier. Calendar event
+   ids live on the task (synced); the enable flag + calendar id are
+   per-browser. Whole-task three-way merge carries remindBefore automatically. */
 const CAL_STORE_KEY = 'doto-cal';
 const CAL_QUEUE_KEY = 'doto-cal-queue';
 function calStore() {
@@ -2812,36 +2770,13 @@ function queueCalDelete(eventId) {
   calQueueSave(q);
 }
 function calConnected() { return !!(calStore().enabled && syncMeta.email); }
-function calTokenValid() {
-  const t = syncMeta.calToken;
-  return !!(t && t.access_token && t.expires_at - Date.now() > 60000);
-}
-let calTokenClient = null;
-async function ensureCalToken(mode) {
-  if (calTokenValid()) return syncMeta.calToken.access_token;
-  await gisLoad();
-  const cid = googleClientId();
-  if (!cid) throw new Error('setup');
-  if (!calTokenClient) {
-    calTokenClient = google.accounts.oauth2.initTokenClient({ client_id: cid, scope: DRIVE_SCOPE + ' ' + CAL_SCOPE, callback: () => {} });
-  }
-  const tok = mode === 'popup' ? await gisAttempt(calTokenClient, 'consent', 180000) : await gisAttempt(calTokenClient, 'none', 10000);
-  if (!tok || !tok.access_token) {
-    const err = new Error('auth');
-    err.gis = String((tok && (tok.error || tok.error_subtype)) || 'no_token');
-    throw err;
-  }
-  syncMeta.calToken = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000 };
-  saveSyncMeta();
-  return syncMeta.calToken.access_token;
-}
 async function calFetch(path, opts = {}, mode = 'silent') {
-  const at = await ensureCalToken(mode);
+  const at = await ensureToken(mode);
   const r = await fetch('https://www.googleapis.com/calendar/v3' + path, {
     ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
   });
   // Only 401 kills the token; 403 (scope denied, API disabled) must NOT loop popups.
-  if (r.status === 401) { syncMeta.calToken = null; saveSyncMeta(); throw new Error('auth'); }
+  if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
   if (r.status === 204) return null;
   if (!r.ok) {
     const err = new Error('cal' + r.status);
@@ -2852,8 +2787,8 @@ async function calFetch(path, opts = {}, mode = 'silent') {
   return r.json();
 }
 function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } }
-function eventDateTime(remindAtStr) {
-  const d = new Date(remindAtStr);
+function eventDateTime(ms) {
+  const d = new Date(ms);
   const off = -d.getTimezoneOffset(), sign = off >= 0 ? '+' : '-', a = Math.abs(off);
   const s = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}:00${sign}${p2(Math.floor(a / 60))}:${p2(a % 60)}`;
   const o = { dateTime: s };
@@ -2861,18 +2796,18 @@ function eventDateTime(remindAtStr) {
   return o;
 }
 function calEventBody(t) {
-  const ts = remindTs(t);
+  const due = dueTs(t);
   return {
     summary: (t.title || '(untitled)').slice(0, 200),
     description: `${t.notes || ''}\n— ${listName(t.listId)} (DoTo reminder)`.slice(0, 2000),
-    start: eventDateTime(t.remindAt),
-    end: eventDateTime(isoLocal(ts + 30 * 60000)),
-    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+    start: eventDateTime(due),
+    end: eventDateTime(due + 30 * 60000),
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: t.remindBefore }] },
   };
 }
-function calRev(t) { return JSON.stringify([t.title, t.notes, t.remindAt, t.listId]); }
+function calRev(t) { return JSON.stringify([t.title, t.notes, t.date, t.time, t.remindBefore, t.listId]); }
 function needsCalEvent(t) {
-  return !!(calStore().enabled && t.remindAt && remindTs(t) && remindChannel(t) === 'calendar' && !t.done);
+  return !!(calStore().enabled && typeof t.remindBefore === 'number' && dueTs(t) && !t.done);
 }
 async function ensureCalCalendar(mode) {
   const s = calStore();
@@ -2913,7 +2848,7 @@ async function deleteCalEvent(calId, eventId, mode) {
   } catch (e) { if (!e || (e.status !== 404 && e.status !== 410)) throw e; }
 }
 /* debounced reconcile: drains the delete queue, creates/updates events for
-   calendar-channel tasks, removes events that are no longer needed. Armed
+   tasks with reminders, removes events that are no longer needed. Armed
    from save() so every mutation path is covered; idempotent and cheap
    (hash compare skips up-to-date tasks). */
 let calSyncTimer = 0, calSyncing = false;
@@ -2982,8 +2917,7 @@ function handleCalError(e, mode) {
     return;
   }
   if (detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0) {
-    syncMeta.calToken = null; saveSyncMeta();
-    const msg = 'Calendar needs a new permission — tap Connect Calendar again.';
+    const msg = 'Calendar needs its permission — tap Sync now to re-grant it.';
     if (mode !== 'silent') { try { toast(msg); } catch {} }
     slog('error', msg);
     return;
@@ -3001,7 +2935,7 @@ function handleCalError(e, mode) {
 async function calConnectFlow() {
   if (!syncMeta.email) { try { toast('Sign in with Google first'); } catch {} openAccount(); return; }
   try {
-    await ensureCalToken('popup');
+    await ensureToken('popup'); // single sign-in: same token covers Drive + Calendar
     const s = calStore(); s.enabled = true; saveCalStore(s);
     slog('info', 'Calendar connected — reconciling');
     await calendarReconcile('popup');
@@ -3009,7 +2943,6 @@ async function calConnectFlow() {
 }
 function calDisconnect() {
   const s = calStore(); s.enabled = false; saveCalStore(s);
-  syncMeta.calToken = null; saveSyncMeta();
   try { paintCalSettings(); } catch {}
   try { toast('Calendar disconnected — existing events stay in Google Calendar'); } catch {}
   slog('info', 'Calendar disconnected (events left in place)');
@@ -3026,7 +2959,7 @@ function paintCalSettings() {
     return;
   }
   if (s.enabled) {
-    st.textContent = `Calendar connected${n ? ` — ${n} reminder${n === 1 ? '' : 's'}` : ' — no calendar-channel reminders yet'}. Set per-task channel in Details.`;
+    st.textContent = `Calendar connected${n ? ` — ${n} reminder${n === 1 ? '' : 's'}` : ' — no reminders set yet'}. Pick a lead time per task in Details.`;
     if (cb) { cb.innerHTML = '<span class="material-icons-outlined">event_busy</span> Disconnect'; }
     if (sb) sb.classList.remove('hidden');
   } else {
@@ -3035,8 +2968,8 @@ function paintCalSettings() {
     if (sb) sb.classList.add('hidden');
   }
 }
-/* drop the linked event when a reminder no longer needs one (channel switch,
-   clear, done, delete). Async delete is queued; ids cleared immediately so a
+/* drop the linked event when a reminder no longer needs one (reminder cleared,
+   done, delete). Async delete is queued; ids cleared immediately so a
    later undo re-creates instead of pointing at a deleted event. */
 function dropCalEvent(t) {
   if (t && t.calEventId) {
@@ -3046,24 +2979,16 @@ function dropCalEvent(t) {
   }
 }
 function paintReminderUI(t) {
-  const inp = $('#dRemindAt'); if (!inp) return;
-  inp.value = t.remindAt || '';
-  $$('#dRemindVia button').forEach((b) => {
-    const on = remindChannel(t) === b.dataset.v;
-    b.classList.toggle('selected', on);
-    b.setAttribute('aria-checked', String(on));
-  });
+  const sel = $('#dRemindBefore'); if (!sel) return;
+  sel.value = typeof t.remindBefore === 'number' ? String(t.remindBefore) : '';
   const hint = $('#dRemindHint'); if (!hint) return;
-  if (!t.remindAt) { hint.textContent = 'No reminder — pick a time above.'; return; }
-  if (remindChannel(t) === 'calendar') {
-    if (!syncMeta.email) hint.textContent = 'Needs Google sign-in — nothing will fire until then.';
-    else if (!calStore().enabled) hint.textContent = 'Calendar not connected — switch to App or connect in Sync & Settings.';
-    else hint.textContent = t.calEventId ? `Synced to Google Calendar (${fmtRemind(t.remindAt)}).` : `Will sync to Google Calendar (${fmtRemind(t.remindAt)}).`;
-    return;
-  }
-  if (!('Notification' in window)) hint.textContent = 'This browser cannot show notifications — use the Calendar channel.';
-  else if (Notification.permission === 'granted') hint.textContent = `App will notify at ${fmtRemind(t.remindAt)} (only while the app is open).`;
-  else hint.textContent = 'App notifications are off — enable in Sync & Settings, or use the Calendar channel.';
+  if (typeof t.remindBefore !== 'number') { hint.textContent = 'No reminder.'; return; }
+  if (!t.date) { hint.textContent = 'Add a due date first — the reminder counts back from it.'; return; }
+  const when = fmtRemind(isoLocal(triggerTs(t)));
+  const timeNote = t.time ? '' : ' (due time defaults to 9:00 AM)';
+  if (!syncMeta.email) hint.textContent = `Popup ${when}${timeNote} — needs Google sign-in first.`;
+  else if (!calStore().enabled) hint.textContent = `Popup ${when}${timeNote} — connect Calendar in Sync & Settings to activate it.`;
+  else hint.textContent = t.calEventId ? `Popup ${when}${timeNote} — synced to Google Calendar.` : `Popup ${when}${timeNote} — will sync to Google Calendar.`;
 }
 
 /* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
@@ -3164,14 +3089,14 @@ async function pullNow(mode) {
       }
     }
     setSync('ok');
-    scheduleCalendarSync(); // remote edits may change calendar-channel tasks
+    scheduleCalendarSync(); // remote edits may change reminded tasks
   } catch (e) {
     handleSyncFailure(e, mode, prev, true);
   } finally { syncing = false; syncStartAt = 0; paintSync(); }
 }
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
-  if (!syncMeta.email && !tokenValid()) {
+  if (!syncMeta.email || !tokenValid() || !tokenHasCal()) {
     try { await ensureToken('popup'); await fetchEmail(); }
     catch (e) {
       lastSyncError = e && e.gis
@@ -3190,7 +3115,6 @@ function openAccount() {
   const ni = $('#userNameInput');
   if (ni && document.activeElement !== ni) ni.value = state.userName || '';
   paintColorEditor();
-  paintNotifSettings();
   paintCalSettings();
   $('#accountScrim').classList.remove('hidden');
 }
@@ -3273,10 +3197,7 @@ function bindSync() {
     if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.token) {
       try { google.accounts.oauth2.revoke(syncMeta.token.access_token, () => {}); } catch {}
     }
-    if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.calToken) {
-      try { google.accounts.oauth2.revoke(syncMeta.calToken.access_token, () => {}); } catch {}
-    }
-    syncMeta.token = null; syncMeta.calToken = null; syncMeta.email = '';
+    syncMeta.token = null; syncMeta.email = '';
     saveSyncMeta(); setSync('signedout'); paintSync();
     slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');
@@ -3285,8 +3206,13 @@ function bindSync() {
   $('#logOpenBtn').onclick = openLog;
   $('#logClose').onclick = closeLog;
   $('#logClear').onclick = () => { syncLog = []; saveSyncLog(); paintLog(); };
-  $('#conflictMine').onclick = () => resolveConflict(false);
-  $('#conflictTheirs').onclick = () => resolveConflict(true);
+  $('#conflictAllMine').onclick = () => {
+    [...document.querySelectorAll('#conflictList .conflict-pick')].forEach((p) => paintConflictPick(p, 'mine'));
+  };
+  $('#conflictAllTheirs').onclick = () => {
+    [...document.querySelectorAll('#conflictList .conflict-pick')].forEach((p) => paintConflictPick(p, 'theirs'));
+  };
+  $('#conflictApply').onclick = () => applyConflicts();
   $('#diagCopy').onclick = async () => {
     toast(await copyText(diagLines() + '\n\n' + syncLog.slice(-20).map((e) => new Date(e.t).toLocaleString() + ' [' + e.kind + '] ' + e.msg).join('\n')) ? 'Diagnostics copied' : 'Copy failed');
   };
@@ -3309,18 +3235,6 @@ function bindSync() {
     save(); renderAll(); paintColorEditor();
   };
   $('#resetColorsBtn').onclick = resetColors;
-  $('#notifEnableBtn').onclick = async () => {
-    if (!('Notification' in window)) return;
-    try { await Notification.requestPermission(); } catch {}
-    paintNotifSettings();
-    if (ui.detailId) { try { renderDetail(); } catch {} }
-    checkReminders();
-  };
-  $('#notifTestBtn').onclick = async () => {
-    const t = { id: 'test', title: 'DoTo test', notes: '', listId: '', date: '', time: '' };
-    try { await showReminderNotif(t); toast('Test notification sent'); }
-    catch { toast('Could not show a notification'); }
-  };
   $('#calConnectBtn').onclick = () => {
     if (calStore().enabled) calDisconnect();
     else calConnectFlow().catch(() => {});
@@ -3336,7 +3250,6 @@ function bindSync() {
     if (!document.hidden) {
       maybeRefreshToken().catch(() => {});
       pumpConflicts();
-      checkReminders();
       if (Date.now() - lastPullAt > 60000) pullNow('silent').catch(() => {});
     }
   });
@@ -3361,7 +3274,7 @@ function bindSync() {
   });
   bindPullToRefresh();
   bindEdgeSwipe();
-  setInterval(() => { paintSync(); syncWatchdog(); checkReminders(); }, 5000);
+  setInterval(() => { paintSync(); syncWatchdog(); }, 5000);
   setInterval(() => { maybeRefreshToken().catch(() => {}); }, 60000);
   paintSync();
 }
@@ -3690,55 +3603,15 @@ function bind() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeLog(); closeConflict(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderNav(); renderCurrentView(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
-  $('#dDate').onchange = (e) => {
+  $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };
+  $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; save(); renderAll(); } };
+  $('#dRemindBefore').onchange = (e) => {
     const t = getTask(ui.detailId); if (!t) return;
-    const oldDue = dueIso(t);
-    t.date = e.target.value;
-    if (t.remindAt && oldDue && t.remindAt === oldDue && t.date) {
-      t.remindAt = t.date + 'T' + (t.time || '00:00'); // "at due time" follows the move
-      t.lastRemindedAt = 0;
-    }
+    t.remindBefore = e.target.value === '' ? '' : +e.target.value;
+    if (typeof t.remindBefore === 'number' && !REMIND_OFFSETS.includes(t.remindBefore)) t.remindBefore = '';
+    if (t.remindBefore === '') dropCalEvent(t); // reconcile creates/updates otherwise
     save(); renderAll();
   };
-  $('#dTime').onchange = (e) => {
-    const t = getTask(ui.detailId); if (!t) return;
-    const oldDue = dueIso(t);
-    t.time = e.target.value;
-    if (t.remindAt && oldDue && t.remindAt === oldDue && t.date) {
-      t.remindAt = t.date + 'T' + (t.time || '00:00');
-      t.lastRemindedAt = 0;
-    }
-    save(); renderAll();
-  };
-  $('#dRemindAt').onchange = (e) => {
-    const t = getTask(ui.detailId); if (!t) return;
-    t.remindAt = e.target.value || '';
-    if (t.remindAt && t.remindVia !== 'calendar') t.remindVia = 'app';
-    if (!t.remindAt) dropCalEvent(t);
-    t.lastRemindedAt = 0;
-    save(); renderAll();
-  };
-  $('#dRemindClear').onclick = () => {
-    const t = getTask(ui.detailId); if (!t) return;
-    t.remindAt = ''; t.lastRemindedAt = 0;
-    dropCalEvent(t);
-    save(); renderAll();
-  };
-  $$('#dRemindVia button').forEach((b) => {
-    b.onclick = () => {
-      const t = getTask(ui.detailId); if (!t) return;
-      if (b.dataset.v === 'calendar') {
-        if (!t.remindAt) { toast('Pick a reminder time first'); return; }
-        if (!syncMeta.email) { toast('Sign in with Google first'); openAccount(); return; }
-        if (!calStore().enabled) { toast('Connect Google Calendar first (Sync & Settings)'); openAccount(); return; }
-        t.remindVia = 'calendar';
-      } else {
-        t.remindVia = 'app';
-        dropCalEvent(t);
-      }
-      save(); renderAll();
-    };
-  });
   $('#dClearDate').onclick = () => { const t = getTask(ui.detailId); if (t) { t.date = ''; t.time = ''; save(); renderAll(); } };
   $('#dExt').oninput = (e) => {
     const t = getTask(ui.detailId); if (!t) return;
@@ -3762,9 +3635,6 @@ function bind() {
 
   // Google Drive sync
   bindSync();
-
-  // reminders (notification intents from the service worker)
-  bindReminders();
 
   // resizers (desktop)
   makeResizable($('#sideResizer'), (ev) => {    state.prefs.sideW = Math.min(420, Math.max(220, ev.clientX));

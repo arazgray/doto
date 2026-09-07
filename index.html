@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788782214" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788782214" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788787134" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788787134" />
 </head>
 <body>
 <header class="topbar">
@@ -312,15 +312,18 @@
         </div>
       </div>
       <div class="d-section">
-        <p class="d-label">Reminder <span class="hint">— app notification or Google Calendar</span></p>
+        <p class="d-label">Reminder <span class="hint">— Google Calendar popup before due</span></p>
         <div class="d-row">
           <span class="material-icons-outlined muted">notifications</span>
-          <input id="dRemindAt" type="datetime-local" aria-label="Reminder time" />
-          <button id="dRemindClear" class="icon-btn sm" aria-label="Clear reminder"><span class="material-icons-outlined">close</span></button>
-        </div>
-        <div id="dRemindVia" class="segmented" role="radiogroup" aria-label="Reminder channel" style="margin-top:8px">
-          <button data-v="app" role="radio"><span class="material-icons-outlined">smartphone</span>App</button>
-          <button data-v="calendar" role="radio"><span class="material-icons-outlined">event</span>Calendar</button>
+          <select id="dRemindBefore" aria-label="Remind before due">
+            <option value="">No reminder</option>
+            <option value="1">1 minute before</option>
+            <option value="5">5 minutes before</option>
+            <option value="30">30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="180">3 hours before</option>
+            <option value="1440">1 day before</option>
+          </select>
         </div>
         <p id="dRemindHint" class="muted small" style="margin:6px 0 0"></p>
       </div>
@@ -413,13 +416,8 @@
       <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
     </div>
     <div class="set-group">
-      <p class="d-label">Reminders <span class="hint">— per-task channel is set in Details</span></p>
-      <p id="notifStatus" class="muted small" style="margin:0 0 6px"></p>
-      <div class="modal-actions account-actions" style="margin-top:0">
-        <button type="button" id="notifEnableBtn" class="btn-ghost"><span class="material-icons-outlined">notifications</span> Enable notifications</button>
-        <button type="button" id="notifTestBtn" class="btn-ghost"><span class="material-icons-outlined">volume_up</span> Test</button>
-      </div>
-      <p id="calStatus" class="muted small" style="margin:8px 0 6px"></p>
+      <p class="d-label">Calendar reminders <span class="hint">— popup before due, set per task in Details</span></p>
+      <p id="calStatus" class="muted small" style="margin:0 0 6px"></p>
       <div class="modal-actions account-actions" style="margin-top:0">
         <button type="button" id="calConnectBtn" class="btn-ghost"><span class="material-icons-outlined">event</span> Connect Calendar</button>
         <button type="button" id="calSyncBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
@@ -452,14 +450,14 @@
   </div>
 </div>
 <div id="conflictScrim" class="modal-scrim hidden">
-  <div class="modal conflict-modal" role="dialog" aria-modal="true" aria-label="Sync conflict">
-    <h3>Sync conflict</h3>
-    <p id="conflictTitle" class="conflict-title" dir="auto"></p>
+  <div class="modal conflict-modal" role="dialog" aria-modal="true" aria-label="Sync conflicts">
+    <h3 id="conflictTitle">Sync conflicts</h3>
     <p id="conflictCount" class="muted small"></p>
-    <div id="conflictDiff" class="conflict-diff"></div>
+    <div id="conflictList" class="conflict-list"></div>
     <div class="modal-actions conflict-actions">
-      <button type="button" id="conflictMine" class="btn-ghost">Keep mine</button>
-      <button type="button" id="conflictTheirs" class="btn-primary">Use Drive's</button>
+      <button type="button" id="conflictAllMine" class="btn-ghost">All mine</button>
+      <button type="button" id="conflictAllTheirs" class="btn-ghost">All Drive's</button>
+      <button type="button" id="conflictApply" class="btn-primary">Apply</button>
     </div>
   </div>
 </div>
@@ -500,6 +498,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788782214"></script>
+<script src="app.js?v=1.0-1788787134"></script>
 </body>
 </html>

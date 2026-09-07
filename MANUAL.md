@@ -99,27 +99,24 @@ Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
 
 ## Reminders
 
-Each task can remind you once at a chosen time. Open Details → Reminder,
-pick a time (it defaults to nothing — set it explicitly), then pick the
-channel:
+Each task can pop up a Google Calendar reminder before it is due. Open
+Details → Reminder and pick how far in advance: 1 or 5 or 30 minutes, 1 or
+3 hours, or 1 day. The reminder counts back from the due date + time (a
+dateless time defaults to 9:00 AM); without a due date there is nothing to
+count back from.
 
-- **App**: a system notification with Mark-done and Snooze-10-min buttons,
-  plus an app-icon badge counting overdue + due-today tasks. Needs
-  notification permission (Sync & Settings → Enable notifications) and only
-  fires **while the app is open** — a fully closed app or PWA cannot wake
-  itself up. No server involved, works offline.
-- **Calendar**: syncs the reminder into a dedicated **DoTo** calendar in
-  your Google account with a popup alert at the reminder time. Google
-  Calendar then notifies you with the app closed — including on iPhone.
-  Needs Drive sign-in plus one extra consent (Sync & Settings → Connect
-  Calendar). The event updates when you edit the task and disappears when
-  you complete, delete or un-schedule it.
+Reminders live in a dedicated **DoTo** calendar in your Google account —
+the event sits at the due time with a popup alert beforehand — so Google
+Calendar notifies you with the app closed, including on iPhone. Needs
+Drive sign-in (Sync & Settings → Connect Calendar for the one-time
+consent; it is the same sign-in as sync). The event updates when you edit
+the task and disappears when you complete or delete the task, or switch
+the reminder off. Moving the due date moves the reminder with it, and
+completing a repeating task carries the reminder to the next occurrence.
 
-The channel is exclusive per task, so the two can never double-notify; a
-fired reminder is stamped, which also stops a second device from refiring
-it. Moving a due date drags an "at due time" reminder along; completing a
-repeating task carries it to the next occurrence. Tapping a notification
-opens the task.
+There is deliberately no in-app notification channel: nothing on your
+device needs to run, and one channel means reminders can never
+double-notify.
 
 ## Search, filters and sorting
 
@@ -204,11 +201,10 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
 ### Your own Google client ID (for sync on your host)
 
 1. Open <https://console.cloud.google.com/> and create (or pick) a project.
-2. **APIs & Services → Library**: find and **Enable** the **Google Drive API**.
-   For Calendar reminders also enable the **Google Calendar API**.
+2. **APIs & Services → Library**: find and **Enable** the **Google Drive API**
+   and the **Google Calendar API** (one sign-in covers sync + reminders).
 3. **APIs & Services → OAuth consent screen**: choose External, fill in app
-   name + support email, and add these scopes (the third only if you want
-   Calendar reminders):
+   name + support email, and add these three scopes:
    - `https://www.googleapis.com/auth/drive.appdata`
    - `https://www.googleapis.com/auth/userinfo.email`
    - `https://www.googleapis.com/auth/calendar.events`
