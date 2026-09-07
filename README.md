@@ -1,5 +1,6 @@
 # DoTo
 A ridiculously fast, lightweight, privacy-first task manager built by someone who actually uses a ToDo app. Offline-first, synced with your own Google Drive, and hosted on GitHub. Written in 100% vanilla HTML, CSS, and JavaScript with no dependencies, no build step, and no framework. Mobile-first, fully responsive, with complete touch and mouse parity.
+
 **Live app: <https://arazgray.github.io/doto/>**
 
 ![DoTo screenshot](screenshot.png)
