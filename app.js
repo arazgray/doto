@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788787134'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788789057'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2408,7 +2408,10 @@ function gisAttempt(tc, prompt, ms) {
   });
 }
 async function ensureToken(mode) {
-  if (tokenValid()) return syncMeta.token.access_token;
+  // A still-valid token is reused — EXCEPT an explicit popup when it predates
+  // the calendar scope. Otherwise the old Drive-only token would be returned
+  // forever and no consent popup could ever grant the missing scope.
+  if (tokenValid() && (mode !== 'popup' || tokenHasCal())) return syncMeta.token.access_token;
   await gisLoad();
   const cid = googleClientId();
   if (!cid) throw new Error('setup');
