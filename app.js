@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788795448'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788797169'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1999,13 +1999,16 @@ function openDetail(id) {
   $('#detail').classList.remove('hidden');
   if (window.innerWidth < 1024) $('#scrim').classList.remove('hidden');
   else if (isAll()) {
-    // board keeps its scroll when the panel pushes in (feels like an overlay),
-    // so slide the task's column into view — same leftward motion as list view
     const t = getTask(id);
     const col = t && document.querySelector(`.board-col[data-list-id="${t.listId}"]`);
-    if (col) setTimeout(() => col.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 30);
+    const board = $('#board');
+    if (col && board) {
+      setTimeout(() => {
+        board.scrollTo({ left: Math.max(0, col.offsetLeft - 16), behavior: 'smooth' });
+      }, 220);
+    }
   }
-  setTimeout(() => $('#dTitle').focus(), 50);
+  setTimeout(() => { const el = $('#dTitle'); if (el) el.focus({ preventScroll: true }); }, 220);
 }
 function closeDetail() { ui.detailId = null; $('#detail').classList.add('hidden'); $('#scrim').classList.add('hidden'); }
 function renderDetail() {
@@ -3000,8 +3003,11 @@ function applyConflicts() {
    that could double-notify — and nothing needs to run on the device at all. */
 /* effective due timestamp; dateless-time tasks default to 9:00 AM */
 function dueTs(t) {
-  if (!t.date) return 0;
-  const n = Date.parse(`${t.date}T${t.time || '09:00'}`);
+  if (!t.date || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return 0;
+  const [Y, M, D] = t.date.split('-').map(Number);
+  const tm = (t.time && /^\d{1,2}:\d{2}/.test(t.time)) ? t.time : '09:00';
+  const [h, min] = tm.split(':').map(Number);
+  const n = new Date(Y, M - 1, D, h || 0, min || 0, 0, 0).getTime();
   return isNaN(n) ? 0 : n;
 }
 function triggerTs(t) {
@@ -3014,7 +3020,8 @@ function isoLocal(ms) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
 }
 function fmtRemind(v) {
-  const n = Date.parse(v || ''); if (isNaN(n)) return '—';
+  const n = typeof v === 'number' ? v : Date.parse(v || '');
+  if (isNaN(n)) return '—';
   return new Date(n).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function fmtOffset(min) {
@@ -3050,7 +3057,8 @@ function queueCalDelete(eventId) {
   if (!q.some((x) => x && x.eventId === eventId)) q.push({ eventId });
   calQueueSave(q);
 }
-function calConnected() { return !!(calStore().enabled && syncMeta.email); }
+function calConnected() { return !!syncMeta.email; }
+let lastCalError = '';
 async function calFetch(path, opts = {}, mode = 'silent') {
   const at = await ensureToken(mode);
   const r = await fetch('https://www.googleapis.com/calendar/v3' + path, {
@@ -3070,43 +3078,78 @@ async function calFetch(path, opts = {}, mode = 'silent') {
 function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } }
 function eventDateTime(ms) {
   const d = new Date(ms);
+  const wall = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}:00`;
+  const tz = tzName();
+  if (tz) return { dateTime: wall, timeZone: tz };
   const off = -d.getTimezoneOffset(), sign = off >= 0 ? '+' : '-', a = Math.abs(off);
-  const s = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}:00${sign}${p2(Math.floor(a / 60))}:${p2(a % 60)}`;
-  const o = { dateTime: s };
-  const tz = tzName(); if (tz) o.timeZone = tz;
-  return o;
+  return { dateTime: `${wall}${sign}${p2(Math.floor(a / 60))}:${p2(a % 60)}` };
 }
 function calEventBody(t) {
   const due = dueTs(t);
+  const mins = typeof t.remindBefore === 'number' ? t.remindBefore : 0;
   return {
     summary: (t.title || '(untitled)').slice(0, 200),
     description: `${t.notes || ''}\n— ${listName(t.listId)} (DoTo reminder)`.slice(0, 2000),
     start: eventDateTime(due),
     end: eventDateTime(due + 30 * 60000),
-    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: t.remindBefore }] },
+    status: 'confirmed',
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'popup', minutes: mins },
+        { method: 'email', minutes: mins },
+      ],
+    },
   };
 }
 function calRev(t) { return JSON.stringify([t.title, t.notes, t.date, t.time, t.remindBefore, t.listId]); }
 function needsCalEvent(t) {
+  if (!calConnected() || t.done || typeof t.remindBefore !== 'number') return false;
   const due = dueTs(t);
-  return !!(calStore().enabled && typeof t.remindBefore === 'number' && due && due > Date.now() - 60000 && !t.done);
+  if (!due) return false;
+  // Keep the Google event until an hour after due so a 1-minute popup can still fire.
+  return due > Date.now() - 3600000;
+}
+async function ensureCalVisible(calId, mode) {
+  const path = '/users/me/calendarList/' + encodeURIComponent(calId);
+  const body = JSON.stringify({ selected: true, hidden: false, defaultReminders: [] });
+  try {
+    await calFetch(path, { method: 'PATCH', body }, mode);
+  } catch (e) {
+    if (!e || e.status !== 404) throw e;
+    await calFetch('/users/me/calendarList', { method: 'POST', body: JSON.stringify({ id: calId, selected: true, hidden: false, defaultReminders: [] }) }, mode);
+  }
 }
 async function ensureCalCalendar(mode) {
   const s = calStore();
   if (s.calendarId) {
     try { await calFetch('/calendars/' + encodeURIComponent(s.calendarId), {}, mode); return s.calendarId; }
-    catch (e) { if (!e || e.status !== 404) throw e; }
+    catch (e) { if (!e || (e.status !== 404 && e.status !== 403)) throw e; s.calendarId = ''; }
   }
   const list = await calFetch('/users/me/calendarList', {}, mode);
-  const hit = ((list && list.items) || []).find((c) => c && c.summary === 'DoTo' && !c.deleted);
-  let id = hit ? hit.id : null;
-  if (!id) {
+  const items = (list && list.items) || [];
+  const hit = items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted && !c.hidden);
+  const anyDoTo = hit || items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted);
+  if (anyDoTo) {
+    s.calendarId = anyDoTo.id; s.kind = 'doto'; saveCalStore(s);
+    try { await ensureCalVisible(anyDoTo.id, mode); } catch {}
+    return anyDoTo.id;
+  }
+  try {
     const body = { summary: 'DoTo', description: 'Reminders from the DoTo task manager' };
     const tz = tzName(); if (tz) body.timeZone = tz;
-    id = (await calFetch('/calendars', { method: 'POST', body: JSON.stringify(body) }, mode)).id;
+    const created = await calFetch('/calendars', { method: 'POST', body: JSON.stringify(body) }, mode);
+    s.calendarId = created.id; s.kind = 'doto'; saveCalStore(s);
+    try { await ensureCalVisible(created.id, mode); } catch {}
+    return created.id;
+  } catch (e) {
+    // calendar.events cannot create calendars — fall back to the user's primary calendar
+    const primary = items.find((c) => c && c.primary) || items[0];
+    if (!primary) throw e;
+    s.calendarId = primary.id; s.kind = 'primary'; saveCalStore(s);
+    slog('info', 'Using your main Google Calendar (cannot create a DoTo calendar with current permission)');
+    return primary.id;
   }
-  s.calendarId = id; saveCalStore(s);
-  return id;
 }
 async function upsertCalEvent(t, mode) {
   const calId = await ensureCalCalendar(mode);
@@ -3137,7 +3180,7 @@ let calSyncTimer = 0, calSyncing = false, calSyncAgain = false;
 function scheduleCalendarSync() {
   if (!calConnected()) return;
   clearTimeout(calSyncTimer);
-  calSyncTimer = setTimeout(() => { calendarReconcile('silent').catch(() => {}); }, 10000);
+  calSyncTimer = setTimeout(() => { calendarReconcile('silent').catch(() => {}); }, 1200);
 }
 async function calendarReconcile(mode) {
   if (calSyncing) { calSyncAgain = true; return; }
@@ -3175,84 +3218,28 @@ async function calendarReconcile(mode) {
       }
     }
     if (changed) { clearTimeout(calSyncTimer); save(); renderAll(); }
-    if (mode !== 'silent') {
-      const n = state.tasks.filter(needsCalEvent).length;
-      toast(n ? `Calendar synced — ${n} reminder${n === 1 ? '' : 's'}` : 'Calendar synced — nothing to remind');
-      slog('ok', `Calendar reconcile (${n} active reminder${n === 1 ? '' : 's'})`);
-    }
+    lastCalError = '';
+    const n = state.tasks.filter(needsCalEvent).length;
+    const placed = state.tasks.filter((t) => t.calEventId && needsCalEvent(t)).length;
+    slog('ok', `Reminders synced (${placed}/${n})`);
   } catch (e) { handleCalError(e, mode); }
   finally {
-    calSyncing = false; try { paintCalSettings(); } catch {} if (ui.detailId) { try { renderDetail(); } catch {} }
+    calSyncing = false; if (ui.detailId) { try { renderDetail(); } catch {} }
     if (calSyncAgain) { calSyncAgain = false; scheduleCalendarSync(); }
   }
 }
 function handleCalError(e, mode) {
   const m = (e && e.message) || '';
   const detail = (e && e.detail) || '';
-  if (m === 'auth' || m === 'setup') {
-    if (mode !== 'silent') {
-      try { toast(m === 'setup' ? 'Set a Google client ID first' : 'Google session ended — sign in again'); } catch {}
-    }
-    return;
-  }
-  if (e && e.gis) {
-    if (mode !== 'silent') {
-      try { toast('Calendar sign-in failed (' + e.gis + '). Allow popups and try again.'); } catch {}
-      slog('error', 'Calendar sign-in failed: ' + e.gis);
-    }
-    return;
-  }
-  if (detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0) {
-    const msg = 'Calendar needs its permission — tap Sync now to re-grant it.';
-    if (mode !== 'silent') { try { toast(msg); } catch {} }
-    slog('error', msg);
-    return;
-  }
-  if (detail.indexOf('accessNotConfigured') >= 0) {
-    const msg = 'Google Calendar API is off for your Cloud project — enable it, then retry.';
-    if (mode !== 'silent') { try { toast(msg); } catch {} }
-    slog('error', msg);
-    return;
-  }
-  const msg = 'Calendar sync failed — retry.';
-  if (mode !== 'silent') { try { toast(msg); } catch {} }
-  slog('error', msg + (detail ? ' ' + detail.slice(0, 120) : ''));
-}
-async function calConnectFlow() {
-  if (!syncMeta.email) { try { toast('Sign in with Google first'); } catch {} openAccount(); return; }
-  try {
-    await ensureToken('popup'); // single sign-in: same token covers Drive + Calendar
-    const s = calStore(); s.enabled = true; saveCalStore(s);
-    slog('info', 'Calendar connected — reconciling');
-    await calendarReconcile('popup');
-  } catch (e) { handleCalError(e, 'popup'); }
-}
-function calDisconnect() {
-  const s = calStore(); s.enabled = false; saveCalStore(s);
-  try { paintCalSettings(); } catch {}
-  try { toast('Calendar disconnected — existing events stay in Google Calendar'); } catch {}
-  slog('info', 'Calendar disconnected (events left in place)');
-}
-function paintCalSettings() {
-  const st = $('#calStatus'); if (!st) return;
-  const cb = $('#calConnectBtn'), sb = $('#calSyncBtn');
-  const s = calStore();
-  const n = state.tasks.filter(needsCalEvent).length;
-  if (!syncMeta.email) {
-    st.textContent = 'Google Calendar sync needs Drive sign-in first.';
-    if (cb) { cb.innerHTML = '<span class="material-icons-outlined">event</span> Connect Calendar'; }
-    if (sb) sb.classList.add('hidden');
-    return;
-  }
-  if (s.enabled) {
-    st.textContent = `Calendar connected${n ? ` — ${n} reminder${n === 1 ? '' : 's'}` : ' — no reminders set yet'}. Pick a lead time per task in Details.`;
-    if (cb) { cb.innerHTML = '<span class="material-icons-outlined">event_busy</span> Disconnect'; }
-    if (sb) sb.classList.remove('hidden');
-  } else {
-    st.textContent = 'Calendar sync is off. Connect to get reminders with the app closed (works on iPhone too).';
-    if (cb) { cb.innerHTML = '<span class="material-icons-outlined">event</span> Connect Calendar'; }
-    if (sb) sb.classList.add('hidden');
-  }
+  let msg = 'Calendar sync failed — retry.';
+  if (m === 'auth' || m === 'setup') msg = m === 'setup' ? 'Set a Google client ID first' : 'Google session ended — sign in again';
+  else if (e && e.gis) msg = 'Calendar sign-in failed (' + e.gis + '). Allow popups and try again.';
+  else if (detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0)
+    msg = 'Calendar needs its permission — tap Sync now (Drive) to re-grant it.';
+  else if (detail.indexOf('accessNotConfigured') >= 0)
+    msg = 'Google Calendar API is off for your Cloud project — enable it, then retry.';
+  lastCalError = msg + (detail && msg.indexOf('failed') >= 0 ? ' ' + detail.slice(0, 80) : '');
+  slog('error', lastCalError);
 }
 /* drop the linked event when a reminder no longer needs one (reminder cleared,
    done, delete). Async delete is queued; ids cleared immediately so a
@@ -3270,11 +3257,13 @@ function paintReminderUI(t) {
   const hint = $('#dRemindHint'); if (!hint) return;
   if (typeof t.remindBefore !== 'number') { hint.textContent = 'No reminder.'; return; }
   if (!t.date) { hint.textContent = 'Add a due date first — the reminder counts back from it.'; return; }
-  const when = fmtRemind(isoLocal(triggerTs(t)));
+  const when = fmtRemind(triggerTs(t));
   const timeNote = t.time ? '' : ' (due time defaults to 9:00 AM)';
-  if (!syncMeta.email) hint.textContent = `Popup ${when}${timeNote} — needs Google sign-in first.`;
-  else if (!calStore().enabled) hint.textContent = `Popup ${when}${timeNote} — connect Calendar in Sync & Settings to activate it.`;
-  else hint.textContent = t.calEventId ? `Popup ${when}${timeNote} — synced to Google Calendar.` : `Popup ${when}${timeNote} — will sync to Google Calendar.`;
+  if (!syncMeta.email) hint.textContent = `Notify ${when}${timeNote} — sign in to turn reminders on.`;
+  else if (lastCalError) hint.textContent = `Notify ${when}${timeNote}.`;
+  else hint.textContent = t.calEventId
+    ? `Notify ${when}${timeNote}.`
+    : `Notify ${when}${timeNote} — saving…`;
 }
 
 /* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
@@ -3436,7 +3425,6 @@ function openAccount() {
   const ni = $('#userNameInput');
   if (ni && document.activeElement !== ni) ni.value = state.userName || '';
   paintColorEditor();
-  paintCalSettings();
   $('#accountScrim').classList.remove('hidden');
 }
 function colorLabelRow(c) {
@@ -3563,14 +3551,6 @@ function bindSync() {
     save(); renderAll(); paintColorEditor();
   };
   $('#resetColorsBtn').onclick = resetColors;
-  $('#calConnectBtn').onclick = () => {
-    if (calStore().enabled) calDisconnect();
-    else calConnectFlow().catch(() => {});
-  };
-  $('#calSyncBtn').onclick = () => {
-    if (!calStore().enabled) { calConnectFlow().catch(() => {}); return; }
-    calendarReconcile('popup').catch(() => {});
-  };
   window.addEventListener('online', () => { paintSync(); maybeRefreshToken().catch(() => {}); pullNow('silent').catch(() => {}); });
   window.addEventListener('offline', () => paintSync());
   window.addEventListener('focus', () => { maybeRefreshToken().catch(() => {}); pumpConflicts(); });
@@ -3630,7 +3610,6 @@ function bindEdgeSwipe() {
     const t = e.touches[0], open = sb().classList.contains('open');
     if (!open) {
       if (t.clientX < 20) return; // system back-gesture strip
-      if (t.clientX > window.innerWidth * 0.5) return; // left half only (matches Manual)
       if (t.target && t.target.closest && t.target.closest('#board,.drag')) return;
       mode = 'open';
     } else {
@@ -3956,14 +3935,18 @@ function bind() {
   });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderAll(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
-  $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };
-  $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; save(); renderAll(); } };
+  $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
+  $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
   $('#dRemindBefore').onchange = (e) => {
     const t = getTask(ui.detailId); if (!t) return;
     t.remindBefore = e.target.value === '' ? '' : +e.target.value;
     if (typeof t.remindBefore === 'number' && !REMIND_OFFSETS.includes(t.remindBefore)) t.remindBefore = '';
     if (t.remindBefore === '') dropCalEvent(t); // reconcile creates/updates otherwise
     save(); renderAll();
+    if (calConnected() && typeof t.remindBefore === 'number') {
+      clearTimeout(calSyncTimer);
+      calendarReconcile('silent').catch(() => {});
+    }
   };
   $('#dClearDate').onclick = () => { const t = getTask(ui.detailId); if (t) { t.date = ''; t.time = ''; save(); renderAll(); } };
   $('#dExt').oninput = (e) => {

@@ -27,7 +27,7 @@
 1. Open <https://arazgray.github.io/doto/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar — or on touch screens,
-   drag right starting in the left half of the screen — then **Create new list** for your own categories.
+   drag right from anywhere on the page (except the Board) — then **Create new list** for your own categories.
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
 Everything is saved automatically in your browser as you type.
@@ -101,24 +101,16 @@ Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
 
 ## Reminders
 
-Each task can pop up a Google Calendar reminder before it is due. Open
-Details → Reminder and pick how far in advance: 1 or 5 or 30 minutes, 1 or
-3 hours, or 1 day. The reminder counts back from the due date + time (a
-dateless time defaults to 9:00 AM); without a due date there is nothing to
-count back from.
+Open Details → Reminder and pick how far in advance: 1 or 5 or 30 minutes,
+1 or 3 hours, or 1 day. The reminder counts back from the due date + time
+(a dateless time defaults to 9:00 AM); without a due date there is nothing
+to count back from.
 
-Reminders live in a dedicated **DoTo** calendar in your Google account —
-the event sits at the due time with a popup alert beforehand — so Google
-Calendar notifies you with the app closed, including on iPhone. Needs
-Drive sign-in (Sync & Settings → Connect Calendar for the one-time
-consent; it is the same sign-in as sync). The event updates when you edit
-the task and disappears when you complete or delete the task, or switch
-the reminder off. Moving the due date moves the reminder with it, and
+Sign in with Google (the same **Sign in** as sync) and reminders run in the
+background — no extra Calendar setup. The event updates when you edit the
+task and disappears when you complete or delete the task, or switch the
+reminder off. Moving the due date moves the reminder with it, and
 completing a repeating task carries the reminder to the next occurrence.
-
-There is deliberately no in-app notification channel: nothing on your
-device needs to run, and one channel means reminders can never
-double-notify.
 
 ## Search, filters and sorting
 

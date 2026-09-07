@@ -19,7 +19,7 @@
   --side-w:280px; --detail-w:440px;
 }
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) var(--scroll-track)}
-html,body{height:100%}
+html,body{height:100%;overflow-x:hidden}
 body{
   margin:0; font-family:Roboto,"Google Sans",Arial,sans-serif; color:var(--text);
   background:var(--bg); -webkit-tap-highlight-color:transparent;
@@ -76,7 +76,7 @@ input,select,textarea{font:inherit;color:inherit}
 }
 
 /* Layout */
-.app{display:flex;min-height:calc(100dvh - var(--topbar-h));position:relative;align-items:stretch}
+.app{display:flex;min-height:calc(100dvh - var(--topbar-h));position:relative;align-items:stretch;overflow-x:hidden}
 .scrim{position:fixed;inset:var(--topbar-h) 0 0 0;background:rgba(0,0,0,.35);z-index:30;transition:opacity .22s ease}
 
 /* Sidebar drawer on mobile */
@@ -595,10 +595,10 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   container-type:inline-size;container-name:detail;min-width:0;
   &:not(.hidden){animation:detailIn .2s ease}
 }
-/* 0.2s open animation, like the sidebar drawer (bottom sheet slides up) */
+/* 0.2s open animation. Overflow is clipped on .app so the slide cannot
+   flash a horizontal scrollbar (that used to collapse board padding). */
 @keyframes detailIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media (min-width:1024px){
-  /* side panel slides in from the right */
   @keyframes detailIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 }
 /* Weight + Importance side-by-side only when the panel itself is wide enough */
