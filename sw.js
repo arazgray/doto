@@ -1,7 +1,7 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v4';
+const CACHE = 'doto-v5';
 const CORE = [
   './',
   'index.html',
@@ -40,6 +40,32 @@ self.addEventListener('activate', (e) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
+  );
+});
+
+// Reminder notifications: tap opens the task, actions message the app.
+// postMessage wins when a client is alive; the #<verb>-<id> hash is the
+// fallback for a freshly opened window (handled by the app on boot).
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const id = e.notification && e.notification.data && e.notification.data.taskId;
+  if (!id) {
+    e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((cs) => (cs.length ? cs[0].focus() : clients.openWindow('./'))));
+    return;
+  }
+  const verb = e.action === 'done' ? 'done' : e.action === 'snooze' ? 'snooze' : 'task';
+  const msgType = verb === 'done' ? 'doto-task-done' : verb === 'snooze' ? 'doto-snooze' : 'doto-open-task';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      const target = cs.find((c) => 'focus' in c) || cs[0];
+      if (target) {
+        if ('focus' in target) target.focus().catch(() => {});
+        target.postMessage({ type: msgType, id });
+        return undefined;
+      }
+      return clients.openWindow('./#' + verb + '-' + id);
+    })
   );
 });
 

@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788775846" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788775846" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788782214" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788782214" />
 </head>
 <body>
 <header class="topbar">
@@ -312,6 +312,19 @@
         </div>
       </div>
       <div class="d-section">
+        <p class="d-label">Reminder <span class="hint">— app notification or Google Calendar</span></p>
+        <div class="d-row">
+          <span class="material-icons-outlined muted">notifications</span>
+          <input id="dRemindAt" type="datetime-local" aria-label="Reminder time" />
+          <button id="dRemindClear" class="icon-btn sm" aria-label="Clear reminder"><span class="material-icons-outlined">close</span></button>
+        </div>
+        <div id="dRemindVia" class="segmented" role="radiogroup" aria-label="Reminder channel" style="margin-top:8px">
+          <button data-v="app" role="radio"><span class="material-icons-outlined">smartphone</span>App</button>
+          <button data-v="calendar" role="radio"><span class="material-icons-outlined">event</span>Calendar</button>
+        </div>
+        <p id="dRemindHint" class="muted small" style="margin:6px 0 0"></p>
+      </div>
+      <div class="d-section">
         <p class="d-label">Repeat</p>
         <div class="d-row">
           <span class="material-icons-outlined muted">repeat</span>
@@ -400,6 +413,19 @@
       <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
     </div>
     <div class="set-group">
+      <p class="d-label">Reminders <span class="hint">— per-task channel is set in Details</span></p>
+      <p id="notifStatus" class="muted small" style="margin:0 0 6px"></p>
+      <div class="modal-actions account-actions" style="margin-top:0">
+        <button type="button" id="notifEnableBtn" class="btn-ghost"><span class="material-icons-outlined">notifications</span> Enable notifications</button>
+        <button type="button" id="notifTestBtn" class="btn-ghost"><span class="material-icons-outlined">volume_up</span> Test</button>
+      </div>
+      <p id="calStatus" class="muted small" style="margin:8px 0 6px"></p>
+      <div class="modal-actions account-actions" style="margin-top:0">
+        <button type="button" id="calConnectBtn" class="btn-ghost"><span class="material-icons-outlined">event</span> Connect Calendar</button>
+        <button type="button" id="calSyncBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
+      </div>
+    </div>
+    <div class="set-group">
       <p class="d-label">Color labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
       <div id="colorNames" class="color-names"></div>
       <div class="setup-row color-add-row">
@@ -474,6 +500,6 @@
 <div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788775846"></script>
+<script src="app.js?v=1.0-1788782214"></script>
 </body>
 </html>

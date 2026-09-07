@@ -624,9 +624,10 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
 }
 .d-row{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;
-  & input[type="date"],& input[type="time"]{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0;flex:1}
+  & input[type="date"],& input[type="time"],& input[type="datetime-local"]{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0;flex:1}
   & input[type="time"]{flex:0 1 128px}
   & input[type="date"]{flex:1 1 170px;min-width:0}
+  & input[type="datetime-local"]{flex:1 1 200px;min-width:0}
   & select{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0}
 }
 #dRecurN{
