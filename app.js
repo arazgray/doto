@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788798713'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788799801'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2727,11 +2727,18 @@ async function fetchEmail() {
 
 /* ----- Drive appDataFolder API ----- */
 async function driveFetch(url, opts = {}, mode = 'silent') {
-  const at = await ensureToken(mode);
-  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at } });
-  // Only 401 means the token died. 403 (API disabled, scope denied, …) must
-  // NOT wipe the token — otherwise every retry re-opens the sign-in popup.
-  if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  const doFetch = (at) => fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at } });
+  let r = await doFetch(await ensureToken(mode));
+  // Only 401 means the token died (expired/revoked): drop it and retry ONCE
+  // with a fresh token so one tap on Sync now recovers instead of needing two.
+  // 403 (API disabled, scope denied, …) must NOT wipe the token — otherwise
+  // every retry re-opens the sign-in popup.
+  if (r.status === 401) {
+    syncMeta.token = null; saveSyncMeta();
+    try { r = await doFetch(await ensureToken(mode)); }
+    catch { throw new Error('auth'); }
+    if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  }
   return r;
 }
 async function driveOk(r) {
@@ -3079,12 +3086,19 @@ function queueCalDelete(eventId) {
 function calConnected() { return !!syncMeta.email; }
 let lastCalError = '';
 async function calFetch(path, opts = {}, mode = 'silent') {
-  const at = await ensureToken(mode, true);
-  const r = await fetch('https://www.googleapis.com/calendar/v3' + path, {
+  const doFetch = (at) => fetch('https://www.googleapis.com/calendar/v3' + path, {
     ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
   });
-  // Only 401 kills the token; 403 (scope denied, API disabled) must NOT loop popups.
-  if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  let r = await doFetch(await ensureToken(mode, true));
+  // Same one-retry rule as Drive: a cached token can be valid locally but
+  // dead at Google (expiry/revoke). Retry once with a fresh token so Sync now
+  // heals in one tap. 403 (scope denied, API disabled) must NOT loop popups.
+  if (r.status === 401) {
+    syncMeta.token = null; saveSyncMeta();
+    try { r = await doFetch(await ensureToken(mode, true)); }
+    catch { throw new Error('auth'); }
+    if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
+  }
   if (r.status === 204) return null;
   if (!r.ok) {
     const err = new Error('cal' + r.status);
