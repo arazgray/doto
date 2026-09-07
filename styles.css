@@ -49,6 +49,8 @@ input,select,textarea{font:inherit;color:inherit}
   & .brand{
     display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer;flex:none;
   }
+  & .brand-mark{display:inline-flex;flex:none}
+  & .brand-mark img{width:30px;height:30px;display:block}
   & .brand-text{display:flex;flex-direction:column;line-height:1.05}
   & .brand-name{font-weight:700;font-size:19px;letter-spacing:.2px}
   & .brand-slogan{font-size:11px;color:var(--muted);white-space:nowrap}

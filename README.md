@@ -1,7 +1,24 @@
-# DoTo
-A ridiculously fast, lightweight, privacy-first task manager built by someone who actually uses a ToDo app. Offline-first, synced with your own Google Drive, and hosted on GitHub. Written in 100% vanilla HTML, CSS, and JavaScript with no dependencies, no build step, and no framework. Mobile-first, fully responsive, with complete touch and mouse parity.
+<p align="center">
+  <img src="assets/logo.svg" alt="DoTo Logo" height="64"/>
+  <h1 align="center" style="display:inline">DoTo</h1>
+</p>
 
-**Live app: <https://arazgray.github.io/doto/>**
+<p align="center">
+  <strong>Task Manager, Simple. Ridiculously fast, lightweight and privacy-first — offline-first, synced with your own Google Drive.</strong><br>
+  <strong>Version 1.0</strong><br>
+  <a href="https://arazgray.github.io/doto/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/arazgray/doto/releases">
+    <img src="https://img.shields.io/github/v/release/arazgray/doto?label=version&color=brightgreen" alt="Version">
+  </a>
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+  <img src="https://img.shields.io/github/last-commit/arazgray/doto" alt="Last Commit">
+  <img src="https://img.shields.io/github/languages/top/arazgray/doto" alt="Top Language">
+</p>
+
+---
 
 ![DoTo screenshot](screenshot.png)
 
