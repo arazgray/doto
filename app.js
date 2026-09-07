@@ -2,11 +2,14 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788789057'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788795448'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+const uid = () => {
+  try { if (crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 16); } catch {}
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+};
 
 const COLORS = [
   { id: 'default', name: 'Gray', hex: '#9aa0a6' },
@@ -33,19 +36,21 @@ const colorName = (id) => {
 };
 
 const WEIGHTS = { light: { label: 'Light', icon: 'arrow_downward' }, medium: { label: 'Medium', icon: 'remove' }, heavy: { label: 'Heavy', icon: 'arrow_upward' } };
-const IMPORTANCE = { low: { label: 'Low', icon: 'arrow_downward' }, medium: { label: 'Med', icon: 'remove' }, high: { label: 'High', icon: 'arrow_upward' } };
+const IMPORTANCE = { low: { label: 'Low', icon: 'arrow_downward' }, medium: { label: 'Medium', icon: 'remove' }, high: { label: 'High', icon: 'arrow_upward' } };
+const WEIGHT_IDS = Object.keys(WEIGHTS), IMP_IDS = Object.keys(IMPORTANCE);
+function clampWeight(v) { return WEIGHT_IDS.includes(v) ? v : 'medium'; }
+function clampImp(v) { return IMP_IDS.includes(v) ? v : 'medium'; }
 const REMIND_OFFSETS = [1, 5, 30, 60, 180, 1440]; // minutes before due; '' = off
 const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
 
 let state = migrate(load() || seed());
-let ui = { completedOpen: false, boardDone: {}, sort: 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '' };
+let ui = { completedOpen: false, boardDone: {}, sort: (typeof state !== 'undefined' && state.sort) || 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '', searchFromHome: false };
 // shared single-click timer: opening any popup cancels a pending details-open
 // so the panel can never ambush a popup tap
 let pendingDetailTimer = 0;
 
 function seed() {
   const l1 = { id: uid(), name: 'General', createdAt: Date.now() };
-  const today = new Date(); const iso = (d) => d.toISOString().slice(0, 10);
   return {
     lists: [l1],
     activeView: HOME,
@@ -57,11 +62,13 @@ function seed() {
     prefs: { sideW: 280, detailW: 440 },
     times: [],
     timer: null,
+    sort: 'order',
+    lastListId: l1.id,
     tasks: [
       {
         id: uid(), listId: l1.id, title: 'Example Task',
         notes: 'This is a sample task showing every field. Open its details, then delete it when ready.',
-        date: iso(today), time: '09:00', extRef: 'https://example.com',
+        date: todayIso(), time: '09:00', extRef: 'https://example.com',
         color: 'blue', weight: 'heavy', importance: 'high',
         recur: { freq: 'weekly', interval: 1, days: [1] },
         done: false, completedAt: 0, order: 0, createdAt: Date.now(),
@@ -75,13 +82,35 @@ function seed() {
 }
 function migrate(s) {
   if (!s) return s;
+  if (!Array.isArray(s.lists)) s.lists = [];
+  if (!Array.isArray(s.tasks)) s.tasks = [];
   if (!s.activeView) s.activeView = s.activeListId && s.lists.some((l) => l.id === s.activeListId) ? s.activeListId : HOME;
   delete s.activeListId;
   if (!s.prefs) s.prefs = { sideW: 280, detailW: 440 };
   // one-time fix: the old default (360px) was too narrow and clipped
   // Weight/Importance controls — widen it unless the user resized manually
   if (s.prefs.detailW === 360) s.prefs.detailW = 440;
-  s.tasks.forEach((t) => { if (!t.weight) t.weight = 'medium'; if (!t.importance) t.importance = 'medium'; if (!t.color) t.color = 'default'; if (!Array.isArray(t.subtasks)) t.subtasks = []; if (!('recId' in t)) t.recId = ''; if (!('recur' in t)) t.recur = null; if (t.recur && !['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) t.recur = null; });
+  if (!s.filters || typeof s.filters !== 'object') s.filters = { color: '', weight: '', importance: '' };
+  if (typeof s.filters.color !== 'string') s.filters.color = '';
+  if (typeof s.filters.weight !== 'string') s.filters.weight = '';
+  if (typeof s.filters.importance !== 'string') s.filters.importance = '';
+  if (typeof s.showCompleted !== 'boolean') s.showCompleted = true;
+  if (!['order', 'date', 'title', 'priority'].includes(s.sort)) s.sort = 'order';
+  if (typeof s.lastListId !== 'string') s.lastListId = (s.lists[0] && s.lists[0].id) || '';
+  s.tasks.forEach((t) => {
+    t.weight = clampWeight(t.weight);
+    t.importance = clampImp(t.importance);
+    if (!t.color) t.color = 'default';
+    if (typeof t.notes !== 'string') t.notes = '';
+    if (typeof t.extRef !== 'string') t.extRef = '';
+    if (typeof t.date !== 'string') t.date = '';
+    if (typeof t.time !== 'string') t.time = '';
+    if (!Array.isArray(t.subtasks)) t.subtasks = [];
+    if (!('recId' in t)) t.recId = '';
+    if (!('recur' in t)) t.recur = null;
+    if (t.recur && !['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) t.recur = null;
+    if (!('spawnedId' in t)) t.spawnedId = '';
+  });
   // reminders: keep only well-formed values; unknown shapes reset to off
   // reminders are due-based offsets now; convert the short-lived explicit-time
   // model (remindAt) once, then drop its fields
@@ -126,12 +155,21 @@ function migrate(s) {
   if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
   if (typeof s.userName !== 'string') s.userName = '';
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
+  if (s.timer && typeof s.timer.startedAt !== 'number') s.timer.startedAt = Date.now();
+  if (s.timer && typeof s.timer.acc !== 'number') s.timer.acc = 0;
+  return s;
+}
+function salvageState(s) {
+  if (!s || typeof s !== 'object' || !Array.isArray(s.lists) || !Array.isArray(s.tasks)) return null;
+  s.lists = s.lists.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string');
+  if (!s.lists.length) return null;
+  s.tasks = s.tasks.filter((t) => t && typeof t.id === 'string' && typeof t.listId === 'string' && typeof t.title === 'string');
+  if (Array.isArray(s.times)) s.times = s.times.filter((r) => r && typeof r.id === 'string' && typeof r.seconds === 'number');
+  else s.times = [];
   return s;
 }
 function validState(s) {
-  return !!s && typeof s === 'object' && Array.isArray(s.lists) && Array.isArray(s.tasks)
-    && s.lists.every((l) => l && typeof l.id === 'string' && typeof l.name === 'string')
-    && s.tasks.every((t) => t && typeof t.id === 'string' && typeof t.listId === 'string' && typeof t.title === 'string');
+  return !!salvageState(JSON.parse(JSON.stringify(s)));
 }
 function load() {
   let raw = null;
@@ -139,9 +177,16 @@ function load() {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw);
-    if (validState(s)) return s;
+    const before = Array.isArray(s.tasks) ? s.tasks.length : 0;
+    const ok = salvageState(s);
+    if (ok) {
+      if (ok.tasks.length < before) {
+        setTimeout(() => { try { toast('Some saved tasks were invalid and were skipped'); } catch {} }, 600);
+      }
+      return ok;
+    }
   } catch { /* fall through to recovery */ }
-  // Corrupted save: stash it for forensics, then start fresh instead of dying.
+  // Unrecoverable save: stash it for forensics, then start fresh instead of dying.
   try { localStorage.setItem(LS_KEY + '-corrupt-' + Date.now(), String(raw).slice(0, 500000)); } catch {}
   try { localStorage.removeItem(LS_KEY); } catch {}
   setTimeout(() => { try { toast('Saved data was corrupted — started fresh (a backup was kept in this browser)'); } catch {} }, 600);
@@ -184,7 +229,17 @@ function listTasks(listId) { return state.tasks.filter((t) => t.listId === listI
 function getTask(id) { return state.tasks.find((t) => t.id === id); }
 function isUrl(s) { return /^https?:\/\/\S+/i.test((s || '').trim()); }
 function todayIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
-function go(view) { state.activeView = view; save(); closeSidebar(); closeDetail(); renderAll(); window.scrollTo({ top: 0 }); }
+function go(view) {
+  ui.searchFromHome = false;
+  state.activeView = view;
+  if (state.lists.some((l) => l.id === view)) state.lastListId = view;
+  save(); closeSidebar(); closeDetail(); renderAll(); window.scrollTo({ top: 0 });
+}
+function setSort(v) {
+  if (!['order', 'date', 'title', 'priority'].includes(v)) v = 'order';
+  ui.sort = state.sort = v;
+  save(); renderAll();
+}
 
 /* ---------- toast with undo ---------- */
 let toastTimer = 0;
@@ -257,7 +312,7 @@ function forceReload() {
    localStorage and survive this — only the runnable code is replaced. */
 async function forceUpdate() {
   toast('Saving + updating to newest version…');
-  try { await pushNow('silent'); } catch {}
+  try { await pushNow('force'); } catch {}
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
@@ -282,7 +337,7 @@ const SHORTCUTS = [
   { keys: ['Up', 'Down'], desc: 'Select previous / next task (once a task is selected)' },
   { keys: ['Enter'], desc: 'Open selected task' },
   { keys: ['x'], desc: 'Complete / reopen selected task' },
-  { keys: ['Del'], desc: 'Delete selected task (undoable)' },
+  { keys: ['Del'], desc: 'Delete selected task (undoable; Mac: Delete key)' },
   { keys: ['g', 'then', 'h'], desc: 'Go to Home' },
   { keys: ['g', 'then', 'b'], desc: 'Go to Board' },
   { keys: ['g', 'then', 'c'], desc: 'Go to Calendar' },
@@ -332,10 +387,10 @@ function paletteCommands() {
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
     { icon: 'dark_mode', label: 'Toggle dark mode', run: () => toggleTheme() },
     { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
-    { icon: 'swap_vert', label: 'Sort by My order', run: () => { ui.sort = 'order'; renderAll(); } },
-    { icon: 'event', label: 'Sort by Date', run: () => { ui.sort = 'date'; renderAll(); } },
-    { icon: 'flag', label: 'Sort by Importance and weight', run: () => { ui.sort = 'priority'; renderAll(); } },
-    { icon: 'sort_by_alpha', label: 'Sort by Title', run: () => { ui.sort = 'title'; renderAll(); } },
+    { icon: 'swap_vert', label: 'Sort by My order', run: () => setSort('order') },
+    { icon: 'event', label: 'Sort by Date', run: () => setSort('date') },
+    { icon: 'flag', label: 'Sort by Importance and weight', run: () => setSort('priority') },
+    { icon: 'sort_by_alpha', label: 'Sort by Title', run: () => setSort('title') },
     { icon: 'upload', label: 'Import JSON', run: () => $('#importFile').click() },
     { icon: 'download', label: 'Export JSON', run: () => exportJSON() },
     { icon: 'keyboard', label: 'Keyboard shortcuts', run: () => openHelp() },
@@ -389,7 +444,11 @@ function renderPalette(q) {
   ul.scrollTop = 0;
 }
 function paintPaletteSel() {
-  $$('#paletteList .palette-item').forEach((li, i) => li.classList.toggle('selected', i === paletteIdx));
+  $$('#paletteList .palette-item').forEach((li, i) => {
+    const on = i === paletteIdx;
+    li.classList.toggle('selected', on);
+    li.setAttribute('aria-selected', String(on));
+  });
   const sel = $('#paletteList .palette-item.selected');
   if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
@@ -468,7 +527,9 @@ function bindShortcuts() {
     }
     if (k === 'Enter') { const t = selectedTask(); if (t) openDetail(t.id); return; }
     if (k === 'x' || k === 'X') { const t = selectedTask(); if (t) toggleDone(t.id); return; }
-    if (k === 'Delete' || k === 'Backspace') { const t = selectedTask(); if (t) { e.preventDefault(); ui.selectedId = null; deleteTask(t.id); } return; }
+    if (k === 'Delete' || (k === 'Backspace' && /Mac|iPhone|iPad/.test(navigator.platform || ''))) {
+      const t = selectedTask(); if (t) { e.preventDefault(); ui.selectedId = null; deleteTask(t.id); } return;
+    }
     if (k === 'u' || k === 'U') { toggleShowCompleted(); return; }
     if (k === 'd' || k === 'D') { toggleTheme(); return; }
   });
@@ -482,7 +543,7 @@ function sortFn() {
     date: (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.order - b.order,
     title: (a, b) => a.title.localeCompare(b.title),
     priority: (a, b) => impRank[a.importance] - impRank[b.importance] || wRank[a.weight] - wRank[b.weight] || a.order - b.order,
-  }[ui.sort] || ((a, b) => a.order - b.order);
+  }[state.sort || ui.sort] || ((a, b) => a.order - b.order);
 }
 function matchesFilters(t) {
   const q = $('#searchInput').value.trim().toLowerCase();
@@ -504,9 +565,14 @@ function renderNav() {
   $('#navTime').classList.toggle('active', isTime());
   const openAll = state.tasks.filter((t) => !t.done).length;
   $('#allCount').textContent = openAll;
-  $('#allCountPill').textContent = openAll ? `${openAll} open` : 'All done 🎉';
+  $('#allCountPill').textContent = openAll ? `${openAll} open` : 'All done';
   const dueToday = state.tasks.filter((t) => !t.done && t.date === todayIso()).length;
   $('#calCount').textContent = dueToday || '';
+  const todayS = state.times.filter((r) => recDay(r) === todayIso()).reduce((a, r) => a + (r.seconds || 0), 0)
+    + (state.timer ? timerElapsed() : 0);
+  $('#timeCount').textContent = todayS > 0 ? fmtDur(todayS) : '';
+  paintSortMenu();
+  renderQuickColors();
 
   const nav = $('#listNav'); nav.innerHTML = '';
   state.lists.forEach((l) => {
@@ -557,8 +623,7 @@ function renderNav() {
     Object.entries(obj).forEach(([v, m]) => {
       const b = document.createElement('button');
       b.className = 'f-btn' + (state.filters[key] === v ? ' selected' : '');
-      b.innerHTML = `<span class="material-icons-outlined">${m.icon}</span><span></span>`;
-      b.querySelector('span:last-child').textContent = m.label[0];
+      b.innerHTML = `<span class="material-icons-outlined">${m.icon}</span>`;
       b.title = m.label; b.setAttribute('aria-label', 'Filter by ' + m.label);
       b.onclick = () => { state.filters[key] = state.filters[key] === v ? '' : v; save(); renderAll(); };
       h.appendChild(b);
@@ -570,6 +635,36 @@ function renderNav() {
   const anyFilter = state.filters.color || state.filters.weight || state.filters.importance || $('#searchInput').value.trim();
   $('#clearFilters').classList.toggle('hidden', !anyFilter);
   renderChips();
+}
+function paintSortMenu() {
+  const cur = state.sort || ui.sort || 'order';
+  ui.sort = cur;
+  $$('#sortMenu button[data-sort]').forEach((b) => {
+    const on = b.dataset.sort === cur;
+    b.classList.toggle('selected', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+}
+function contrastText(hex) {
+  const h = String(hex || '').replace('#', '');
+  if (h.length !== 6) return '#fff';
+  const n = parseInt(h, 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (r * 299 + g * 587 + b * 114) / 1000 > 160 ? '#202124' : '#fff';
+}
+function renderQuickColors() {
+  const qaC = $('#qaColors'); if (!qaC) return;
+  qaC.innerHTML = '';
+  allColors().forEach((c) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'f-dot' + (ui.quick.color === c.id ? ' selected' : '');
+    b.style.background = c.hex;
+    b.title = colorName(c.id); b.setAttribute('aria-label', 'Color ' + colorName(c.id));
+    b.onclick = () => {
+      ui.quick.color = ui.quick.color === c.id ? undefined : c.id;
+      $$('#qaColors .f-dot').forEach((x) => x.classList.toggle('selected', x === b && !!ui.quick.color));
+    };
+    qaC.appendChild(b);
+  });
 }
 function renderChips() {
   const hosts = $$('[data-chips]'); if (!hosts.length) return;
@@ -656,12 +751,19 @@ async function deleteList(id) {
   if (!ok) return;
   const removedTasks = state.tasks.filter((t) => t.listId === id);
   const removedLists = state.lists.filter((x) => x.id === id);
+  const savedTimer = state.timer && removedTasks.some((t) => t.id === state.timer.taskId) ? state.timer : null;
+  removedTasks.forEach((t) => { if (t.calEventId) { queueCalDelete(t.calEventId); t.calEventId = ''; t.calRev = ''; } });
+  if (savedTimer) state.timer = null;
   state.tasks = state.tasks.filter((t) => t.listId !== id);
   state.lists = state.lists.filter((x) => x.id !== id);
   if (state.activeView === id) state.activeView = HOME;
   if (ui.detailId && removedTasks.some((t) => t.id === ui.detailId)) closeDetail();
   save(); renderAll();
-  toast('List deleted', () => { state.lists.push(...removedLists); state.tasks.push(...removedTasks); save(); renderAll(); });
+  toast('List deleted', () => {
+    state.lists.push(...removedLists); state.tasks.push(...removedTasks);
+    if (savedTimer) state.timer = savedTimer;
+    save(); renderAll();
+  });
 }
 
 /* ---------- dates ---------- */
@@ -695,13 +797,42 @@ function nextRecurDate(dateStr, recur) {
   if (recur.freq === 'daily') d.setDate(d.getDate() + n);
   else if (recur.freq === 'weekly') {
     if (Array.isArray(recur.days) && recur.days.length) {
-      const want = new Set(recur.days);
-      for (let i = 1; i <= 7; i++) { const c = new Date(d); c.setDate(c.getDate() + i); if (want.has(c.getDay())) { d.setTime(c.getTime()); break; } }
+      const want = new Set(recur.days.filter((x) => x >= 0 && x <= 6));
+      if (!want.size) d.setDate(d.getDate() + 7 * n);
+      else {
+        const weekStart = (dt) => {
+          const x = new Date(dt);
+          x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+          x.setHours(12, 0, 0, 0);
+          return x;
+        };
+        const startW = weekStart(d).getTime();
+        let found = '';
+        for (let i = 1; i <= 7 * n + 7; i++) {
+          const c = new Date(d); c.setDate(c.getDate() + i);
+          if (!want.has(c.getDay())) continue;
+          const weeksApart = Math.round((weekStart(c).getTime() - startW) / 6048e5);
+          if (weeksApart === 0 || weeksApart >= n) { found = isoOf(c); break; }
+        }
+        if (found) return found;
+        d.setDate(d.getDate() + 7 * n);
+      }
     } else d.setDate(d.getDate() + 7 * n);
   }
   else if (recur.freq === 'monthly') addMonthsClamped(d, n);
   else if (recur.freq === 'yearly') { const day = d.getDate(); d.setDate(1); d.setFullYear(d.getFullYear() + n); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); }
   return isoOf(d);
+}
+function nextFutureRecurDate(dateStr, recur) {
+  let nd = nextRecurDate(dateStr, recur);
+  if (!nd) return '';
+  const today = todayIso();
+  let guard = 0, prev = dateStr;
+  while (nd && nd < today && nd !== prev && guard++ < 400) {
+    prev = nd;
+    nd = nextRecurDate(nd, recur);
+  }
+  return nd && nd !== dateStr ? nd : nd;
 }
 function recurLabel(r) {
   if (!r || !r.freq || !RECUR_UNITS[r.freq]) return '';
@@ -806,12 +937,14 @@ function taskRow(t, opts = {}) {
     b.onclick = (e) => e.stopPropagation();
     meta.appendChild(b);
   }
-  const w = document.createElement('span'); w.className = 'badge w-' + t.weight + ' clickable';
+  t.weight = clampWeight(t.weight);
+  t.importance = clampImp(t.importance);
+  const w = document.createElement('button'); w.type = 'button'; w.className = 'badge w-' + t.weight + ' clickable';
   w.innerHTML = `<span class="material-icons-outlined">${WEIGHTS[t.weight].icon}</span>${opts.compact ? WEIGHTS[t.weight].label[0] : WEIGHTS[t.weight].label}`;
   w.title = 'Change weight (now: ' + WEIGHTS[t.weight].label + ')';
   w.onclick = (e) => { e.stopPropagation(); openWeightPop(w, t.id); };
   meta.appendChild(w);
-  const im = document.createElement('span'); im.className = 'badge imp-' + t.importance + ' clickable';
+  const im = document.createElement('button'); im.type = 'button'; im.className = 'badge imp-' + t.importance + ' clickable';
   im.innerHTML = `<span class="material-icons-outlined">${IMPORTANCE[t.importance].icon}</span>${opts.compact ? IMPORTANCE[t.importance].label[0] : IMPORTANCE[t.importance].label}`;
   im.title = 'Change importance (now: ' + IMPORTANCE[t.importance].label + ')';
   im.onclick = (e) => { e.stopPropagation(); openImportancePop(im, t.id); };
@@ -887,15 +1020,25 @@ function taskRow(t, opts = {}) {
 function dropOntoTask(fromId, toId, offset) {
   const from = getTask(fromId), to = getTask(toId);
   if (!from || !to || fromId === toId) return;
-  if (from.done !== to.done) { moveTask(fromId, to.listId); return; }
+  if (isCal() && to.date && from.date !== to.date) {
+    from.date = to.date; save(); renderAll();
+    toast(`Moved to ${to.date}`);
+    return;
+  }
+  if (from.done !== to.done) {
+    if (!from.done && to.done) toggleDone(from.id);
+    else if (from.done && !to.done) toggleDone(from.id);
+    const now = getTask(fromId);
+    if (!now || now.done !== to.done) { moveTask(fromId, to.listId); return; }
+  }
   if (from.listId !== to.listId) { moveTask(fromId, to.listId, toId, offset); return; }
-  // same list reorder
-  const group = tasksFor(to.listId).filter((x) => x.done === to.done);
+  // same list reorder — use the full unfiltered group so hidden tasks keep their slots
+  const group = listTasks(to.listId).filter((x) => x.done === to.done).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
   const without = group.filter((x) => x.id !== from.id);
   let idx = without.findIndex((x) => x.id === to.id) + offset;
   without.splice(Math.max(0, idx), 0, from);
   without.forEach((x, i) => x.order = i);
-  ui.sort = 'order'; save(); renderAll();
+  ui.sort = state.sort = 'order'; save(); renderAll();
 }
 
 /* ---------- list (category) reorder: mouse + touch ---------- */
@@ -999,6 +1142,18 @@ function attachTaskTouchDrag(li, t, handle) {
         touchTaskTarget = { type: 'task', id: row.dataset.id, offset: above ? 0 : 1 };
         return;
       }
+      const cell = under && under.closest ? under.closest('.cal-cell[data-iso]') : null;
+      if (cell && cell.dataset.iso) {
+        cell.classList.add('drop-target');
+        touchTaskTarget = { type: 'day', date: cell.dataset.iso };
+        return;
+      }
+      const agenda = under && under.closest ? under.closest('#calDayList,.cal-side') : null;
+      if (agenda && isCal()) {
+        agenda.classList.add('drop-target');
+        touchTaskTarget = { type: 'day', date: calDaySel() };
+        return;
+      }
       const zone = under && under.closest ? under.closest('.board-col-body,.board-col,.list-item[data-list-id],#openList') : null;
       if (zone) {
         const col = zone.closest('.board-col[data-list-id]');
@@ -1020,6 +1175,13 @@ function attachTaskTouchDrag(li, t, handle) {
         ui.suppressClickUntil = Date.now() + 450;
         if (target) {
           if (target.type === 'task') dropOntoTask(t.id, target.id, target.offset);
+          else if (target.type === 'day') {
+            const task = getTask(t.id);
+            if (task && task.date !== target.date) {
+              task.date = target.date; save(); renderAll();
+              toast(`Moved to ${target.date}`);
+            }
+          }
           else moveTask(t.id, target.listId);
         }
       }
@@ -1042,7 +1204,7 @@ function moveTask(taskId, targetListId, beforeTaskId = null, offset = 1) {
     group.splice(Math.max(0, idx), 0, t);
   } else group.push(t);
   group.forEach((x, i) => x.order = i);
-  ui.sort = 'order'; save(); renderAll();
+  ui.sort = state.sort = 'order'; save(); renderAll();
   toast(`Moved to “${listName(targetListId)}”`, null);
   void fromName;
 }
@@ -1095,7 +1257,7 @@ function renderQuote() {
   const el = $('#quoteText'); if (!el) return;
   el.textContent = '“' + QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length] + '”';
 }
-let weatherCache = null;
+let weatherCache = null; // [args] | { fail: true, ts }
 function wmoInfo(code, isDay) {
   if (code === 0) return { label: 'Clear sky', icon: isDay ? 'wb_sunny' : 'nights_stay' };
   if (code <= 2) return { label: code === 1 ? 'Mainly clear' : 'Partly cloudy', icon: isDay ? 'wb_cloudy' : 'nights_stay' };
@@ -1120,7 +1282,8 @@ function paintWeather(temp, label, icon, city, tom) {
   card.classList.remove('hidden');
 }
 async function loadWeather() {
-  if (weatherCache) { paintWeather(...weatherCache); return; }
+  if (weatherCache && Array.isArray(weatherCache)) { paintWeather(...weatherCache); return; }
+  if (weatherCache && weatherCache.fail && Date.now() - weatherCache.ts < 600000) return;
   const LOC_KEY = 'doto-loc', LOC_TTL = 7 * 864e5; // re-resolve at most weekly
   const readStored = () => {
     try {
@@ -1130,24 +1293,27 @@ async function loadWeather() {
     return null;
   };
   const store = (lat, lon) => { try { localStorage.setItem(LOC_KEY, JSON.stringify({ lat, lon, ts: Date.now() })); } catch {} };
+  const fail = () => { weatherCache = { fail: true, ts: Date.now() }; };
   let lat, lon;
   const stored = readStored();
   if (stored) { lat = stored.lat; lon = stored.lon; }
   else {
-    if (!navigator.geolocation) return;
-    const pos = await new Promise((res) => navigator.geolocation.getCurrentPosition(res, () => res(null), { timeout: 8000, maximumAge: 600000 }));
+    let pos = null;
+    if (navigator.geolocation) {
+      pos = await new Promise((res) => navigator.geolocation.getCurrentPosition(res, () => res(null), { timeout: 8000, maximumAge: 600000 }));
+    }
     if (pos) { lat = pos.coords.latitude; lon = pos.coords.longitude; store(lat, lon); }
     else {
       try {
         const ip = await (await fetch('https://ipapi.co/json/')).json();
-        if (!ip || ip.latitude === undefined) return;
+        if (!ip || ip.latitude === undefined) { fail(); return; }
         lat = ip.latitude; lon = ip.longitude; store(lat, lon);
-      } catch { return; }
+      } catch { fail(); return; }
     }
   }
   try {
     const w = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weathercode&forecast_days=2&timezone=auto`)).json();
-    if (!w || !w.current) return;
+    if (!w || !w.current) { fail(); return; }
     const info = wmoInfo(w.current.weather_code, w.current.is_day !== 0);
     const tom = w.daily && w.daily.time && w.daily.time[1]
       ? { max: w.daily.temperature_2m_max[1], min: w.daily.temperature_2m_min[1], code: w.daily.weathercode[1] }
@@ -1159,11 +1325,11 @@ async function loadWeather() {
     } catch {}
     weatherCache = [w.current.temperature_2m, info.label, info.icon, city, tom];
     paintWeather(...weatherCache);
-  } catch {}
+  } catch { fail(); }
 }
 
 function statCard(label, n, icon, color, fn) {
-  const d = document.createElement('div'); d.className = 'stat clickable';
+  const d = document.createElement('button'); d.type = 'button'; d.className = 'stat clickable';
   d.innerHTML = `<div class="num" style="color:${color}"></div><div class="lbl"></div>`;
   d.querySelector('.num').textContent = n; d.querySelector('.lbl').textContent = label;
   d.onclick = fn; return d;
@@ -1191,7 +1357,7 @@ function renderHome() {
   const h = new Date().getHours();
   const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
   const nm = (state.userName || '').trim();
-  $('#homeGreet').textContent = nm ? `Good ${part}, ${nm} 👋` : `Good ${part} 👋`;
+  $('#homeGreet').textContent = nm ? `Good ${part}, ${nm}` : `Good ${part}`;
   $('#homeSub').textContent = open.length
     ? `You have ${open.length} open task${open.length === 1 ? '' : 's'}, ${overdue.length} overdue, ${today.length} due today.`
     : 'Everything is done. Enjoy your day!';
@@ -1239,7 +1405,7 @@ function renderSingle() {
   $('#completedToggle').setAttribute('aria-expanded', String(ui.completedOpen));
   $('#completedCount').textContent = done.length ? String(done.length) : '';
   $('#completedCount').classList.toggle('hidden', !done.length);
-  $('#taskCount').textContent = open.length ? `${open.length} open` : 'All done 🎉';
+  $('#taskCount').textContent = open.length ? `${open.length} open` : 'All done';
   paintQuickMeta();
 }
 
@@ -1332,11 +1498,22 @@ function calDaySel() {
   return ui.calDay;
 }
 function renderCalendar() {
-  $$('#calViewSeg button').forEach((b) => b.classList.toggle('selected', (ui.calView || 'month') === b.dataset.v));
+  $$('#calViewSeg button').forEach((b) => {
+    const on = (ui.calView || 'month') === b.dataset.v;
+    b.classList.toggle('selected', on);
+    b.setAttribute('aria-selected', String(on));
+  });
   const gridAnim = ui.calAnim; ui.calAnim = null;
   const yw = $('#calYearGrid'), wrap = $('.cal-wrap');
   if ((ui.calView || 'month') === 'year') { yw.classList.remove('hidden'); wrap.classList.add('hidden'); renderYear(gridAnim); return; }
   yw.classList.add('hidden'); wrap.classList.remove('hidden');
+  {
+    const m = calMonth(), sel = calDaySel();
+    if (!sel.startsWith(m + '-')) {
+      const t = todayIso();
+      ui.calDay = t.startsWith(m + '-') ? t : m + '-01';
+    }
+  }
   const [Y, M] = calMonth().split('-').map(Number);
   const first = new Date(Y, M - 1, 1);
   // Monday-first grid
@@ -1372,6 +1549,7 @@ function renderCalendar() {
     const list = (byDay.get(iso) || []).sort(sortFn());
     const openN = list.filter((t) => !t.done).length;
     if ((i % 7) >= 5) cell.classList.add('weekend');
+    cell.dataset.iso = iso;
     if (iso === tIso) cell.classList.add('today');
     if (iso === sel) cell.classList.add('selected');
     if (openN && iso < tIso) cell.classList.add('has-overdue');
@@ -1457,7 +1635,10 @@ function renderYear(gridAnim) {
     card.querySelector('h3').textContent = name;
     card.setAttribute('aria-label', name + ' ' + Y);
     card.onclick = () => {
-      ui.calCursor = `${Y}-${String(m).padStart(2, '0')}`;
+      const mm = `${Y}-${String(m).padStart(2, '0')}`;
+      ui.calCursor = mm;
+      const t = todayIso();
+      ui.calDay = t.startsWith(mm + '-') ? t : mm + '-01';
       ui.calView = 'month'; ui.calAnim = 'in'; renderAll();
     };
     grid.appendChild(card);
@@ -1533,9 +1714,21 @@ function timePlay() {
     if (tm.taskId === id) return;
     toast('Stop the running timer first'); return;
   }
-  if (tm && !tm.running && tm.taskId !== id) { state.timer = null; } // discard paused other-task timer
+  if (tm && !tm.running && tm.taskId !== id) {
+    const secs = Math.round(timerElapsed());
+    if (secs >= 1) {
+      const rec = { id: uid(), taskId: tm.taskId, seconds: secs, startedAt: Date.now() - (tm.acc || 0) * 1000 };
+      const prev = getTask(tm.taskId);
+      rec.title = prev ? prev.title : '(deleted task)';
+      rec.listName = prev ? listName(prev.listId) : '';
+      state.times.unshift(rec);
+      toast(`Saved ${fmtDur(secs)} on previous task`);
+    } else toast('Paused time was too short — nothing saved');
+    state.timer = null;
+  }
   state.timer = { taskId: id, startedAt: Date.now(), acc: (state.timer && state.timer.acc) || 0, running: true };
   save(); renderAll();
+  armTick();
 }
 function timePause() {
   const tm = state.timer; if (!tm || !tm.running) return;
@@ -1566,6 +1759,14 @@ function paintHomeClock() {
   hEl.textContent = String(h % 12 || 12).padStart(2, '0');
   mEl.textContent = String(d.getMinutes()).padStart(2, '0');
   if (cEl) cEl.style.opacity = Math.floor(Date.now() / 500) % 2 ? '1' : '0.2';
+}
+let tickHandle = 0;
+function armTick() {
+  if (tickHandle) return;
+  tickHandle = setInterval(() => {
+    if (!state.timer || !state.timer.running) { clearInterval(tickHandle); tickHandle = 0; return; }
+    tickTime();
+  }, 100);
 }
 function tickTime() {
   if (!state.timer || !state.timer.running) return;
@@ -1641,17 +1842,21 @@ function renderTime() {
     }
     ul.appendChild(h);
   };
-  const todayRs = state.times.filter((r) => recDay(r) === todayIso()).slice(0, 30);
-  const prevRs = state.times.filter((r) => recDay(r) !== todayIso()).slice(0, 30);
+  const todayRs = state.times.filter((r) => recDay(r) === todayIso());
+  const prevRs = state.times.filter((r) => recDay(r) !== todayIso()).slice(0, 200);
   if (todayRs.length) { dayHead('Today', todayRs); todayRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
   if (prevRs.length) { dayHead('Previously', null); prevRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
   // middle: searchable tasks with totals
   const q = (ui.timeQuery || '').trim().toLowerCase();
   const tasks = state.tasks
-    .filter((t) => !t.done)
+    .filter((t) => !t.done || state.showCompleted)
     .filter(matchesFilters)
     .filter((t) => !q || (t.title + ' ' + t.notes).toLowerCase().includes(q))
-    .sort((a, b) => taskTime(b.id) - taskTime(a.id) || b.createdAt - a.createdAt)
+    .sort((a, b) => {
+      const bySort = sortFn()(a, b);
+      if ((state.sort || ui.sort) && (state.sort || ui.sort) !== 'order' && bySort) return bySort;
+      return taskTime(b.id) - taskTime(a.id) || b.createdAt - a.createdAt;
+    })
     .slice(0, 80);
   const tu = $('#timeTaskList'); tu.innerHTML = '';
   if (!tasks.length) {
@@ -1711,15 +1916,23 @@ function paintQuickMeta() {
   if (inp && qa) qa.classList.toggle('hidden', !inp.value.trim());
 }
 function focusComposer() {
-  if (isHome()) { const f = fallbackList(); if (f) go(f.id); }
+  if (isHome()) { const f = state.lists.find((l) => l.id === state.lastListId) || fallbackList(); if (f) go(f.id); }
   else if (isAll()) { const first = $('#board input'); if (first) first.focus(); }
-  else if (isCal()) { const ci = $('#calAddInput'); if (ci) { ci.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ci.focus(), 250); } return; }
-  else if (isTime()) { const ts = $('#timeSearch'); if (ts) { ts.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ts.focus(), 250); } return; }
+  else if (isCal()) {
+    if ((ui.calView || 'month') === 'year') { ui.calView = 'month'; renderAll(); }
+    const ci = $('#calAddInput'); if (ci) { ci.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => ci.focus(), 250); } return;
+  }
+  else if (isTime()) {
+    const f = state.lists.find((l) => l.id === state.lastListId) || fallbackList();
+    if (f) go(f.id);
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $('#addInput') && $('#addInput').focus(), 250);
 }
 function addTaskTo(listId, title, extra = {}, toTop = false) {
   title = (title || '').trim(); if (!title) return null;
-  const t = { id: uid(), listId, title: title.slice(0, 200), notes: '', date: '', time: '', extRef: '', color: 'default', weight: 'medium', importance: 'medium', recur: null, done: false, completedAt: 0, order: nextOrder(listId, false), createdAt: Date.now(), subtasks: [], ...extra };
+  state.lastListId = listId;
+  const t = { id: uid(), listId, title: title.slice(0, 200), notes: '', date: '', time: '', extRef: '', color: 'default', weight: clampWeight(extra.weight) || 'medium', importance: clampImp(extra.importance) || 'medium', recur: null, done: false, completedAt: 0, order: nextOrder(listId, false), createdAt: Date.now(), subtasks: [], ...extra };
+  t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance);
   if (toTop) {
     const g = listTasks(listId).filter((x) => !x.done);
     t.order = g.length ? Math.min(...g.map((x) => x.order)) - 1 : 0;
@@ -1733,35 +1946,51 @@ function toggleDone(id) {
   t.done = becomingDone; t.completedAt = t.done ? Date.now() : 0;
   if (becomingDone) dropCalEvent(t); // completed tasks need no reminder event
   let spawned = null;
-  // Google-style repeat: completing an instance schedules the next one
+  if (!becomingDone && t.spawnedId) {
+    const sp = getTask(t.spawnedId);
+    if (sp && !sp.done) state.tasks = state.tasks.filter((x) => x.id !== t.spawnedId);
+    t.spawnedId = '';
+  }
+  // Google-style repeat: completing an instance schedules the next future one
   if (becomingDone && t.recur && t.recur.freq && t.date) {
-    const nd = nextRecurDate(t.date, t.recur);
-    if (nd && nd !== t.date) {
-      spawned = {
-        id: uid(), listId: t.listId, title: t.title, notes: t.notes, date: nd, time: t.time,
-        extRef: t.extRef, color: t.color, weight: t.weight, importance: t.importance,
-        recur: t.recur ? { freq: t.recur.freq, interval: t.recur.interval || 1, ...(Array.isArray(t.recur.days) ? { days: [...t.recur.days] } : {}) } : null,
-        recId: t.recId || '', done: false, completedAt: 0, order: 1e9, createdAt: Date.now(),
-        subtasks: t.subtasks.map((s) => ({ id: uid(), title: s.title, done: false })),
-      };
-      // the reminder offset follows the repeat; the calendar event is re-created
-      if (typeof t.remindBefore === 'number') spawned.remindBefore = t.remindBefore;
-      state.tasks.push(spawned);
+    if (t.spawnedId && getTask(t.spawnedId) && !getTask(t.spawnedId).done) {
+      spawned = getTask(t.spawnedId);
+    } else {
+      const nd = nextFutureRecurDate(t.date, t.recur);
+      if (nd && nd !== t.date) {
+        if (!t.recId) t.recId = uid();
+        spawned = {
+          id: uid(), listId: t.listId, title: t.title, notes: t.notes, date: nd, time: t.time,
+          extRef: t.extRef, color: t.color, weight: t.weight, importance: t.importance,
+          recur: t.recur ? { freq: t.recur.freq, interval: t.recur.interval || 1, ...(Array.isArray(t.recur.days) ? { days: [...t.recur.days] } : {}) } : null,
+          recId: t.recId || '', done: false, completedAt: 0, order: 1e9, createdAt: Date.now(),
+          subtasks: t.subtasks.map((s) => ({ id: uid(), title: s.title, done: false })),
+        };
+        if (typeof t.remindBefore === 'number') spawned.remindBefore = t.remindBefore;
+        t.spawnedId = spawned.id;
+        state.tasks.push(spawned);
+      }
     }
   }
   [true, false].forEach((d) => listTasks(t.listId).filter((x) => x.done === d).sort((a, b) => a.order - b.order).forEach((x, i) => x.order = i));
   save(); renderAll();
-  if (spawned) { const f = fmtDate(spawned.date); toast(`Repeats — next: ${f ? f.label : spawned.date}`); }
+  if (spawned && becomingDone) { const f = fmtDate(spawned.date); toast(`Repeats — next: ${f ? f.label : spawned.date}`); }
   if (ui.detailId === id) renderDetail();
 }
 function deleteTask(id) {
   const i = state.tasks.findIndex((t) => t.id === id); if (i < 0) return;
   const [rm] = state.tasks.splice(i, 1);
+  const savedTimer = state.timer && state.timer.taskId === id ? state.timer : null;
+  if (savedTimer) state.timer = null;
   // clear the link before the undo snapshot: undo re-creates the event fresh
   if (rm.calEventId) { queueCalDelete(rm.calEventId); rm.calEventId = ''; rm.calRev = ''; }
   if (ui.detailId === id) closeDetail();
   save(); renderAll();
-  toast('Task deleted', () => { state.tasks.push(rm); save(); renderAll(); });
+  toast('Task deleted', () => {
+    state.tasks.push(rm);
+    if (savedTimer) state.timer = savedTimer;
+    save(); renderAll();
+  });
 }
 
 /* ---------- detail panel ---------- */
@@ -1846,7 +2075,7 @@ function renderDetail() {
     const task = getTask(ui.detailId); if (!task) return;
     task.recur = readRecurUI();
     if (task.recur && !task.date) { task.date = todayIso(); $('#dDate').value = task.date; }
-    save(); renderTasks(); renderDetail();
+    save(); renderAll();
   }
 
   const pal = $('#dColors'); pal.innerHTML = '';
@@ -1898,6 +2127,7 @@ function openColorPop(anchor, taskId, mini) {
     b.setAttribute('aria-label', colorName(c.id));
     const lb = document.createElement('span');
     lb.className = 'swatch-label'; lb.textContent = colorName(c.id);
+    lb.style.color = contrastText(c.hex);
     b.appendChild(lb);
     b.onclick = (e) => { e.stopPropagation(); const t = getTask(taskId); if (t) { t.color = c.id; save(); renderAll(); } closeColorPop(); };
     pop.appendChild(b);
@@ -1967,11 +2197,15 @@ function openMovePop(anchor, taskId) {
 function closeMovePop() { $('#movePop').classList.add('hidden'); }
 
 /* ---------- sidebar drawer ---------- */
-function openSidebar() { $('#sidebar').classList.add('open'); $('#scrim').classList.remove('hidden'); }
+function openSidebar() {
+  $('#sidebar').classList.add('open'); $('#scrim').classList.remove('hidden');
+  const m = $('#menuBtn'); if (m) m.setAttribute('aria-expanded', 'true');
+}
 function closeSidebar() {
   if (window.innerWidth >= 1024) return;
   $('#sidebar').classList.remove('open');
   if (!ui.detailId) $('#scrim').classList.add('hidden');
+  const m = $('#menuBtn'); if (m) m.setAttribute('aria-expanded', 'false');
 }
 
 /* ---------- resizable panels ---------- */
@@ -2004,8 +2238,7 @@ function download(filename, text) {
 }
 function exportJSON() {
   const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [], customColors: state.customColors || [], colorNames: state.colorNames || {} };
-  const d = new Date().toISOString().slice(0, 10);
-  download(`doto-export-${d}.json`, JSON.stringify(payload, null, 2));
+  download(`doto-export-${todayIso()}.json`, JSON.stringify(payload, null, 2));
   toast(`Exported ${state.tasks.length} tasks`);
 }
 function parseGoogleDate(v) {
@@ -2035,7 +2268,18 @@ function googleItemsToList(items, name, listCreatedAt, schedules) {
     const iv = r.schedule.interval;
     const freq = iv.daily ? 'daily' : iv.weekly ? 'weekly' : iv.monthly ? 'monthly' : iv.yearly ? 'yearly' : '';
     if (!freq) return;
-    recMap.set(r.id, { freq, interval: Math.max(1, Math.min(99, iv.interval_multiplier || 1)) });
+    const rec = { freq, interval: Math.max(1, Math.min(99, iv.interval_multiplier || 1)) };
+    if (freq === 'weekly' && iv.weekly && typeof iv.weekly === 'object') {
+      const raw = iv.weekly.week_days || iv.weekly.days || iv.weekly.days_of_week || iv.weekly.weekDays || [];
+      const names = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 };
+      const days = (Array.isArray(raw) ? raw : []).map((x) => {
+        if (typeof x === 'number' && x >= 0 && x <= 6) return x;
+        const k = String(x).toLowerCase().replace(/[^a-z]/g, '');
+        return k in names ? names[k] : -1;
+      }).filter((n) => n >= 0);
+      if (days.length) rec.days = [...new Set(days)];
+    }
+    recMap.set(r.id, rec);
   });
   let usable = (items || []).filter((x) => x && !x.deleted);
   // Google exports one item PER INSTANCE of a recurring task (e.g. a daily
@@ -2127,8 +2371,10 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
       state.tasks.push({
         id: nid, listId: idMap.get(t.listId) || fallbackList()?.id || state.lists[0].id,
         title: String(t.title || '(untitled)').slice(0, 200), notes: String(t.notes || ''), date: t.date || '', time: t.time || '',
-        extRef: String(t.extRef || ''), color: t.color || 'default', weight: t.weight || 'medium', importance: t.importance || 'medium',
+        extRef: String(t.extRef || ''), color: t.color || 'default', weight: clampWeight(t.weight), importance: clampImp(t.importance),
         recur: (t.recur && ['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) ? { freq: t.recur.freq, interval: Math.max(1, Math.min(99, t.recur.interval || 1)), ...(Array.isArray(t.recur.days) ? { days: t.recur.days.filter((x) => x >= 0 && x <= 6) } : {}) } : null,
+        recId: typeof t.recId === 'string' ? t.recId : '',
+        remindBefore: (typeof t.remindBefore === 'number' && REMIND_OFFSETS.includes(t.remindBefore)) ? t.remindBefore : '',
         done: !!t.done, completedAt: t.completedAt || 0, order: typeof t.order === 'number' ? t.order : i,
         createdAt: t.createdAt || Date.now(), subtasks: Array.isArray(t.subtasks) ? t.subtasks.map((s) => ({ id: uid(), title: String(s.title || '').slice(0, 150), done: !!s.done })) : [],
       });
@@ -2256,8 +2502,9 @@ function loadSyncMeta() {
 let syncMeta = loadSyncMeta();
 let syncStatus = 'signedout'; // setup|signedout|checking|syncing|ok|error
 let lastSyncError = '';
+let silentFailCount = 0;
 function saveSyncMeta() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncMeta)); } catch {} }
-function setSync(s) { syncStatus = s; if (s === 'ok') lastSyncError = ''; paintSync(); }
+function setSync(s) { syncStatus = s; if (s === 'ok') { lastSyncError = ''; silentFailCount = 0; } paintSync(); }
 function friendlySyncError(e) {
   const m = (e && e.message) || '';
   if (m === 'forbidden') return 'Drive refused access (403). Enable the Drive API for your Cloud project and grant access when asked.' + (e.detail ? ' Google says: ' + e.detail : '');
@@ -2276,7 +2523,13 @@ function handleSyncFailure(e, mode, prev, logIt) {
     setSync('signedout');
     return;
   }
-  if (mode === 'silent') { syncStatus = prev; paintSync(); return; } // background stays quiet
+  if (mode === 'silent') {
+    slog('error', friendlySyncError(e));
+    silentFailCount = (silentFailCount || 0) + 1;
+    if (silentFailCount >= 3) { lastSyncError = friendlySyncError(e); setSync('error'); }
+    else { syncStatus = prev; paintSync(); }
+    return;
+  } // background stays quiet after one log; 3 fails surface on the pill
   lastSyncError = friendlySyncError(e);
   slog('error', lastSyncError);
   setSync('error');
@@ -2431,7 +2684,7 @@ async function ensureToken(mode) {
     err.gis = String(code);
     throw err;
   }
-  syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000, scope: DRIVE_SCOPE };
+  syncMeta.token = { access_token: tok.access_token, expires_at: Date.now() + (tok.expires_in || 3600) * 1000, scope: tok.scope || DRIVE_SCOPE };
   saveSyncMeta();
   fetchEmail().catch(() => {});
   return syncMeta.token.access_token;
@@ -2469,20 +2722,32 @@ async function driveOk(r) {
 }
 async function driveFind(mode) {
   const q = encodeURIComponent(`'appDataFolder' in parents and name = '${DRIVE_FILE}' and trashed = false`);
-  const r = await driveOk(await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&fields=files(id,modifiedTime)`, {}, mode));
+  const r = await driveOk(await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&orderBy=modifiedTime desc&fields=files(id,modifiedTime)`, {}, mode));
   const j = await r.json();
-  return (j.files && j.files[0]) || null;
+  const files = (j.files || []).filter((f) => f && f.id);
+  return files[0] || null;
 }
 async function driveDownload(id, mode) {
   const r = await driveOk(await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {}, mode));
   return r.json();
 }
+function stateForDrive(s) {
+  const copy = JSON.parse(JSON.stringify(s));
+  copy.timer = null; // running timer is device-local
+  return copy;
+}
 async function driveUpload(data, mode) {
-  const body = JSON.stringify(data);
+  const body = JSON.stringify(stateForDrive(data));
   if (syncMeta.fileId) {
-    const r = await driveOk(await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${syncMeta.fileId}?uploadType=media`, {
+    const r = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${syncMeta.fileId}?uploadType=media`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body,
-    }, mode));
+    }, mode);
+    if (r.status === 404) {
+      syncMeta.fileId = '';
+      saveSyncMeta();
+      return driveUpload(data, mode);
+    }
+    await driveOk(r);
     return r.json();
   }
   const meta = { name: DRIVE_FILE, parents: ['appDataFolder'] };
@@ -2500,10 +2765,22 @@ async function driveUpload(data, mode) {
 function snapState(s) {
   return JSON.parse(JSON.stringify({
     lists: s.lists || [], tasks: s.tasks || [], times: s.times || [],
-    timer: s.timer || null, colorNames: s.colorNames || {},
+    colorNames: s.colorNames || {},
     customColors: s.customColors || [], userName: s.userName || '',
     deletedColors: s.deletedColors || [],
   }));
+}
+function mergeIdSet(baseArr, localArr, remoteArr) {
+  const B = new Set(baseArr || []), L = new Set(localArr || []), R = new Set(remoteArr || []);
+  const out = [];
+  new Set([...B, ...L, ...R]).forEach((id) => {
+    const b = B.has(id), l = L.has(id), r = R.has(id);
+    if (l === r) { if (l) out.push(id); return; }
+    if (l !== b && r === b) { if (l) out.push(id); return; }
+    if (r !== b && l === b) { if (r) out.push(id); return; }
+    if (l || r) out.push(id); // both changed: keep a deletion
+  });
+  return out;
 }
 const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function mergeArrays(base, local, remote, takeRemote, collect, coll, labelOf) {
@@ -2556,7 +2833,10 @@ function mergeScalar(base, local, remote, takeRemote) {
 }
 function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
-  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], timer: null, colorNames: {}, customColors: [], userName: '', deletedColors: [] };
+  salvageState(remote);
+  if (!remote.lists.length) throw new Error('drive');
+  remote.tasks.forEach((t) => { t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance); });
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], colorNames: {}, customColors: [], userName: '', deletedColors: [] };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const freshConflicts = [];
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote, freshConflicts, 'lists', (l) => l.name || '(untitled)');
@@ -2565,11 +2845,9 @@ function applyRemote(remote, remoteTime) {
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
   const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote);
   const mu = mergeScalar(typeof base.userName === 'string' ? base.userName : '', state.userName || '', typeof remote.userName === 'string' ? remote.userName : '', takeRemote);
-  const mdl = mergeScalar([...(base.deletedColors || [])].sort(), [...(state.deletedColors || [])].sort(), [...(remote.deletedColors || [])].sort(), takeRemote);
-  let timer = state.timer, tConflict = 0;
-  const bt = base.timer || null, rt = remote.timer || null;
-  if (!recEq(timer, bt) && !recEq(rt, bt) && takeRemote) { timer = rt; tConflict = 1; }
-  else if (recEq(timer, bt)) timer = rt;
+  const mergedDeleted = mergeIdSet(base.deletedColors, state.deletedColors, remote.deletedColors);
+  const mdl = { obj: mergedDeleted, conflict: 0, fromRemote: 0 };
+  const timer = state.timer; // timer is device-local
   state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
   state.colorNames = mc.obj;
   state.customColors = mcc.arr;
@@ -2579,7 +2857,7 @@ function applyRemote(remote, remoteTime) {
   const okC = new Set(allColors().map((c) => c.id));
   state.tasks.forEach((t) => { if (!okC.has(t.color)) t.color = 'default'; });
   if (!okC.has(state.filters.color)) state.filters.color = '';
-  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + tConflict + mc.conflict + mcc.conflicts + mu.conflict + mdl.conflict;
+  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + mc.conflict + mcc.conflicts + mu.conflict;
   const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
@@ -2610,7 +2888,7 @@ function conflictVal(kind, t, k) {
   return s.length > 42 ? s.slice(0, 42) + '…' : s;
 }
 function conflictDiff(c) {
-  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'calEventId', 'calRev']);
+  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'calEventId', 'calRev', 'spawnedId']);
   const rows = [];
   new Set([...Object.keys(c.local), ...Object.keys(c.remote)]).forEach((k) => {
     if (skip.has(k)) return;
@@ -2810,7 +3088,8 @@ function calEventBody(t) {
 }
 function calRev(t) { return JSON.stringify([t.title, t.notes, t.date, t.time, t.remindBefore, t.listId]); }
 function needsCalEvent(t) {
-  return !!(calStore().enabled && typeof t.remindBefore === 'number' && dueTs(t) && !t.done);
+  const due = dueTs(t);
+  return !!(calStore().enabled && typeof t.remindBefore === 'number' && due && due > Date.now() - 60000 && !t.done);
 }
 async function ensureCalCalendar(mode) {
   const s = calStore();
@@ -2854,15 +3133,16 @@ async function deleteCalEvent(calId, eventId, mode) {
    tasks with reminders, removes events that are no longer needed. Armed
    from save() so every mutation path is covered; idempotent and cheap
    (hash compare skips up-to-date tasks). */
-let calSyncTimer = 0, calSyncing = false;
+let calSyncTimer = 0, calSyncing = false, calSyncAgain = false;
 function scheduleCalendarSync() {
   if (!calConnected()) return;
   clearTimeout(calSyncTimer);
   calSyncTimer = setTimeout(() => { calendarReconcile('silent').catch(() => {}); }, 10000);
 }
 async function calendarReconcile(mode) {
-  if (calSyncing || !calConnected() || !navigator.onLine) return;
-  calSyncing = true;
+  if (calSyncing) { calSyncAgain = true; return; }
+  if (!calConnected() || !navigator.onLine) return;
+  calSyncing = true; calSyncAgain = false;
   let changed = false;
   try {
     const calId = await ensureCalCalendar(mode);
@@ -2901,7 +3181,10 @@ async function calendarReconcile(mode) {
       slog('ok', `Calendar reconcile (${n} active reminder${n === 1 ? '' : 's'})`);
     }
   } catch (e) { handleCalError(e, mode); }
-  finally { calSyncing = false; try { paintCalSettings(); } catch {} if (ui.detailId) { try { renderDetail(); } catch {} } }
+  finally {
+    calSyncing = false; try { paintCalSettings(); } catch {} if (ui.detailId) { try { renderDetail(); } catch {} }
+    if (calSyncAgain) { calSyncAgain = false; scheduleCalendarSync(); }
+  }
 }
 function handleCalError(e, mode) {
   const m = (e && e.message) || '';
@@ -3026,18 +3309,39 @@ function syncWatchdog() {
     setSync('error');
   }
 }
+let pendingPush = false;
 function schedulePush() {
   if (!syncMeta.auto) return;
   if (!syncMeta.email && !syncMeta.token) return; // never signed in: stay quiet
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => { pushNow('silent').catch(() => {}); }, 8000);
 }
+async function mergeRemoteIfNewer(mode) {
+  const found = await driveFind(mode);
+  if (!found) return null;
+  syncMeta.fileId = found.id;
+  const remoteTime = Date.parse(found.modifiedTime) || 0;
+  if (remoteTime > (syncMeta.lastSyncedAt || 0) || !syncMeta.base) {
+    const remote = await driveDownload(found.id, mode);
+    return { found, remoteTime, res: applyRemote(remote, remoteTime), remote };
+  }
+  return { found, remoteTime, res: null, remote: null };
+}
 async function pushNow(mode) {
-  if (syncing || !navigator.onLine || !googleClientId()) return;
+  if (!navigator.onLine || !googleClientId()) return;
   if (!syncMeta.auto && mode === 'silent') return;
   if (!syncMeta.email && !syncMeta.token) return;
+  if (syncing) { pendingPush = true; return; }
   syncing = true; syncStartAt = Date.now(); setSync('syncing');
   try {
+    const hit = await mergeRemoteIfNewer(mode);
+    if (hit && hit.res) {
+      if (hit.res.conflicts) {
+        toast('Sync conflict — pick which version to keep', () => pumpConflicts(), 'Review');
+        slog('conflict', `${hit.res.conflicts} conflict${hit.res.conflicts === 1 ? '' : 's'} need${hit.res.conflicts === 1 ? 's' : ''} your pick`);
+        pumpConflicts();
+      }
+    }
     await driveUpload(state, mode);
     syncMeta.base = snapState(state);
     syncMeta.lastSyncedAt = Date.now();
@@ -3046,7 +3350,13 @@ async function pushNow(mode) {
     setSync('ok');
   } catch (e) {
     handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout', false);
-  } finally { syncing = false; syncStartAt = 0; paintSync(); }
+  } finally {
+    syncing = false; syncStartAt = 0; paintSync();
+    if (pendingPush) {
+      pendingPush = false;
+      if (syncMeta.auto) schedulePush();
+    }
+  }
 }
 async function pullNow(mode) {
   if (syncing || !navigator.onLine || !googleClientId()) return;
@@ -3068,9 +3378,8 @@ async function pullNow(mode) {
       if (remoteTime > (syncMeta.lastSyncedAt || 0) || !syncMeta.base) {
         const remote = await driveDownload(found.id, mode);
         const res = applyRemote(remote, remoteTime);
-        // converge the other side immediately when local had its own changes
         const merged = snapState(state);
-        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], timer: remote.timer || null, colorNames: remote.colorNames || {}, customColors: remote.customColors || [], userName: remote.userName || '', deletedColors: remote.deletedColors || [] };
+        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], colorNames: remote.colorNames || {}, customColors: remote.customColors || [], userName: remote.userName || '', deletedColors: remote.deletedColors || [] };
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
@@ -3085,9 +3394,14 @@ async function pullNow(mode) {
           else if (res.fresh) slog('ok', `Pulled ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
           else slog('ok', 'Pulled — already up to date');
         }
-      } else {
+      } else if ((state.dirtyAt || 0) > (syncMeta.lastSyncedAt || 0)) {
+        await driveUpload(state, mode);
         syncMeta.base = snapState(state);
         syncMeta.lastSyncedAt = Date.now();
+        saveSyncMeta();
+        if (mode !== 'silent') slog('ok', 'Pushed local changes to Drive');
+      } else {
+        syncMeta.base = snapState(state);
         saveSyncMeta();
       }
     }
@@ -3095,7 +3409,10 @@ async function pullNow(mode) {
     scheduleCalendarSync(); // remote edits may change reminded tasks
   } catch (e) {
     handleSyncFailure(e, mode, prev, true);
-  } finally { syncing = false; syncStartAt = 0; paintSync(); }
+  } finally {
+    syncing = false; syncStartAt = 0; paintSync();
+    if (pendingPush) { pendingPush = false; if (syncMeta.auto) schedulePush(); }
+  }
 }
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
@@ -3111,6 +3428,7 @@ async function syncNowFlow() {
     }
   }
   await pullNow('popup');
+  await pushNow('popup');
 }
 
 function openAccount() {
@@ -3176,6 +3494,10 @@ function resetColors() {
 }
 function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
+  if (location.protocol === 'file:') {
+    const si = $('#signInBtn');
+    if (si) { si.disabled = true; si.title = 'Google sign-in needs http(s), not a local file'; }
+  }
   $('#syncPill').onclick = openAccount;
   $('#accountBtn').onclick = openAccount;
   $('#updateBtn').onclick = () => { forceUpdate().catch(() => forceReload()); };
@@ -3201,6 +3523,7 @@ function bindSync() {
       try { google.accounts.oauth2.revoke(syncMeta.token.access_token, () => {}); } catch {}
     }
     syncMeta.token = null; syncMeta.email = '';
+    syncMeta.fileId = ''; syncMeta.base = null;
     saveSyncMeta(); setSync('signedout'); paintSync();
     slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');
@@ -3216,6 +3539,8 @@ function bindSync() {
     [...document.querySelectorAll('#conflictList .conflict-pick')].forEach((p) => paintConflictPick(p, 'theirs'));
   };
   $('#conflictApply').onclick = () => applyConflicts();
+  const cl = $('#conflictLater'); if (cl) cl.onclick = () => closeConflict();
+  $('#conflictScrim').onclick = (e) => { if (e.target === $('#conflictScrim')) closeConflict(); };
   $('#diagCopy').onclick = async () => {
     toast(await copyText(diagLines() + '\n\n' + syncLog.slice(-20).map((e) => new Date(e.t).toLocaleString() + ' [' + e.kind + '] ' + e.msg).join('\n')) ? 'Diagnostics copied' : 'Copy failed');
   };
@@ -3293,7 +3618,7 @@ function bindEdgeSwipe() {
   let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0, fadeT = 0;
   const sb = () => $('#sidebar');
   const sc = () => $('#scrim');
-  const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim']
+  const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim']
     .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
   const blocked = () => window.innerWidth >= 1024 || ui.detailId || overlays();
   const reset = () => { sx = sy = null; active = false; mode = null; lastDx = 0; };
@@ -3305,6 +3630,7 @@ function bindEdgeSwipe() {
     const t = e.touches[0], open = sb().classList.contains('open');
     if (!open) {
       if (t.clientX < 20) return; // system back-gesture strip
+      if (t.clientX > window.innerWidth * 0.5) return; // left half only (matches Manual)
       if (t.target && t.target.closest && t.target.closest('#board,.drag')) return;
       mode = 'open';
     } else {
@@ -3405,7 +3731,7 @@ function bindPullToRefresh() {  const ptr = document.createElement('div');
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1 || window.scrollY > 0) return;
     const t = e.target;
-    if (t && t.closest && t.closest('#sidebar,#detail,.modal-scrim,.menu,#sortMenu,#listMenu,.toast')) return;
+    if (t && t.closest && t.closest('#sidebar,#detail,.modal-scrim,.menu,#sortMenu,#listMenu,.toast,#board,.board-col-body,.cal-side,#timeTaskList,.board-col')) return;
     start = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
@@ -3439,6 +3765,10 @@ function setTheme(dark) {
   const t = $('#darkModeToggle');
   if (t && document.activeElement !== t) t.checked = !!dark;
   try { localStorage.setItem('doto-theme', dark ? 'dark' : 'light'); } catch {}
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#131314' : '#1a73e8');
+  const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (apple) apple.setAttribute('content', 'black-translucent');
 }
 function toggleTheme() { setTheme(!document.body.classList.contains('dark')); }
 
@@ -3455,7 +3785,9 @@ function bind() {
     if (t && t.closest && t.closest('#detail,.task,.cal-chip,.cal-more,.cal-num,.menu,.modal-scrim,.toast')) return;
     closeDetail();
   });
-  $('#brandHome').onclick = () => { $('#searchInput').value = ''; save(); go(HOME); };
+  const goHomeBrand = () => { $('#searchInput').value = ''; save(); go(HOME); };
+  $('#brandHome').onclick = goHomeBrand;
+  $('#brandHome').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHomeBrand(); } };
   $('#navHome').onclick = () => go(HOME);
   $('#navAll').onclick = () => go(ALL);
   $('#navCal').onclick = () => go(CAL);
@@ -3464,7 +3796,7 @@ function bind() {
   $('#timePlay').onclick = timePlay;
   $('#timePause').onclick = timePause;
   $('#timeStop').onclick = timeStop;
-  setInterval(tickTime, 100);
+  if (state.timer && state.timer.running) armTick();
   setInterval(paintHomeClock, 500); paintHomeClock();
   const shiftCalMonth = (n) => {
     if ((ui.calView || 'month') === 'year') { ui.calYear = (ui.calYear || new Date().getFullYear()) + n; ui.calAnim = n < 0 ? 'prev' : 'next'; renderAll(); return; }
@@ -3478,7 +3810,7 @@ function bind() {
   $('#calNext').onclick = () => shiftCalMonth(1);
   $('#calTodayBtn').onclick = () => {
     const d = new Date();
-    if ((ui.calView || 'month') === 'year') ui.calYear = d.getFullYear();
+    if ((ui.calView || 'month') === 'year') { ui.calYear = d.getFullYear(); ui.calDay = todayIso(); }
     else {
       const cur = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (cur !== calMonth()) ui.calAnim = 'out';
@@ -3494,10 +3826,14 @@ function bind() {
   $('#calAddForm').onsubmit = (e) => {
     e.preventDefault();
     const inp = $('#calAddInput'); if (!inp.value.trim()) return;
-    const lid = (fallbackList() || {}).id; if (!lid) { toast('Create a list first'); return; }
+    const lid = (state.lists.some((l) => l.id === state.lastListId) && state.lastListId) || (fallbackList() || {}).id;
+    if (!lid) { toast('Create a list first'); return; }
     addTaskTo(lid, inp.value, { date: calDaySel() }, true); inp.value = '';
   };
-  $('#homeAddBtn').onclick = () => { const f = fallbackList(); if (f) go(f.id); setTimeout(() => $('#addInput') && $('#addInput').focus(), 80); };
+  $('#homeAddBtn').onclick = () => {
+    const f = state.lists.find((l) => l.id === state.lastListId) || fallbackList();
+    if (f) go(f.id); setTimeout(() => $('#addInput') && $('#addInput').focus(), 80);
+  };
   $('#homeBoardBtn').onclick = () => go(ALL);
   $('#homeCalBtn').onclick = () => go(CAL);
   $('#homeTimeBtn').onclick = () => go(TIME);
@@ -3515,10 +3851,19 @@ function bind() {
     toast(`${rm.length} completed deleted`, () => { state.tasks.push(...rm); save(); renderAll(); });
   };
   $('#listMenuBtn').onclick = (e) => { e.stopPropagation(); $('#listMenu').classList.toggle('hidden'); $('#sortMenu').classList.add('hidden'); };
-  $('#sortBtn').onclick = (e) => { e.stopPropagation(); $('#sortMenu').classList.toggle('hidden'); $('#listMenu').classList.add('hidden'); };
-  $$('#sortMenu button').forEach((b) => b.onclick = () => { ui.sort = b.dataset.sort; $('#sortMenu').classList.add('hidden'); renderAll(); toast('Sorted: ' + b.textContent.trim()); });
+  $('#sortBtn').onclick = (e) => {
+    e.stopPropagation(); paintSortMenu();
+    const menu = $('#sortMenu');
+    menu.classList.toggle('hidden');
+    $('#listMenu').classList.add('hidden');
+    $('#sortBtn').setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
+  };
+  $$('#sortMenu button').forEach((b) => b.onclick = () => { setSort(b.dataset.sort); $('#sortMenu').classList.add('hidden'); toast('Sorted: ' + b.textContent.trim()); });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#sortMenu') && !e.target.closest('#sortBtn')) $('#sortMenu').classList.add('hidden');
+    if (!e.target.closest('#sortMenu') && !e.target.closest('#sortBtn')) {
+      $('#sortMenu').classList.add('hidden');
+      const sb = $('#sortBtn'); if (sb) sb.setAttribute('aria-expanded', 'false');
+    }
     if (!e.target.closest('#listMenu') && !e.target.closest('#listMenuBtn')) $('#listMenu').classList.add('hidden');
     if (!e.target.closest('#colorPop')) closeColorPop();
     if (!e.target.closest('#weightPop')) closeWeightPop();
@@ -3526,7 +3871,11 @@ function bind() {
     if (!e.target.closest('#movePop')) closeMovePop();
   });
 
-  try { setTheme(localStorage.getItem('doto-theme') === 'dark'); } catch { setTheme(false); }
+  try {
+    const saved = localStorage.getItem('doto-theme');
+    if (saved === 'dark' || saved === 'light') setTheme(saved === 'dark');
+    else setTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  } catch { setTheme(false); }
   $('#darkModeToggle').onchange = (e) => setTheme(e.target.checked);
 
   // import / export (now inside the Sync & Settings dialog)
@@ -3540,12 +3889,16 @@ function bind() {
   const onSearchInput = () => {
     $('#clearSearch').classList.toggle('hidden', !s.value);
     // searching from Home jumps straight to Board results
-    if (s.value.trim() && isHome()) { state.activeView = ALL; save(); }
+    if (s.value.trim() && isHome()) { ui.searchFromHome = true; state.activeView = ALL; save(); }
     renderAll();
   };
   s.oninput = onSearchInput;
   s.onsearch = onSearchInput;
-  $('#clearSearch').onclick = () => { s.value = ''; $('#clearSearch').classList.add('hidden'); renderAll(); };
+  $('#clearSearch').onclick = () => {
+    s.value = ''; $('#clearSearch').classList.add('hidden');
+    if (ui.searchFromHome) { ui.searchFromHome = false; go(HOME); return; }
+    renderAll();
+  };
 
   // filters (buttons are rendered in renderNav; clear lives here)
   $('#clearFilters').onclick = () => { state.filters = { color: '', weight: '', importance: '' }; s.value = ''; save(); renderAll(); };
@@ -3556,7 +3909,7 @@ function bind() {
   // quick composer: due date + weight + importance presets, persistent
   // across adds for rapid entry (toggle again to clear)
   const qaDate = $('#qaDate');
-  const tomIso = () => { const d = new Date(Date.now() + 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const tomIso = () => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const markQaSeg = (id, val) => $$(`#${id} button`).forEach((x) => x.classList.toggle('active', x.dataset.v === val));
   qaDate.onchange = () => {
     ui.quick.date = qaDate.value || undefined;
@@ -3576,17 +3929,7 @@ function bind() {
   };
   segInit('qaWeight', 'weight');
   segInit('qaImportance', 'importance');
-  const qaC = $('#qaColors');
-  allColors().forEach((c) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'f-dot'; b.style.background = c.hex;
-    b.title = colorName(c.id); b.setAttribute('aria-label', 'Color ' + colorName(c.id));
-    b.onclick = () => {
-      ui.quick.color = ui.quick.color === c.id ? undefined : c.id;
-      $$('#qaColors .f-dot').forEach((x) => x.classList.toggle('selected', x === b && !!ui.quick.color));
-    };
-    qaC.appendChild(b);
-  });
+  renderQuickColors();
   form.onsubmit = (e) => {
     e.preventDefault();
     const t = addTask(inp.value, {
@@ -3603,8 +3946,15 @@ function bind() {
 
   // detail bindings
   $('#detailBack').onclick = closeDetail; $('#detailClose').onclick = closeDetail;
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDetail(); closeSidebar(); closeAccount(); closeLog(); closeConflict(); closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop(); } });
-  $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderNav(); renderCurrentView(); } };
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const dialogOpen = ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim']
+      .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
+    closePalette(); closeHelp(); closeAccount(); closeLog(); closeConflict();
+    closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop();
+    if (!dialogOpen) { closeDetail(); closeSidebar(); }
+  });
+  $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderAll(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
   $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); } };
   $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; save(); renderAll(); } };
@@ -3621,9 +3971,9 @@ function bind() {
     t.extRef = e.target.value.slice(0, 500); save();
     const open = $('#dExtOpen');
     if (isUrl(t.extRef)) { open.href = t.extRef; open.classList.remove('hidden'); } else open.classList.add('hidden');
-    renderNav(); renderCurrentView();
+    renderAll();
   };
-  $('#dNotes').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.notes = e.target.value; save(); renderNav(); renderCurrentView(); } };
+  $('#dNotes').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.notes = e.target.value; save(); renderAll(); } };
   $('#subForm').onsubmit = (e) => {
     e.preventDefault();
     const t = getTask(ui.detailId); const v = $('#subInput').value.trim(); if (!t || !v) return;
@@ -3657,35 +4007,33 @@ function bind() {
 bind();
 renderAll();
 
-// One-time cleanup for recurring tasks imported before the recurrence
-// dedupe existed: groups of 3+ same-titled, all-dated tasks in one list
-// collapse to the nearest upcoming (else latest) instance, with undo.
-(function dedupeLegacyRecurring() {
-  if (state._recDeduped) return;
-  state._recDeduped = true;
-  const groups = new Map();
-  state.tasks.forEach((t) => {
-    const k = t.listId + '|' + (t.title || '').trim().toLowerCase() + '|' + (t.notes || '').trim().toLowerCase();
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(t);
-  });
-  const today = todayIso();
-  const removed = [];
-  groups.forEach((g) => {
-    if (g.length < 3 || !g.every((t) => t.date)) return;
-    const sorted = [...g].sort((a, b) => a.date.localeCompare(b.date));
-    const keep = sorted.find((t) => t.date >= today) || sorted[sorted.length - 1];
-    g.forEach((t) => { if (t.id !== keep.id) removed.push(t); });
-  });
-  save();
-  if (removed.length) {
-    const ids = new Set(removed.map((t) => t.id));
-    state.tasks = state.tasks.filter((t) => !ids.has(t.id));
-    if (ui.detailId && ids.has(ui.detailId)) closeDetail();
-    save(); renderAll();
-    toast(`Removed ${removed.length} duplicate recurring tasks`, () => { state.tasks.push(...removed); save(); renderAll(); });
+window.addEventListener('storage', (e) => {
+  if (e.key === LS_KEY && e.newValue) {
+    try {
+      const incoming = JSON.parse(e.newValue);
+      const ok = salvageState(incoming);
+      if (!ok) return;
+      state = migrate(ok);
+      ui.sort = state.sort || 'order';
+      if (state.timer && state.timer.running) armTick();
+      renderAll();
+    } catch {}
   }
-})();
+  if (e.key === 'doto-theme' && e.newValue) setTheme(e.newValue === 'dark');
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab') return;
+  const scrim = ['modalScrim', 'paletteScrim', 'accountScrim', 'conflictScrim', 'logScrim', 'helpScrim']
+    .map((id) => document.getElementById(id)).find((el) => el && !el.classList.contains('hidden'));
+  if (!scrim) return;
+  const nodes = [...scrim.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => !el.disabled && el.offsetParent !== null);
+  if (!nodes.length) return;
+  const first = nodes[0], last = nodes[nodes.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 
 // PWA: offline + installable (Chrome/Edge desktop & Android, iOS Add to Home)
 if ('serviceWorker' in navigator) {

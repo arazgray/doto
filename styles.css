@@ -11,7 +11,11 @@
   --radius:14px; --radius-sm:10px;
   --shadow:0 1px 2px rgba(60,64,67,.25),0 2px 8px rgba(60,64,67,.15);
   --shadow-lg:0 8px 28px rgba(0,0,0,.18);
-  --topbar-h:58px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --topbar-h:calc(58px + env(safe-area-inset-top,0px));
   --side-w:280px; --detail-w:440px;
 }
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) var(--scroll-track)}
@@ -44,7 +48,8 @@ input,select,textarea{font:inherit;color:inherit}
 /* Topbar — mobile first */
 .topbar{
   height:var(--topbar-h); display:flex; align-items:center; gap:8px;
-  padding:0 8px; border-bottom:1px solid var(--line-soft);
+  padding:var(--safe-t) max(8px,var(--safe-r)) 0 max(8px,var(--safe-l));
+  border-bottom:1px solid var(--line-soft);
   position:fixed; top:0; left:0; right:0; z-index:100; background:var(--bg);
   & .brand{
     display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer;flex:none;
@@ -77,6 +82,7 @@ input,select,textarea{font:inherit;color:inherit}
 /* Sidebar drawer on mobile */
 .sidebar{
   position:fixed;top:var(--topbar-h);bottom:0;left:0;width:min(300px,84vw);
+  padding-bottom:var(--safe-b);padding-left:var(--safe-l);
   background:var(--sidebar);z-index:31;transform:translateX(-102%);
   transition:transform .22s ease;display:flex;flex-direction:column;
   border-right:1px solid var(--line-soft);overflow-y:auto;overflow-x:hidden;
@@ -195,7 +201,7 @@ input,select,textarea{font:inherit;color:inherit}
   display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--line);border-radius:16px;padding:4px 6px 4px 10px;background:var(--bg);
   & button{display:flex;border-radius:50%}
 }
-.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none;border:1px solid rgba(0,0,0,.2)}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none;border:1px solid var(--line)}
 
 /* Home / summary */
 .home-hero{
@@ -213,7 +219,7 @@ input,select,textarea{font:inherit;color:inherit}
   .home-hero .home-hero-actions > *{flex:none;padding-left:12px;padding-right:12px}
 }
 #homeAddBtn .short-t{display:none}
-@media (max-width:600px){
+@media (max-width:699px){
   #homeAddBtn .full-t{display:none}
   #homeAddBtn .short-t{display:inline}
 }
@@ -235,7 +241,7 @@ input,select,textarea{font:inherit;color:inherit}
 }
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px}
 .stat{
-  background:var(--bg2);border:1px solid var(--line-soft);border-radius:16px;padding:18px;
+  background:var(--bg2);border:1px solid var(--line-soft);border-radius:16px;padding:18px;text-align:left;width:100%;
   & .num{font-size:24px;font-weight:700}
   & .lbl{font-size:12px;color:var(--muted)}
   &.clickable{
@@ -299,8 +305,8 @@ input,select,textarea{font:inherit;color:inherit}
   }
 }
 .task{
-  display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;column-gap:6px;row-gap:4px;
-  background:var(--bg);border:1px solid var(--line-soft);border-left:4px solid var(--task-color,transparent);
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:6px;row-gap:4px;
+  background:var(--bg);border:1px solid var(--line-soft);border-inline-start:4px solid var(--task-color,transparent);
   border-radius:0 10px 10px 0;margin:8px 0 4px;padding:13px 15px;position:relative;
   &.dragging{opacity:.5}
   &.drop-above{box-shadow:0 -2px 0 var(--blue)}
@@ -317,7 +323,10 @@ input,select,textarea{font:inherit;color:inherit}
   & .check{margin:0}
 }
 .drag{color:var(--line);cursor:grab;padding:8px 2px;touch-action:none;display:none}
-@media (pointer:coarse){.drag{display:block}}
+@media (pointer:coarse),(any-pointer:coarse){
+  .drag{display:block}
+  .task{grid-template-columns:auto auto 1fr auto}
+}
 
 /* Compact mobile topbar: give the search field room */
 @media (max-width:699px){
@@ -341,7 +350,10 @@ input,select,textarea{font:inherit;color:inherit}
   &:hover{border-color:var(--blue)}
 }
 .task-main{display:contents;min-width:0}
-.task-titlewrap{grid-column:3;grid-row:2;min-width:0}
+.task-titlewrap{grid-column:2;grid-row:2;min-width:0}
+@media (pointer:coarse),(any-pointer:coarse){
+  .task-titlewrap{grid-column:3}
+}
 .task-title{width:100%;border:0;outline:0;background:transparent;font-size:15px;padding:6px 2px;min-width:0;text-align:left}
 span.task-title{display:block;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 span.task-title.empty{opacity:.55;font-style:italic}
@@ -359,7 +371,7 @@ input.task-title{cursor:text}
   grid-row:1;grid-column:1/-1;padding:0;margin:0;justify-content:flex-end;
 }
 .badge{
-  display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:12px;padding:2px 8px;background:var(--bg);white-space:nowrap;max-width:100%;
+  display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:12px;padding:2px 8px;background:var(--bg);white-space:nowrap;max-width:100%;font:inherit;color:inherit;
   & .material-icons-outlined{font-size:15px}
   &.date.overdue{color:var(--danger);border-color:var(--danger)}
   &.date.today{color:var(--blue);border-color:var(--blue)}
@@ -371,9 +383,12 @@ input.task-title{cursor:text}
 }
 .task-actions{
   display:flex;align-items:center;flex:none;
-  grid-row:3;grid-column:2/-1;justify-content:flex-end;margin:0;
+  grid-row:2;grid-column:3;justify-content:flex-end;margin:0;
 }
-.color-dot-btn{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);margin-right:2px;padding:0;flex:none}
+@media (pointer:coarse),(any-pointer:coarse){
+  .task-actions{grid-column:4}
+}
+.color-dot-btn{width:22px;height:22px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line);margin-right:2px;padding:0;flex:none}
 .sub-progress{font-size:11px;color:var(--muted)}
 
 .empty{
@@ -405,7 +420,7 @@ body.view-board{
   &.drop-before{box-shadow:-3px 0 0 var(--blue)}
   &.drop-after{box-shadow:3px 0 0 var(--blue)}
   & .col-drag{display:none}
-  @media (pointer:coarse){
+  @media (pointer:coarse),(any-pointer:coarse){
     & .col-drag{display:block}
   }
 }
@@ -419,7 +434,7 @@ body.view-board{
    so they never collide; smaller controls + compact badges to fit columns */
 .board-col-body{
   & .drag{display:none}
-  @media (pointer:coarse){
+  @media (pointer:coarse),(any-pointer:coarse){
     & .drag{display:block}
   }
   & .badge{
@@ -509,7 +524,7 @@ body.view-cal{
 }
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal-cell{
-  aspect-ratio:1/1;min-height:76px;border:1px solid var(--line-soft);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--bg);cursor:pointer;
+  aspect-ratio:1/1;min-height:64px;border:1px solid var(--line-soft);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--bg);cursor:pointer;
   &.out{border:0;background:transparent;cursor:default}
   &.weekend{background:#f1f3f4}
   &.today{border-color:var(--blue)}
@@ -680,6 +695,7 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
     display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:8px;text-align:left;font-size:14px;
     &:hover{background:rgba(60,64,67,.08)}
     &.danger{color:var(--danger)}
+    &.selected{color:var(--blue);font-weight:500;background:var(--blue-soft)}
   }
 }
 #sortMenu{position:absolute;top:calc(100% + 6px);right:0}
@@ -711,7 +727,7 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));
   background:#323232;color:#fff;border-radius:10px;padding:12px 14px;display:flex;gap:14px;align-items:center;
-  z-index:80;box-shadow:var(--shadow-lg);max-width:min(92vw,480px);font-size:14px;
+  z-index:220;box-shadow:var(--shadow-lg);max-width:min(92vw,480px);font-size:14px;
   & button{color:#8ab4f8;font-weight:500}
 }
 
@@ -903,11 +919,12 @@ a.btn-ghost{text-decoration:none}
    title row where the space is. Must stay last in file: equal-specificity
    overrides of the base task rules. */
 @media (max-width:600px){
+  .cal-cell{aspect-ratio:auto;min-height:56px}
   .task{column-gap:4px;padding:10px 12px}
   .task-meta{grid-row:1;grid-column:1/-1;justify-content:flex-start}
   .task-meta .badge{font-size:11px;padding:1px 6px}
   .task-meta .badge .material-icons-outlined{font-size:13px}
-  .task-actions{grid-row:2;grid-column:4;justify-content:flex-end;gap:2px}
+  .task-actions{grid-row:2;grid-column:-2;justify-content:flex-end;gap:2px}
   .task-actions .icon-btn.sm{width:26px;height:26px}
   .task-actions .icon-btn.sm .material-icons-outlined{font-size:19px}
   .task-actions [title="Move to list"],.task-actions [title="Track time on this task"]{display:none}

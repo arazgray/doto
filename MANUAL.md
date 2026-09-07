@@ -27,7 +27,7 @@
 1. Open <https://arazgray.github.io/doto/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar — or on touch screens,
-   drag right starting anywhere in the left half — then **Create new list** for your own categories.
+   drag right starting in the left half of the screen — then **Create new list** for your own categories.
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
 Everything is saved automatically in your browser as you type.
@@ -57,6 +57,8 @@ How it works and what to expect:
 - If the same task or list was edited on two devices between syncs, the
   newest version applies immediately — then a dialog shows each conflict
   with a field-by-field diff so you can keep your version or take Drive's.
+  **Later** dismisses the dialog without changing the applied version (it
+  stays queued until you open Sync again or the next pull).
 - Signing out keeps a full copy on that device; signing back in merges it.
 - **Pull to refresh**: on touch devices, drag down from the very top of any
   page and release to force a Drive sync.
@@ -137,7 +139,7 @@ Shortcuts work when you are not typing in a field. Press `?` anywhere to see thi
 | `Up` / `Down` | Move selection (once a task is selected) |
 | `Enter` | Open selected task |
 | `x` | Complete / reopen selected task |
-| `Del` | Delete selected task (undoable) |
+| `Del` | Delete selected task (undoable). On Mac this is the Delete key (sends Backspace). On Windows/Linux only the Delete key deletes — Backspace does not. |
 | `g` then `h` | Go to Home |
 | `g` then `b` | Go to Board |
 | `g` then `c` | Go to Calendar |

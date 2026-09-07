@@ -8,18 +8,18 @@
 <meta name="theme-color" content="#1a73e8" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="DoTo" />
 <link rel="manifest" href="assets/manifest.webmanifest" />
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788789057" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788789057" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788795448" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788795448" />
 </head>
 <body>
 <header class="topbar">
-  <button id="menuBtn" class="icon-btn" aria-label="Open menu">
+  <button id="menuBtn" class="icon-btn" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">
     <span class="material-icons-outlined">menu</span>
   </button>
   <div class="brand" id="brandHome" role="button" tabindex="0" title="DoTo home">
@@ -38,12 +38,12 @@
   </div>
   <div class="topbar-actions">
     <button id="syncPill" class="sync-pill" title="Sync status — open Sync & Settings"><span class="dot"></span><span id="syncPillText">Not synced yet</span></button>
-    <button id="sortBtn" class="icon-btn" aria-label="Sort tasks" title="Sort"><span class="material-icons-outlined">swap_vert</span></button>
+    <button id="sortBtn" class="icon-btn" aria-label="Sort tasks" title="Sort" aria-haspopup="menu" aria-expanded="false"><span class="material-icons-outlined">swap_vert</span></button>
     <div id="sortMenu" class="menu hidden" role="menu">
-      <button data-sort="order" role="menuitem"><span class="material-icons-outlined">drag_handle</span> My order</button>
-      <button data-sort="date" role="menuitem"><span class="material-icons-outlined">event</span> Date</button>
-      <button data-sort="priority" role="menuitem"><span class="material-icons-outlined">flag</span> Importance &amp; weight</button>
-      <button data-sort="title" role="menuitem"><span class="material-icons-outlined">sort_by_alpha</span> Title</button>
+      <button data-sort="order" role="menuitemradio" aria-checked="true"><span class="material-icons-outlined">drag_handle</span> My order</button>
+      <button data-sort="date" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">event</span> Date</button>
+      <button data-sort="priority" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">flag</span> Importance &amp; weight</button>
+      <button data-sort="title" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">sort_by_alpha</span> Title</button>
     </div>
   </div>
 </header>
@@ -88,7 +88,7 @@
     <section id="viewHome" class="view">
       <div class="home-hero">
         <div>
-          <h1 id="homeGreet">Good day 👋</h1>
+          <h1 id="homeGreet">Good day</h1>
           <p class="eyebrow" id="homeDate"></p>
           <p class="muted" id="homeSub"></p>
         </div>
@@ -168,12 +168,12 @@
       <section aria-label="Open tasks">
         <ul id="openList" class="task-list"></ul>
         <div id="openEmpty" class="empty hidden">
-          <img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90' viewBox='0 0 120 90'%3E%3Crect x='8' y='8' width='104' height='74' rx='12' fill='%23e8f0fe'/%3E%3Cpath d='M30 45l12 12 28-30' stroke='%231a73e8' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+          <svg class="empty-art" width="120" height="90" viewBox="0 0 120 90" aria-hidden="true"><rect x="8" y="8" width="104" height="74" rx="12" fill="var(--blue-soft)"/><path d="M30 45l12 12 28-30" stroke="var(--blue)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <p><strong>All clear!</strong><br />Add your first task above, or drag one here from another list.</p>
         </div>
       </section>
       <section class="completed-section" aria-label="Completed tasks">
-        <button id="completedToggle" class="completed-toggle" aria-expanded="true">
+        <button id="completedToggle" class="completed-toggle" aria-expanded="false">
           <span class="material-icons-outlined chev">expand_more</span>
           <span>Completed</span>
           <span id="completedCount" class="count-pill muted"></span>
@@ -203,9 +203,9 @@
           </div>
         </div>
         <div class="list-header-actions">
-          <button id="calPrev" class="icon-btn" aria-label="Previous"><span class="material-icons-outlined">chevron_left</span></button>
+          <button id="calPrev" class="icon-btn" aria-label="Previous month or year"><span class="material-icons-outlined">chevron_left</span></button>
           <button id="calTodayBtn" class="btn-ghost">Today</button>
-          <button id="calNext" class="icon-btn" aria-label="Next"><span class="material-icons-outlined">chevron_right</span></button>
+          <button id="calNext" class="icon-btn" aria-label="Next month or year"><span class="material-icons-outlined">chevron_right</span></button>
         </div>
       </div>
       <div class="chips" data-chips></div>
@@ -298,7 +298,7 @@
           <p class="d-label">Importance</p>
           <div id="dImportance" class="segmented importance" role="radiogroup" aria-label="Importance">
             <button data-v="low" role="radio"><span class="material-icons-outlined">arrow_downward</span>Low</button>
-            <button data-v="medium" role="radio"><span class="material-icons-outlined">remove</span>Med</button>
+            <button data-v="medium" role="radio"><span class="material-icons-outlined">remove</span>Medium</button>
             <button data-v="high" role="radio"><span class="material-icons-outlined">arrow_upward</span>High</button>
           </div>
         </div>
@@ -455,6 +455,7 @@
     <p id="conflictCount" class="muted small"></p>
     <div id="conflictList" class="conflict-list"></div>
     <div class="modal-actions conflict-actions">
+      <button type="button" id="conflictLater" class="btn-ghost">Later</button>
       <button type="button" id="conflictAllMine" class="btn-ghost">All mine</button>
       <button type="button" id="conflictAllTheirs" class="btn-ghost">All Drive's</button>
       <button type="button" id="conflictApply" class="btn-primary">Apply</button>
@@ -495,9 +496,9 @@
     </div>
   </form>
 </div>
-<div id="toast" class="toast hidden"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788789057"></script>
+<script src="app.js?v=1.0-1788795448"></script>
 </body>
 </html>

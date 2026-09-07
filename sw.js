@@ -1,7 +1,7 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v6';
+const CACHE = 'doto-v7';
 const CORE = [
   './',
   'index.html',
@@ -43,22 +43,32 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Cache-first for same-origin GET; navigations fall back to cached shell offline.
+function isShell(url) {
+  const p = url.pathname;
+  return p.endsWith('/') || p.endsWith('index.html') || p.endsWith('app.js') || p.endsWith('styles.css') || p.endsWith('fonts.css');
+}
+
 self.addEventListener('fetch', (e) => {
   const { request } = e;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // fonts, weather APIs: network only
-  if (url.pathname.endsWith('version.json')) return; // update detector: always network
-  if (request.mode === 'navigate') {
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.endsWith('version.json')) return;
+  if (request.mode === 'navigate' || isShell(url)) {
     e.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('index.html', copy));
+          if (res.ok) {
+            const copy = res.clone();
+            const navCopy = request.mode === 'navigate' ? res.clone() : null;
+            caches.open(CACHE).then((c) => {
+              c.put(request, copy);
+              if (navCopy) c.put('index.html', navCopy);
+            });
+          }
           return res;
         })
-        .catch(() => caches.match('index.html').then((r) => r || caches.match('./')))
+        .catch(() => caches.match(request).then((r) => r || caches.match(request, { ignoreSearch: true }).then((r2) => r2 || caches.match('index.html').then((r3) => r3 || caches.match('./')))))
     );
     return;
   }
