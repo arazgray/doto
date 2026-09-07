@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788725224'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788770541'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1750,6 +1750,10 @@ function openDetail(id) {
 function closeDetail() { ui.detailId = null; $('#detail').classList.add('hidden'); $('#scrim').classList.add('hidden'); }
 function renderDetail() {
   const t = getTask(ui.detailId); if (!t) return closeDetail();
+  if (!Array.isArray(t.subtasks)) t.subtasks = [];
+  // clear rebuilt regions first so a task never shows the previous task's rows
+  $('#dList').innerHTML = ''; $('#dRecurDays').innerHTML = '';
+  $('#dColors').innerHTML = ''; $('#dSubs').innerHTML = '';
   $('#dTitle').value = t.title;
   $('#dDate').value = t.date || ''; $('#dTime').value = t.time || '';
   $('#dExt').value = t.extRef || '';
@@ -3051,6 +3055,13 @@ function bind() {
     else ($('#sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
   };
   $('#scrim').onclick = () => { closeSidebar(); if (window.innerWidth < 1024) closeDetail(); };
+  // click outside the detail panel dismisses it (desktop has no scrim to catch it)
+  document.addEventListener('click', (e) => {
+    if (!ui.detailId) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#detail,.task,.cal-chip,.cal-more,.cal-num,.menu,.modal-scrim,.toast')) return;
+    closeDetail();
+  });
   $('#brandHome').onclick = () => { $('#searchInput').value = ''; save(); go(HOME); };
   $('#navHome').onclick = () => go(HOME);
   $('#navAll').onclick = () => go(ALL);

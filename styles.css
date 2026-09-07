@@ -791,7 +791,7 @@ kbd{
 }
 
 /* Keyboard selection ring on task rows */
-.task.kb-selected{outline:2px solid var(--blue);outline-offset:-2px}
+.task.kb-selected{outline:2px solid var(--blue);outline-offset:2px}
 
 /* Sidebar ghost links + even button rows */
 a.btn-ghost{text-decoration:none}
