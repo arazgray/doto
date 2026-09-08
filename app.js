@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788875959'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788883091'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2486,7 +2486,7 @@ function renderAll() {
    push to Drive's hidden app folder (debounced) and pull on launch,
    focus and reconnect. Merge is per-item, three-way against the last
    synced snapshot; both-sides-edited items resolve newest-wins. */
-const GOOGLE_CLIENT_ID = '1053076438888-cdl30fq68j6sp3uoqgca5evcoa7rbvd5.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
+const GOOGLE_CLIENT_ID = '1053076438888-73jt7847277sev0oq6eaesn4g63v91do.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events'; // one sign-in covers Drive sync + Calendar reminders
 const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
