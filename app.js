@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788898579'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788899497'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2743,7 +2743,29 @@ function gisAttempt(tc, prompt, ms) {
     catch { if (!done) { done = true; clearTimeout(to); resolve({ error: 'popup_failed' }); } }
   });
 }
-async function ensureToken(mode, needCal) {
+/* Only one GIS token request may be in flight at a time. requestAccessToken
+   delivers its result to tc.callback on the shared tokenClient, so a second
+   overlapping call overwrites the first caller's callback — the orphaned
+   caller then hangs until timeout even after a successful login. That is what
+   struck expired sessions: the Sync-now popup raced background silent
+   renewals (auto-push, token refresh, calendar sync). Chain acquisitions
+   instead; later callers reuse whatever the first one obtained. */
+let tokenChain = Promise.resolve();
+function ensureToken(mode, needCal) {
+  const prev = tokenChain;
+  let release;
+  const mine = new Promise((res) => { release = res; });
+  tokenChain = mine; // claimed synchronously — no gap for a racer to slip through
+  const work = (async () => {
+    try { await prev; } catch {}
+    return doEnsureToken(mode, needCal);
+  })();
+  return work.then(
+    (v) => { release(); return v; },
+    (e) => { release(); throw e; }
+  );
+}
+async function doEnsureToken(mode, needCal) {
   // Drive callers reuse any valid token; only calendar callers force a
   // re-consent popup when the calendar grant is unverified. (Forcing it for
   // Drive too caused double popups and still never retried the calendar.)
@@ -3573,6 +3595,16 @@ async function pullNow(mode) {
     if (pendingPush) { pendingPush = false; if (syncMeta.auto) schedulePush(); }
   }
 }
+function signInErrorMsg(e) {
+  const code = e && e.gis ? String(e.gis) : '';
+  // timeout = the Google window never answered (closed too early, popup
+  // blocked, or third-party cookies refused for accounts.google.com — the
+  // login then cannot report back to the app).
+  if (code === 'timeout') return 'Google sign-in timed out — finish the Google window, allow popups for this site and third-party cookies for accounts.google.com, then try again.';
+  return code
+    ? 'Google sign-in failed (' + code + '). Allow popups for this site and try again.'
+    : 'Sign-in failed — try again.';
+}
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
   // Drive sign-in first (no forced calendar popup here — that caused double
@@ -3580,9 +3612,7 @@ async function syncNowFlow() {
   if (!syncMeta.email || !tokenValid()) {
     try { await ensureToken('popup'); await fetchEmail(); }
     catch (e) {
-      lastSyncError = e && e.gis
-        ? 'Google sign-in failed (' + e.gis + '). Allow popups for this site and try again.'
-        : 'Sign-in failed — try again.';
+      lastSyncError = signInErrorMsg(e);
       slog('error', lastSyncError);
       setSync('error'); paintSync();
       return;
@@ -3672,9 +3702,7 @@ function bindSync() {
     if (!googleClientId()) { setSync('setup'); paintSync(); return; }
     try { await ensureToken('popup'); }
     catch (e) {
-      lastSyncError = e && e.gis
-        ? 'Google sign-in failed (' + e.gis + '). Allow popups for this site and try again.'
-        : 'Sign-in failed — try again.';
+      lastSyncError = signInErrorMsg(e);
       slog('error', lastSyncError);
       setSync('error'); paintSync();
       return;

@@ -257,7 +257,10 @@ Not yet — export the JSON and send them the file; they can import it.
 Most common cause: the Google Drive API is not enabled for your Cloud project
 (Drive answers 403) — enable it under APIs & Services, then Sync now. Also
 make sure you ticked the Drive checkbox on Google's consent screen and that
-sign-in popups are not blocked. If the Google window opens and closes with
+sign-in popups are not blocked. A "timed out" failure means the Google window
+never reported back — finish it instead of closing it early, allow popups for
+this site, and allow third-party cookies for `accounts.google.com` (without
+them the login cannot return to the app). If the Google window opens and closes with
 nothing happening, allow popups for this site and try again — the exact
 reason is recorded under Sync → History. That History page also has a
 **Copy diagnostics** button: if sync looks wrong (e.g. pill says sign-in is
