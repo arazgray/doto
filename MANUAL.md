@@ -198,7 +198,7 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
 2. **APIs & Services → Library**: find and **Enable** the **Google Drive API**
    and the **Google Calendar API** (one sign-in covers sync + reminders).
 3. **APIs & Services → OAuth consent screen**: choose External, fill in app
-   name + support email, and add these four scopes:
+   name + support email, and add these five scopes:
    - `https://www.googleapis.com/auth/drive.appdata`
    - `https://www.googleapis.com/auth/userinfo.email`
    - `https://www.googleapis.com/auth/calendar.events`
@@ -206,6 +206,10 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
      (`calendar.events` alone cannot call `calendarList.list` — without the
      readonly list scope every calendar lookup answers 403
      `ACCESS_TOKEN_SCOPE_INSUFFICIENT`.)
+   - `https://www.googleapis.com/auth/calendar.app.created`
+     (lets the app create its own secondary "DoTo" calendar via
+     `calendars.insert` — without it reminders fall back to your main
+     calendar.)
    - Under Test users, add your Gmail address. New projects start in Testing
      mode — only listed users can sign in, and sign-in expires about weekly.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
@@ -253,12 +257,13 @@ reason is recorded under Sync → History. That History page also has a
 needed while the dialog shows you signed in), open it right after the failure
 and send the text — it shows token state, last sync and recent events.
 
-**Calendar says "needs its permission" and Sync now does nothing / nothing appears in Google Calendar.**
+**Calendar says "needs its permission" and Sync now does nothing / nothing appears in Google Calendar / reminders land in the main calendar instead of "DoTo".**
 Only tasks with Details → Reminder set create events (in the "DoTo" Google
 calendar, or your main calendar if creation is not allowed) — dateless tasks
-need a due date first. If you signed in before the Calendar scope was added,
+need a due date first. If you signed in before a Calendar scope was added,
 tap Sync now once to re-grant it (allow the popup and tick the Calendar
-checkbox). "Google Calendar API is off" means enabling the API in your Cloud
+checkboxes — "DoTo" needs the list + app-created scopes, not just events).
+"Google Calendar API is off" means enabling the API in your Cloud
 project, then Sync now. Calendar errors also show inside Sync & Settings and
 under Sync → History.
 

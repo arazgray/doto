@@ -56,9 +56,8 @@ input,select,textarea{font:inherit;color:inherit}
   }
   & .brand-mark{display:inline-flex;flex:none}
   & .brand-mark img{width:30px;height:30px;display:block}
-  & .brand-text{display:flex;flex-direction:column;line-height:1.05}
+  & .brand-text{display:flex;flex-direction:column;justify-content:center;line-height:1.05}
   & .brand-name{font-weight:700;font-size:19px;letter-spacing:.2px}
-  & .brand-slogan{font-size:11px;color:var(--muted);white-space:nowrap}
   & .search-wrap{flex:1;margin-left:4px}
 }
 .search-wrap{
@@ -93,8 +92,8 @@ input,select,textarea{font:inherit;color:inherit}
 .sidebar-scroll{padding:10px 8px;display:flex;flex-direction:column;min-height:100%;min-width:0;overflow-x:hidden}
 .sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-weight:500;color:var(--muted)}
 .list-nav{
-  display:flex;flex-direction:column;gap:2px;
-  & + .sidebar-head{margin-top:14px}
+  display:flex;flex-direction:column;gap:1px;
+  & + .sidebar-head{margin-top:7px}
 }
 .list-item{
   display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:0 24px 24px 0;text-align:left;width:100%;
@@ -105,6 +104,7 @@ input,select,textarea{font:inherit;color:inherit}
   }
   & .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   & .c{font-size:12px;color:var(--muted);background:rgba(0,0,0,.06);border-radius:12px;padding:1px 8px}
+  & .c.alert{background:var(--danger);color:#fff;font-weight:700}
   &.drop-target{outline:2px dashed var(--blue);background:var(--blue-soft)}
   &.dragging{opacity:.5}
   &.drop-before{box-shadow:0 -2px 0 var(--blue)}
@@ -114,12 +114,12 @@ input,select,textarea{font:inherit;color:inherit}
   & .n{font-weight:500}
 }
 .create-list{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;color:var(--blue);font-weight:500;border-radius:24px;margin-top:4px;
+  display:flex;align-items:center;gap:10px;padding:10px 12px;color:var(--blue);font-weight:500;border-radius:24px;margin-top:2px;
   &:hover{background:var(--blue-soft)}
 }
-.sidebar-divider{height:1px;background:var(--line-soft);margin:10px 4px}
+.sidebar-divider{height:1px;background:var(--line-soft);margin:5px 4px}
 .sidebar-label{font-size:12px;color:var(--muted);margin:2px 10px 6px;font-weight:500}
-.f-group{display:flex;align-items:center;gap:8px;margin:2px 0 12px;min-width:0}
+.f-group{display:flex;align-items:center;gap:8px;margin:1px 0 6px;min-width:0}
 .f-name{flex:none;font-size:12px;color:var(--muted);margin:0 0 0 10px;font-weight:500}
 .f-btns{
   display:flex;gap:6px;padding:0 10px 0 0;flex-wrap:wrap;flex:1;min-width:0;
@@ -145,6 +145,9 @@ input,select,textarea{font:inherit;color:inherit}
 .legal-row a{font-size:11px;color:var(--muted);text-decoration:none}
 .legal-row a:hover{color:var(--blue);text-decoration:underline}
 .legal-row span{font-size:11px;color:var(--muted)}
+.made-by{text-align:center;font-size:11px;color:var(--muted);padding:2px 0 0}
+.made-by a{color:var(--blue);text-decoration:none}
+.made-by a:hover{text-decoration:underline}
 .sidebar-foot .btn-ghost{font-size:12px;padding:8px 6px}
 .sidebar-foot .btn-ghost .material-icons-outlined{font-size:16px}
 .switch-row{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
@@ -243,7 +246,8 @@ input,select,textarea{font:inherit;color:inherit}
 .quote{
   flex:1 1 220px;display:flex;gap:8px;align-items:flex-start;background:var(--bg);border:1px dashed var(--line);border-radius:14px;padding:10px 14px;
   & .material-icons-outlined{color:var(--muted);flex:none}
-  & p{margin:2px 0;font-style:italic;color:var(--muted);font-size:14px}
+  & p{margin:2px 0;font-style:italic;color:var(--muted);font-size:14px;flex:1}
+  & #quoteRefresh{flex:none;align-self:center}
 }
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px}
 .stat{
@@ -337,7 +341,6 @@ input,select,textarea{font:inherit;color:inherit}
 /* Compact mobile topbar: give the search field room */
 @media (max-width:699px){
   .topbar{gap:4px;padding:0 4px}
-  .brand-slogan{display:none}
   .brand-name{font-size:17px}
   .search-wrap{height:38px}
   .topbar .icon-btn{width:36px;height:36px}
@@ -599,11 +602,10 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   border-radius:20px 20px 0 0;box-shadow:var(--shadow-lg);max-height:92dvh;display:flex;flex-direction:column;
   border-top:1px solid var(--line-soft);
   container-type:inline-size;container-name:detail;min-width:0;
-  &:not(.hidden){animation:detailIn .2s ease}
+  &:not(.hidden){animation:detailIn .3s cubic-bezier(.32,.72,0,1)}
 }
-/* 0.2s open animation. Overflow is clipped (clip, not hidden) on .app so the
-   slide cannot flash a horizontal scrollbar without breaking sticky panels. */
-@keyframes detailIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+/* Bottom sheet slides up from the screen edge (no fade — it is docked, not floating). */
+@keyframes detailIn{from{transform:translateY(100%)}to{transform:none}}
 @media (min-width:1024px){
   @keyframes detailIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 }
@@ -685,6 +687,11 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   & input{flex:1;border:0;outline:0;background:transparent;min-width:0}
 }
 .detail-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft)}
+.detail-foot-actions{display:flex;align-items:center;gap:8px;flex:none}
+.btn-soft{
+  background:var(--blue-soft);color:var(--blue);border-radius:20px;padding:10px 18px;font-weight:500;display:inline-flex;align-items:center;gap:6px;
+  &:hover{filter:brightness(.96)}
+}
 .btn-primary{
   background:var(--blue);color:#fff;border-radius:20px;padding:10px 18px;font-weight:500;display:inline-flex;align-items:center;gap:6px;
   &:hover{background:var(--blue-dark)}

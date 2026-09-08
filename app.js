@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788893890'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788897012'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -41,7 +41,7 @@ const WEIGHT_IDS = Object.keys(WEIGHTS), IMP_IDS = Object.keys(IMPORTANCE);
 function clampWeight(v) { return WEIGHT_IDS.includes(v) ? v : 'medium'; }
 function clampImp(v) { return IMP_IDS.includes(v) ? v : 'medium'; }
 const REMIND_OFFSETS = [1, 5, 30, 60, 180, 1440]; // minutes before due; '' = off
-const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
+const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__', NOTIF = '__notif__';
 
 let state = migrate(load() || seed());
 let ui = { completedOpen: false, boardDone: {}, sort: (typeof state !== 'undefined' && state.sort) || 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '', searchFromHome: false };
@@ -222,6 +222,7 @@ function isHome() { return state.activeView === HOME; }
 function isAll() { return state.activeView === ALL; }
 function isCal() { return state.activeView === CAL; }
 function isTime() { return state.activeView === TIME; }
+function isNotif() { return state.activeView === NOTIF; }
 function activeList() { return state.lists.find((l) => l.id === state.activeView) || null; }
 function fallbackList() { return state.lists[0] || null; }
 function listName(id) { const l = state.lists.find((x) => x.id === id); return l ? l.name : '(deleted)'; }
@@ -342,6 +343,7 @@ const SHORTCUTS = [
   { keys: ['g', 'then', 'b'], desc: 'Go to Board' },
   { keys: ['g', 'then', 'c'], desc: 'Go to Calendar' },
   { keys: ['g', 'then', 't'], desc: 'Go to Time tracker' },
+  { keys: ['g', 'then', 'n'], desc: 'Go to Notifications' },
   { keys: ['g', 'then', '1-9'], desc: 'Jump to list by position' },
   { keys: ['u'], desc: 'Show / hide completed tasks' },
   { keys: ['d'], desc: 'Toggle dark mode' },
@@ -383,6 +385,7 @@ function paletteCommands() {
     { icon: 'view_column', label: 'Go to Board', run: () => go(ALL) },
     { icon: 'calendar_month', label: 'Go to Calendar', run: () => go(CAL) },
     { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
+    { icon: 'notifications', label: 'Go to Notifications', run: () => { markNotifSeen(); go(NOTIF); } },
     { icon: 'add', label: 'New task', run: () => focusComposer() },
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
     { icon: 'dark_mode', label: 'Toggle dark mode', run: () => toggleTheme() },
@@ -508,6 +511,7 @@ function bindShortcuts() {
       if (gk === 'b') return go(ALL);
       if (gk === 'c') return go(CAL);
       if (gk === 't') return go(TIME);
+      if (gk === 'n') { markNotifSeen(); return go(NOTIF); }
       const n = parseInt(e.key, 10);
       if (n >= 1 && n <= 9 && state.lists[n - 1]) return go(state.lists[n - 1].id);
       return;
@@ -563,6 +567,13 @@ function renderNav() {
   $('#navAll').classList.toggle('active', isAll());
   $('#navCal').classList.toggle('active', isCal());
   $('#navTime').classList.toggle('active', isTime());
+  $('#navNotif').classList.toggle('active', isNotif());
+  const unread = unreadNotifCount();
+  const nc = $('#notifCount');
+  nc.textContent = unread || '';
+  nc.classList.toggle('alert', unread > 0);
+  nc.classList.toggle('hidden', !unread);
+  syncAppBadge(unread);
   const openAll = state.tasks.filter((t) => !t.done).length;
   $('#allCount').textContent = openAll;
   $('#allCountPill').textContent = openAll ? `${openAll} open` : 'All done';
@@ -1216,6 +1227,7 @@ function renderCurrentView() {
   $('#viewAll').classList.toggle('hidden', !isAll());
   $('#viewCal').classList.toggle('hidden', !isCal());
   $('#viewTime').classList.toggle('hidden', !isTime());
+  $('#viewNotif').classList.toggle('hidden', !isNotif());
   document.body.classList.toggle('view-board', isAll());
   document.body.classList.toggle('view-cal', isCal());
   document.body.classList.toggle('view-time', isTime());
@@ -1223,7 +1235,52 @@ function renderCurrentView() {
   else if (isAll()) renderBoard();
   else if (isCal()) renderCalendar();
   else if (isTime()) renderTime();
+  else if (isNotif()) renderNotif();
   else renderSingle();
+}
+
+/* ---------- notifications (fired calendar reminders) ----------
+   A reminder "fires" when its trigger time (due minus offset) has passed —
+   Google shows the popup/email, not us. This page lists those tasks so there
+   is one place to review and zero them. Opening the page marks everything
+   seen and clears the app-icon badge (Badging API, where supported). */
+const NOTIF_SEEN_KEY = 'doto-notif-seen';
+function firedReminders() {
+  const now = Date.now();
+  return state.tasks
+    .filter((t) => t && !t.done && typeof t.remindBefore === 'number' && dueTs(t) && triggerTs(t) <= now)
+    .sort((a, b) => triggerTs(b) - triggerTs(a));
+}
+function notifSeenAt() { try { return parseInt(localStorage.getItem(NOTIF_SEEN_KEY) || '0', 10) || 0; } catch { return 0; } }
+function unreadNotifCount() {
+  const seen = notifSeenAt();
+  return firedReminders().filter((t) => triggerTs(t) > seen).length;
+}
+let lastBadgeN = -1;
+function syncAppBadge(n) {
+  if (n === lastBadgeN) return;
+  lastBadgeN = n;
+  try {
+    if ('setAppBadge' in navigator) {
+      if (n > 0) navigator.setAppBadge(n).catch(() => {});
+      else if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
+    }
+  } catch {}
+}
+function markNotifSeen() {
+  try { localStorage.setItem(NOTIF_SEEN_KEY, String(Date.now())); } catch {}
+  lastBadgeN = -1;
+  try { if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {}); } catch {}
+}
+function renderNotif() {
+  const list = firedReminders();
+  const pill = $('#notifCountPill');
+  if (pill) pill.textContent = list.length ? `${list.length} fired` : 'None fired';
+  const ul = $('#notifList');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!list.length) { ul.innerHTML = '<li class="palette-empty">No fired reminders — set Details → Reminder on a task and it shows up here once its time passes.</li>'; return; }
+  list.forEach((t) => ul.appendChild(taskRow(t)));
 }
 
 /* ---------- daily quote + weather (Home) ---------- */
@@ -1253,9 +1310,17 @@ const QUOTES = [
   'A task with a date is a promise to yourself.',
   'Less but better.',
 ];
+let quoteIdx = null; // null = today's quote; refresh picks a random different one
 function renderQuote() {
   const el = $('#quoteText'); if (!el) return;
-  el.textContent = '“' + QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length] + '”';
+  if (quoteIdx === null) quoteIdx = Math.floor(Date.now() / 864e5) % QUOTES.length;
+  el.textContent = '“' + QUOTES[quoteIdx] + '”';
+}
+function refreshQuote() {
+  let n = quoteIdx;
+  while (n === quoteIdx) n = Math.floor(Math.random() * QUOTES.length);
+  quoteIdx = n;
+  renderQuote();
 }
 let weatherCache = null; // [args] | { fail: true, ts }
 function wmoInfo(code, isDay) {
@@ -2440,7 +2505,7 @@ async function importFiles(files, mode = 'auto') {
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
-  if (state.activeView !== HOME && state.activeView !== ALL && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
+  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && state.activeView !== NOTIF && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
   if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} colors` : ''));
   if (errors.length) toast('Import issue: ' + errors[0]);
@@ -2488,8 +2553,8 @@ function renderAll() {
    synced snapshot; both-sides-edited items resolve newest-wins. */
 const GOOGLE_CLIENT_ID = '1053076438888-73jt7847277sev0oq6eaesn4g63v91do.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT)
-const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly'];
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.app.created'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT; creating the dedicated "DoTo" calendar via calendars.insert needs calendar.app.created — without it everything falls back to the primary calendar)
+const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.app.created'];
 const CAL_SCOPE = CAL_SCOPES[0]; // legacy alias: calendar.events (kept for scope-string cleanup)
 function tokenScopeHasCal(scope) { return typeof scope === 'string' && CAL_SCOPES.every((s) => scope.indexOf(s) >= 0); }
 const SYNC_KEY = 'doto-sync';
@@ -2508,10 +2573,10 @@ function loadSyncMeta() {
       // (GIS does not reliably return granted scopes). Force one verified
       // re-consent instead of trusting the stored string forever.
       if (typeof m.calGranted !== 'boolean') out.calGranted = false;
-      // Tokens issued before calendar.calendarlist.readonly was requested
-      // (events-only) still 403 on calendarList.list even when calGranted is
-      // true — the events scope never covered listing calendars. Force one
-      // re-consent so the new scope is actually granted.
+      // Tokens issued before calendar.calendarlist.readonly / calendar.app.created
+      // were requested (events-only, or events+list) still 403 on calendarList.list
+      // or fall back to the primary calendar even when calGranted is true.
+      // Force one re-consent so the new scopes are actually granted.
       if (out.calGranted === true && out.token && !tokenScopeHasCal(out.token.scope)) out.calGranted = false;
       return out;
     }
@@ -3173,15 +3238,24 @@ async function ensureCalCalendar(mode) {
   // (covered by calendar.calendarlist.readonly), which is all we need.
   const list = await calFetch('/users/me/calendarList', {}, mode);
   const items = (list && list.items) || [];
-  if (s.calendarId) {
-    const stillThere = items.some((c) => c && c.id === s.calendarId && !c.deleted);
-    if (stillThere) return s.calendarId;
-    s.calendarId = '';
+  const oldId = s.calendarId || '';
+  const oldKind = s.kind || '';
+  if (oldId) {
+    const stillThere = items.some((c) => c && c.id === oldId && !c.deleted);
+    if (stillThere) {
+      // Dedicated DoTo calendar sticks. A stored primary calendar is only the
+      // old fallback from before calendar.app.created was requested — keep
+      // going below so it upgrades to a real DoTo calendar instead of
+      // staying on the user's main calendar forever.
+      if (oldKind !== 'primary') return oldId;
+    } else {
+      s.calendarId = '';
+    }
   }
   const hit = items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted && !c.hidden);
   const anyDoTo = hit || items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted);
   if (anyDoTo) {
-    s.calendarId = anyDoTo.id; s.kind = 'doto'; saveCalStore(s);
+    await adoptDoToCalendar(s, anyDoTo.id, oldId, mode);
     try { await ensureCalVisible(anyDoTo.id, mode); } catch {}
     return anyDoTo.id;
   }
@@ -3189,17 +3263,46 @@ async function ensureCalCalendar(mode) {
     const body = { summary: 'DoTo', description: 'Reminders from the DoTo task manager' };
     const tz = tzName(); if (tz) body.timeZone = tz;
     const created = await calFetch('/calendars', { method: 'POST', body: JSON.stringify(body) }, mode);
-    s.calendarId = created.id; s.kind = 'doto'; saveCalStore(s);
+    await adoptDoToCalendar(s, created.id, oldId, mode);
     try { await ensureCalVisible(created.id, mode); } catch {}
     return created.id;
   } catch (e) {
-    // calendar.events cannot create calendars — fall back to the user's primary calendar
+    // Creating a calendar needs calendar.app.created — without it (old token,
+    // scope unticked) fall back to the user's primary calendar. If we got here
+    // while holding a stale primary id, keep it to avoid churn.
+    if (oldId && oldKind === 'primary') {
+      const stillThere = items.some((c) => c && c.id === oldId && !c.deleted);
+      if (stillThere) { s.calendarId = oldId; s.kind = 'primary'; saveCalStore(s); return oldId; }
+    }
     const primary = items.find((c) => c && c.primary) || items[0];
     if (!primary) throw e;
     s.calendarId = primary.id; s.kind = 'primary'; saveCalStore(s);
     slog('info', 'Using your main Google Calendar (cannot create a DoTo calendar with current permission)');
     return primary.id;
   }
+}
+/* Switch the stored target to a dedicated DoTo calendar. Tasks whose events
+   still live in the old primary-fallback calendar are deleted there and their
+   ids cleared, so the next reconcile re-creates them in the DoTo calendar
+   instead of leaving orphans behind. */
+async function adoptDoToCalendar(s, newId, oldId, mode) {
+  const switching = !!oldId && oldId !== newId;
+  s.calendarId = newId; s.kind = 'doto'; saveCalStore(s);
+  if (!switching) return;
+  let moved = false;
+  try {
+    for (const t of state.tasks) {
+      if (!t || !t.calEventId) continue;
+      try {
+        await calFetch(`/calendars/${encodeURIComponent(oldId)}/events/${encodeURIComponent(t.calEventId)}`,
+          { method: 'DELETE' }, mode);
+      } catch (e) { if (!e || (e.status !== 404 && e.status !== 410)) throw e; }
+      t.calEventId = ''; t.calRev = '';
+      moved = true;
+    }
+  } catch {}
+  if (moved) { try { save(); renderAll(); } catch {} }
+  slog('info', 'Reminders moved to the “DoTo” Google calendar');
 }
 async function upsertCalEvent(t, mode) {
   const calId = await ensureCalCalendar(mode);
@@ -3671,16 +3774,17 @@ function bindSync() {
 /* Sidebar drag (touch): drag right starting in the left half to slide it in
    WITH the finger; drag left anywhere while open to slide it out. Release
    past ~35% to settle. Starts right of the system back-gesture strip (x>20)
-   and outside the board's horizontal scroller, task drag handles and text
-   fields, so nothing fights. Mobile drawer only. */
+   and outside task drag handles and text fields, so nothing fights. Board
+   view is included when its scroller sits at the left edge (nothing left to
+   reveal) — otherwise the board keeps the gesture. Mobile drawer only. */
 function bindEdgeSwipe() {
-  let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0, fadeT = 0;
+  let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0, fadeT = 0, boardEl = null;
   const sb = () => $('#sidebar');
   const sc = () => $('#scrim');
   const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim']
     .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
   const blocked = () => window.innerWidth >= 1024 || ui.detailId || overlays();
-  const reset = () => { sx = sy = null; active = false; mode = null; lastDx = 0; };
+  const reset = () => { sx = sy = null; active = false; mode = null; lastDx = 0; boardEl = null; };
   const field = (t) => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
   document.addEventListener('touchstart', (e) => {
     reset();
@@ -3689,7 +3793,15 @@ function bindEdgeSwipe() {
     const t = e.touches[0], open = sb().classList.contains('open');
     if (!open) {
       if (t.clientX < 20) return; // system back-gesture strip
-      if (t.target && t.target.closest && t.target.closest('#board,.drag')) return;
+      if (t.target && t.target.closest && t.target.closest('.drag')) return;
+      // Board view: a right-swipe on the board normally scrolls its columns.
+      // But when the board is already at its left edge there is nothing left
+      // to reveal — treat it like everywhere else and open the sidebar.
+      const b = t.target && t.target.closest ? t.target.closest('#board') : null;
+      if (b) {
+        if (b.scrollLeft > 8) return; // scrolled right: let the board consume it
+        boardEl = b;
+      }
       mode = 'open';
     } else {
       mode = 'close';
@@ -3698,6 +3810,8 @@ function bindEdgeSwipe() {
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (sx === null) return;
+    // board drifted right mid-gesture (e.g. momentum): hand it back to the board
+    if (boardEl && boardEl.scrollLeft > 8) { reset(); return; }
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
     if (!active) {
       if (mode === 'open' && (dx < -12 || Math.abs(dy) > Math.abs(dx) * 1.4)) { reset(); return; }
@@ -3708,6 +3822,8 @@ function bindEdgeSwipe() {
       sc().style.transition = 'none';
       sc().classList.remove('hidden');
     }
+    // swallow the board's overscroll stretch while the drawer follows the finger
+    if (boardEl && mode === 'open') { try { e.preventDefault(); } catch {} }
     if (mode === 'open') {
       lastDx = Math.min(Math.max(dx, 0), sbW);
       sb().style.transform = `translateX(${-sbW + lastDx}px)`;
@@ -3718,7 +3834,7 @@ function bindEdgeSwipe() {
       sb().style.transform = `translateX(${lastDx}px)`;
       sc().style.opacity = String(1 + lastDx / sbW);
     }
-  }, { passive: true });
+  }, { passive: false }); // non-passive: board-edge opens call preventDefault to stop overscroll stretch
   const settle = () => {
     if (sx === null && !active) return;
     const wb = sb(), wc = sc();
@@ -3850,6 +3966,7 @@ function bind() {
   $('#navAll').onclick = () => go(ALL);
   $('#navCal').onclick = () => go(CAL);
   $('#navTime').onclick = () => go(TIME);
+  $('#navNotif').onclick = () => { markNotifSeen(); go(NOTIF); };
   $('#timeSearch').oninput = (e) => { ui.timeQuery = e.target.value; renderTime(); };
   $('#timePlay').onclick = timePlay;
   $('#timePause').onclick = timePause;
@@ -3895,6 +4012,7 @@ function bind() {
   $('#homeBoardBtn').onclick = () => go(ALL);
   $('#homeCalBtn').onclick = () => go(CAL);
   $('#homeTimeBtn').onclick = () => go(TIME);
+  $('#quoteRefresh').onclick = refreshQuote;
 
   $('#createListBtn').onclick = createList;
   $('#renameListBtn').onclick = () => { $('#listMenu').classList.add('hidden'); renameList(state.activeView); };
@@ -4044,6 +4162,12 @@ function bind() {
   };
   $('#detailDelete').onclick = () => { if (ui.detailId) deleteTask(ui.detailId); };
   $('#dDoneToggle').onclick = () => { if (ui.detailId) toggleDone(ui.detailId); };
+  // Everything already autosaves on input; Save just closes and forces a push.
+  $('#dSaveBtn').onclick = () => {
+    closeDetail();
+    try { pushNow('popup').catch(() => {}); } catch {}
+    try { scheduleCalendarSync(); } catch {}
+  };
 
   // keyboard shortcuts + command palette
   bindShortcuts();
