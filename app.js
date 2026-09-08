@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788901361'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788904475'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -3803,6 +3803,7 @@ function bindSync() {
   });
   bindPullToRefresh();
   bindEdgeSwipe();
+  bindDetailSwipe();
   setInterval(() => { paintSync(); syncWatchdog(); }, 5000);
   setInterval(() => { maybeRefreshToken().catch(() => {}); }, 60000);
   paintSync();
@@ -3934,6 +3935,69 @@ function bindEdgeSwipe() {
     reset();
   });
 }
+/* Detail sheet drag (touch): slide down to close the bottom sheet. Only the
+   downward direction is claimed, and only while the sheet's own scroller sits
+   at the very top — otherwise the gesture belongs to content scrolling.
+   Starts in text fields are ignored so typing never dismisses. Mobile only. */
+function bindDetailSwipe() {
+  let sx = null, sy = null, active = false, lastDy = 0;
+  const panel = () => $('#detail');
+  const body = () => panel().querySelector('.detail-body');
+  const reset = () => { sx = sy = null; active = false; lastDy = 0; };
+  const field = (t) => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
+  const eligible = (t) => window.innerWidth < 1024 && ui.detailId && !panel().classList.contains('hidden')
+    && t && !field(t) && t.closest && t.closest('#detail');
+  document.addEventListener('touchstart', (e) => {
+    reset();
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (!eligible(e.target)) return;
+    sx = t.clientX; sy = t.clientY;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (sx === null) return;
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if (!active) {
+      if (dy < -10 || Math.abs(dx) > Math.abs(dy) * 1.4) { reset(); return; } // content scroll / horizontal
+      if (dy < 24) return;
+      const b = body();
+      if (b && b.scrollTop > 0) { reset(); return; } // scrolled content owns the gesture
+      active = true;
+      panel().style.transition = 'none';
+    }
+    if (active) {
+      lastDy = Math.max(dy, 0);
+      panel().style.transform = `translateY(${lastDy}px)`;
+      try { e.preventDefault(); } catch {} // don't rubber-band the content mid-drag
+    }
+  }, { passive: false });
+  const settle = () => {
+    if (sx === null && !active) return;
+    const d = panel();
+    if (!active) { reset(); return; }
+    if (lastDy > 120) {
+      // fling shut: glide off the bottom edge, then unmount
+      d.style.transition = 'transform .18s ease';
+      d.style.transform = 'translateY(100%)';
+      const done = ui.detailId;
+      setTimeout(() => {
+        if (ui.detailId === done) closeDetail();
+        d.style.transition = ''; d.style.transform = '';
+      }, 190);
+    } else {
+      // snap back open
+      d.style.transition = 'transform .18s ease';
+      d.style.transform = '';
+      setTimeout(() => { d.style.transition = ''; }, 200);
+    }
+    reset();
+  };
+  document.addEventListener('touchend', settle);
+  document.addEventListener('touchcancel', () => {
+    panel().style.transition = ''; panel().style.transform = '';
+    reset();
+  });
+}
 function bindPullToRefresh() {  const ptr = document.createElement('div');
   ptr.id = 'ptrSync'; ptr.className = 'ptr-sync hidden';
   ptr.innerHTML = '<span class="material-icons-outlined">sync</span><span>Pull to sync</span>';
@@ -3973,17 +4037,43 @@ function bindPullToRefresh() {  const ptr = document.createElement('div');
   document.addEventListener('touchcancel', reset);
 }
 
-function setTheme(dark) {
+const THEME_KEY = 'doto-theme';
+function prefersDark() { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+function explicitTheme() { // 'dark' | 'light' | null (null = follow the OS)
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return (v === 'dark' || v === 'light') ? v : null;
+  } catch { return null; }
+}
+function setTheme(dark, persist) {
   document.body.classList.toggle('dark', !!dark);
   const t = $('#darkModeToggle');
   if (t && document.activeElement !== t) t.checked = !!dark;
-  try { localStorage.setItem('doto-theme', dark ? 'dark' : 'light'); } catch {}
+  // 'auto' = follow the OS. Only an explicit toggle stores dark/light;
+  // every other path (startup, OS change, other tabs) keeps auto.
+  try { localStorage.setItem(THEME_KEY, persist ? (dark ? 'dark' : 'light') : 'auto'); } catch {}
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#131314' : '#1a73e8');
   const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (apple) apple.setAttribute('content', 'black-translucent');
 }
-function toggleTheme() { setTheme(!document.body.classList.contains('dark')); }
+function applySystemTheme() {
+  // explicit pick wins; otherwise track the OS live
+  if (explicitTheme()) setTheme(explicitTheme() === 'dark');
+  else setTheme(prefersDark(), false);
+}
+let systemThemeWatch = null;
+function watchSystemTheme() {
+  if (!window.matchMedia) return;
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = () => {
+    if (!explicitTheme()) setTheme(prefersDark(), false);
+  };
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
+  systemThemeWatch = mq;
+}
+function toggleTheme() { setTheme(!document.body.classList.contains('dark'), true); }
 
 function bind() {
   $('#menuBtn').onclick = () => {
@@ -4086,11 +4176,10 @@ function bind() {
   });
 
   try {
-    const saved = localStorage.getItem('doto-theme');
-    if (saved === 'dark' || saved === 'light') setTheme(saved === 'dark');
-    else setTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    applySystemTheme(); // follows the OS unless an explicit pick is stored
   } catch { setTheme(false); }
-  $('#darkModeToggle').onchange = (e) => setTheme(e.target.checked);
+  watchSystemTheme();
+  $('#darkModeToggle').onchange = (e) => setTheme(e.target.checked, true);
 
   // import / export (now inside the Sync & Settings dialog)
   $('#exportBtn2').onclick = exportJSON;
@@ -4243,7 +4332,12 @@ window.addEventListener('storage', (e) => {
       renderAll();
     } catch {}
   }
-  if (e.key === 'doto-theme' && e.newValue) setTheme(e.newValue === 'dark');
+  if (e.key === THEME_KEY) {
+    // another tab changed the theme: explicit picks apply directly, otherwise
+    // fall back to whatever this device's OS currently says
+    if (e.newValue === 'dark' || e.newValue === 'light') setTheme(e.newValue === 'dark');
+    else setTheme(prefersDark(), false);
+  }
 });
 
 document.addEventListener('keydown', (e) => {

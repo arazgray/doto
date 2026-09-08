@@ -116,6 +116,7 @@ input,select,textarea{font:inherit;color:inherit}
   &:hover{background:var(--blue-soft)}
 }
 .sidebar-divider{height:1px;background:var(--line-soft);margin:5px 4px;border:0;align-self:stretch}
+.sidebar-filters{margin-top:7px}
 .sidebar-label{font-size:12px;color:var(--muted);margin:2px 10px 6px;font-weight:500}
 .f-group{display:flex;align-items:center;gap:8px;margin:1px 0 6px;min-width:0}
 .f-name{flex:none;font-size:12px;color:var(--muted);margin:0 0 0 10px;font-weight:500}
@@ -139,7 +140,7 @@ input,select,textarea{font:inherit;color:inherit}
 }
 .sidebar-foot{margin-top:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .sidebar-foot .io-row{gap:6px}
-.legal-row{display:flex;align-items:center;justify-content:center;gap:6px;padding:2px 0 0}
+.legal-row{display:flex;align-items:center;justify-content:flex-start;gap:6px;padding:2px 0 0}
 .legal-row a{font-size:11px;color:var(--muted);text-decoration:none}
 .legal-row a:hover{color:var(--blue);text-decoration:underline}
 .legal-row span{font-size:11px;color:var(--muted)}
@@ -411,8 +412,12 @@ input.task-title{cursor:text}
   &[aria-expanded="false"] .chev{transform:rotate(-90deg)}
 }
 
-/* Board (All view) — uses the full available width AND height */
-body.view-board{overflow-y:hidden}
+/* Board (All view) — uses the full available width AND height.
+   overflow-y:clip (NOT hidden): hidden turns body into a scroll container,
+   which corrupts the sticky desktop sidebar's position when arriving from a
+   scrolled page (+18px gap at its top). clip locks window scrolling without
+   creating a scroll container, so sticky keeps working. */
+body.view-board{overflow-y:clip}
 body.view-board{
   & .main{max-width:none;display:flex;flex-direction:column;min-height:calc(100dvh - var(--topbar-h) - 28px);padding-bottom:16px}
   & #viewAll{flex:1;display:flex;flex-direction:column;min-height:0}
