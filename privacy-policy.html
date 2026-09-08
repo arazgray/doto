@@ -56,7 +56,7 @@ td:last-child{white-space:normal}
 
   <h2>3. Google Drive sync (optional)</h2>
   <ul>
-    <li>Only if you sign in with Google: the app requests three scopes — <code>drive.appdata</code> (hidden app folder), <code>userinfo.email</code> (display only), and <code>calendar.events</code> (reminders).</li>
+    <li>Only if you sign in with Google: the app requests four scopes — <code>drive.appdata</code> (hidden app folder), <code>userinfo.email</code> (display only), <code>calendar.events</code> (create/edit reminder events) and <code>calendar.calendarlist.readonly</code> (find the target calendar — <code>calendar.events</code> alone cannot list calendars).</li>
     <li>A copy of your lists/tasks is stored in your own Drive's hidden app folder (<code>doto-state.json</code>). Sync traffic goes directly between your browser and Google's APIs; no intermediary server is involved.</li>
     <li>Access tokens live about an hour in your browser only. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
   </ul>

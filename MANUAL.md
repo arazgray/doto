@@ -198,10 +198,14 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
 2. **APIs & Services → Library**: find and **Enable** the **Google Drive API**
    and the **Google Calendar API** (one sign-in covers sync + reminders).
 3. **APIs & Services → OAuth consent screen**: choose External, fill in app
-   name + support email, and add these three scopes:
+   name + support email, and add these four scopes:
    - `https://www.googleapis.com/auth/drive.appdata`
    - `https://www.googleapis.com/auth/userinfo.email`
    - `https://www.googleapis.com/auth/calendar.events`
+   - `https://www.googleapis.com/auth/calendar.calendarlist.readonly`
+     (`calendar.events` alone cannot call `calendarList.list` — without the
+     readonly list scope every calendar lookup answers 403
+     `ACCESS_TOKEN_SCOPE_INSUFFICIENT`.)
    - Under Test users, add your Gmail address. New projects start in Testing
      mode — only listed users can sign in, and sign-in expires about weekly.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →

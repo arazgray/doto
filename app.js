@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788883091'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788893890'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2488,8 +2488,10 @@ function renderAll() {
    synced snapshot; both-sides-edited items resolve newest-wins. */
 const GOOGLE_CLIENT_ID = '1053076438888-73jt7847277sev0oq6eaesn4g63v91do.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events'; // one sign-in covers Drive sync + Calendar reminders
-const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT)
+const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly'];
+const CAL_SCOPE = CAL_SCOPES[0]; // legacy alias: calendar.events (kept for scope-string cleanup)
+function tokenScopeHasCal(scope) { return typeof scope === 'string' && CAL_SCOPES.every((s) => scope.indexOf(s) >= 0); }
 const SYNC_KEY = 'doto-sync';
 const CLIENT_KEY = 'doto-google-client-id';
 
@@ -2506,6 +2508,11 @@ function loadSyncMeta() {
       // (GIS does not reliably return granted scopes). Force one verified
       // re-consent instead of trusting the stored string forever.
       if (typeof m.calGranted !== 'boolean') out.calGranted = false;
+      // Tokens issued before calendar.calendarlist.readonly was requested
+      // (events-only) still 403 on calendarList.list even when calGranted is
+      // true — the events scope never covered listing calendars. Force one
+      // re-consent so the new scope is actually granted.
+      if (out.calGranted === true && out.token && !tokenScopeHasCal(out.token.scope)) out.calGranted = false;
       return out;
     }
   } catch {}
@@ -2703,7 +2710,7 @@ async function ensureToken(mode, needCal) {
   // GIS rarely echoes granted scopes: optimistically trust a fresh popup,
   // then verify on the first real Calendar call (failure clears it again).
   if (mode === 'popup') {
-    syncMeta.calGranted = tok.scope ? tok.scope.indexOf('calendar.events') >= 0 : true;
+    syncMeta.calGranted = tok.scope ? tokenScopeHasCal(tok.scope) : true;
   }
   saveSyncMeta();
   fetchEmail().catch(() => {});
@@ -2715,7 +2722,7 @@ function tokenHasCal() {
   if (syncMeta.calGranted === true) return true;
   if (syncMeta.calGranted === false) return false;
   const t = syncMeta.token;
-  return !!(t && t.access_token && typeof t.scope === 'string' && t.scope.indexOf('calendar.events') >= 0);
+  return !!(t && t.access_token && tokenScopeHasCal(t.scope));
 }
 async function fetchEmail() {
   if (!syncMeta.token) return;
@@ -3149,18 +3156,28 @@ async function ensureCalVisible(calId, mode) {
   try {
     await calFetch(path, { method: 'PATCH', body }, mode);
   } catch (e) {
+    // 403 here just means the token is read-only for the calendar list
+    // (we only request calendarlist.readonly) — visibility is best-effort.
+    if (!e || e.status === 403) return;
     if (!e || e.status !== 404) throw e;
-    await calFetch('/users/me/calendarList', { method: 'POST', body: JSON.stringify({ id: calId, selected: true, hidden: false, defaultReminders: [] }) }, mode);
+    try {
+      await calFetch('/users/me/calendarList', { method: 'POST', body: JSON.stringify({ id: calId, selected: true, hidden: false, defaultReminders: [] }) }, mode);
+    } catch (e2) { if (!e2 || e2.status === 403) return; throw e2; }
   }
 }
 async function ensureCalCalendar(mode) {
   const s = calStore();
-  if (s.calendarId) {
-    try { await calFetch('/calendars/' + encodeURIComponent(s.calendarId), {}, mode); return s.calendarId; }
-    catch (e) { if (!e || (e.status !== 404 && e.status !== 403)) throw e; s.calendarId = ''; }
-  }
+  // NOTE: no GET /calendars/{id} check here on purpose — that endpoint needs
+  // the calendar.calendars.readonly scope, which we deliberately do not
+  // request. The stored id is validated against calendarList.list instead
+  // (covered by calendar.calendarlist.readonly), which is all we need.
   const list = await calFetch('/users/me/calendarList', {}, mode);
   const items = (list && list.items) || [];
+  if (s.calendarId) {
+    const stillThere = items.some((c) => c && c.id === s.calendarId && !c.deleted);
+    if (stillThere) return s.calendarId;
+    s.calendarId = '';
+  }
   const hit = items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted && !c.hidden);
   const anyDoTo = hit || items.find((c) => c && (c.summary === 'DoTo' || c.summaryOverride === 'DoTo') && !c.deleted);
   if (anyDoTo) {
@@ -3283,7 +3300,11 @@ function handleCalError(e, mode) {
     // Stored token is Drive-only in reality: force one consent popup next time
     // instead of silently reusing it forever (the old "nothing happens" loop).
     syncMeta.calGranted = false;
-    if (syncMeta.token) syncMeta.token.scope = String(syncMeta.token.scope || '').replace(CAL_SCOPE, '').trim();
+    if (syncMeta.token) {
+      let sc = String(syncMeta.token.scope || '');
+      for (const s of CAL_SCOPES) sc = sc.split(s).join(' ');
+      syncMeta.token.scope = sc.replace(/\s+/g, ' ').trim();
+    }
     saveSyncMeta();
   }
   lastCalError = msg + (detail && msg.indexOf('failed') >= 0 ? ' ' + detail.slice(0, 80) : '');
