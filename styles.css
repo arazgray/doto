@@ -141,6 +141,10 @@ input,select,textarea{font:inherit;color:inherit}
 }
 .sidebar-foot{margin-top:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .sidebar-foot .io-row{gap:6px}
+.legal-row{display:flex;align-items:center;justify-content:center;gap:6px;padding:2px 0 0}
+.legal-row a{font-size:11px;color:var(--muted);text-decoration:none}
+.legal-row a:hover{color:var(--blue);text-decoration:underline}
+.legal-row span{font-size:11px;color:var(--muted)}
 .sidebar-foot .btn-ghost{font-size:12px;padding:8px 6px}
 .sidebar-foot .btn-ghost .material-icons-outlined{font-size:16px}
 .switch-row{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}

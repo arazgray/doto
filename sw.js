@@ -1,13 +1,15 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v7';
+const CACHE = 'doto-v8';
 const CORE = [
   './',
   'index.html',
   'styles.css',
   'app.js',
   'manual.html',
+  'terms-of-services.html',
+  'privacy-policy.html',
   'MANUAL.md',
   'assets/manifest.webmanifest',
   'assets/fonts.css',

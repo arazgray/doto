@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>DoTo — Privacy Policy</title>
+<meta name="description" content="DoTo privacy policy: what data stays in your browser, what goes to Google when you enable sync, and what never leaves your device." />
+<meta name="theme-color" content="#1a73e8" />
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+<link rel="apple-touch-icon" href="assets/icon-180.png" />
+<style>
+:root{color-scheme:light;--blue:#1a73e8;--bg:#fff;--bg2:#f6f8fc;--text:#202124;--muted:#5f6368;--line-soft:#e6eaf0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,"Segoe UI",Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.6}
+header.top{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line-soft);padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:10}
+header.top a.back{color:var(--blue);text-decoration:none;font-weight:500}
+article{max-width:760px;margin:0 auto;padding:24px 18px 80px}
+h1{font-size:28px;margin:.4em 0}
+h2{font-size:19px;margin:1.6em 0 .4em;padding-top:.4em;border-top:1px solid var(--line-soft)}
+p,li{font-size:15px}
+ul{padding-left:22px}
+li{margin:.3em 0}
+.muted{color:var(--muted)}
+a{color:var(--blue)}
+code{font-family:Consolas,monospace;font-size:.88em;background:var(--bg2);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px}
+table{width:100%;border-collapse:collapse;margin:1em 0;font-size:14px;display:block;overflow-x:auto}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+th{color:var(--muted);font-weight:500}
+td:last-child{white-space:normal}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="./">← DoTo app</a>
+</header>
+<article>
+  <h1>Privacy Policy</h1>
+  <p class="muted">Last updated: September 8, 2026. Short version: DoTo has no server and collects nothing. Your data stays in your browser unless you turn on Google Drive sync or Google Calendar reminders, which talk directly to Google.</p>
+
+  <h2>1. Data DoTo itself collects</h2>
+  <p>None. There is no analytics, no tracking, no crash reporting, no advertising, and no DoTo account. The authors of DoTo cannot see your tasks because they never leave your device except as described below.</p>
+
+  <h2>2. Data stored in your browser</h2>
+  <p>Everything the app needs is kept in your browser's <code>localStorage</code> on your own device:</p>
+  <table>
+    <thead><tr><th>Key</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td><code>doto-v1</code></td><td>Lists, tasks, subtasks, time records, view, filters, color labels, your name, panel sizes</td></tr>
+      <tr><td><code>doto-sync</code></td><td>Google sync metadata: your email, access token, Drive file id, last-synced snapshot</td></tr>
+      <tr><td><code>doto-sync-log</code></td><td>Recent sync history (last ~50 events, kept for diagnostics)</td></tr>
+      <tr><td><code>doto-cal</code>, <code>doto-cal-queue</code></td><td>Linked Google Calendar id and pending calendar deletions</td></tr>
+      <tr><td><code>doto-theme</code>, <code>doto-loc</code></td><td>Theme choice; weather location (7-day cache)</td></tr>
+    </tbody>
+  </table>
+  <p>Clearing your browser's site data deletes all of this. Export a JSON backup first (Sync dialog → Export) if it matters to you.</p>
+
+  <h2>3. Google Drive sync (optional)</h2>
+  <ul>
+    <li>Only if you sign in with Google: the app requests three scopes — <code>drive.appdata</code> (hidden app folder), <code>userinfo.email</code> (display only), and <code>calendar.events</code> (reminders).</li>
+    <li>A copy of your lists/tasks is stored in your own Drive's hidden app folder (<code>doto-state.json</code>). Sync traffic goes directly between your browser and Google's APIs; no intermediary server is involved.</li>
+    <li>Access tokens live about an hour in your browser only. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
+  </ul>
+
+  <h2>4. Google Calendar reminders (optional)</h2>
+  <ul>
+    <li>Only tasks where you set Details → Reminder create events, in a "DoTo" calendar in your Google account (or your main calendar if creation isn't permitted).</li>
+    <li>Events contain the task title, notes, list name, due time and popup/email offsets. Completing, deleting or un-setting the reminder deletes the event.</li>
+  </ul>
+
+  <h2>5. Weather card (Home view)</h2>
+  <ul>
+    <li>The weather card fetches forecasts from Open-Meteo and resolves location via the browser geolocation API with BigDataCloud/ipapi.co fallback. This is the only non-Google network traffic the app makes, and only for that card.</li>
+    <li>Location is cached for 7 days (<code>doto-loc</code>) and never sent anywhere except those weather providers.</li>
+  </ul>
+
+  <h2>6. What never happens</h2>
+  <ul>
+    <li>No sale, rental or sharing of personal data — there is nothing to share.</li>
+    <li>No cross-site tracking. Fonts and icons ship with the app and load offline.</li>
+    <li>No children's-data collection beyond what any user types into their own tasks.</li>
+  </ul>
+
+  <h2>7. Your control</h2>
+  <ul>
+    <li>Work fully offline and never sign in — nothing leaves the device at all.</li>
+    <li>Export or delete your data any time (Sync dialog → Export; clearing site data removes everything).</li>
+    <li>Revoke Google access any time in your Google account security settings; already-created calendar events stay in your calendar until you delete them.</li>
+  </ul>
+
+  <h2>8. Changes and contact</h2>
+  <p>This policy may be updated; the date above will change. Questions: open an issue at <a href="https://github.com/arazgray/doto/issues">github.com/arazgray/doto/issues</a>. Also see the <a href="terms-of-services.html">Terms of Service</a> and the in-app <a href="manual.html">Manual</a>.</p>
+</article>
+</body>
+</html>

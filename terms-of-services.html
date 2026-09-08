@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>DoTo — Terms of Service</title>
+<meta name="description" content="DoTo terms of service: what the app is, acceptable use, third-party services, liability and changes." />
+<meta name="theme-color" content="#1a73e8" />
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+<link rel="apple-touch-icon" href="assets/icon-180.png" />
+<style>
+:root{color-scheme:light;--blue:#1a73e8;--bg:#fff;--bg2:#f6f8fc;--text:#202124;--muted:#5f6368;--line-soft:#e6eaf0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,"Segoe UI",Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.6}
+header.top{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line-soft);padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:10}
+header.top a.back{color:var(--blue);text-decoration:none;font-weight:500}
+article{max-width:760px;margin:0 auto;padding:24px 18px 80px}
+h1{font-size:28px;margin:.4em 0}
+h2{font-size:19px;margin:1.6em 0 .4em;padding-top:.4em;border-top:1px solid var(--line-soft)}
+p,li{font-size:15px}
+ul{padding-left:22px}
+li{margin:.3em 0}
+.muted{color:var(--muted)}
+a{color:var(--blue)}
+code{font-family:Consolas,monospace;font-size:.88em;background:var(--bg2);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="./">← DoTo app</a>
+</header>
+<article>
+  <h1>Terms of Service</h1>
+  <p class="muted">Last updated: September 8, 2026. DoTo ("the app") is a free, open-source task manager at <a href="https://arazgray.github.io/doto/">arazgray.github.io/doto</a>. By using it, you agree to these terms.</p>
+
+  <h2>1. What DoTo is</h2>
+  <ul>
+    <li>DoTo is a static, local-first web app. There is no DoTo server, no DoTo account, and no DoTo backend storing your data.</li>
+    <li>Your lists, tasks, time records, settings and panel sizes live in your own browser (<code>localStorage</code>).</li>
+    <li>Optional Google Drive sync and Google Calendar reminders move data only between your browser and your own Google account. DoTo's authors never see, store, or process your data.</li>
+    <li>The app is provided as-is under the MIT License (see <code>LICENSE</code> in the repository), without warranties of any kind.</li>
+  </ul>
+
+  <h2>2. Acceptable use</h2>
+  <ul>
+    <li>Use DoTo only for lawful purposes. Do not use it to store or transmit content that is illegal, infringes others' rights, or contains malware.</li>
+    <li>You are responsible for the content you enter (tasks, notes, references, subtasks) and for keeping your own backups via Sync dialog → Export.</li>
+    <li>Do not attempt to disrupt the hosted copy of the app or misrepresent it as someone else's product.</li>
+  </ul>
+
+  <h2>3. Third-party services</h2>
+  <ul>
+    <li>Google sign-in, Drive sync and Calendar reminders are provided by Google under Google's own terms and privacy policy. Enabling them is optional; the app works fully offline without them.</li>
+    <li>Google login tokens last about an hour and are kept only in your browser. Revoking access in your Google account immediately stops sync and reminders.</li>
+    <li>The Home weather card uses Open-Meteo, BigDataCloud and ipapi.co for location fallback. Their terms apply when that card loads.</li>
+  </ul>
+
+  <h2>4. Availability and changes</h2>
+  <ul>
+    <li>The hosted copy is a best-effort static site (GitHub Pages). It may be unavailable during hosting outages or while an update rolls out.</li>
+    <li>Features may change between versions. Installed (PWA) copies update when you open the app with internet; the sidebar Update button forces the newest version.</li>
+    <li>These terms may be updated; the "Last updated" date above will change. Continued use after an update means you accept the new terms.</li>
+  </ul>
+
+  <h2>5. Liability</h2>
+  <ul>
+    <li>To the maximum extent permitted by law, DoTo's authors are not liable for any loss of data, loss of profits, or indirect damages arising from use of the app — including data lost by clearing browser storage without an export or sync copy.</li>
+    <li>Your sole remedy if you disagree with these terms is to stop using the app and delete its browser data.</li>
+  </ul>
+
+  <h2>6. Contact</h2>
+  <p>Questions or reports: open an issue at <a href="https://github.com/arazgray/doto/issues">github.com/arazgray/doto/issues</a>. Also see the <a href="privacy-policy.html">Privacy Policy</a> and the in-app <a href="manual.html">Manual</a>.</p>
+</article>
+</body>
+</html>
