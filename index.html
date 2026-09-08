@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788897012" />
-<link rel="stylesheet" href="styles.css?v=1.0-1788897012" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1788898579" />
+<link rel="stylesheet" href="styles.css?v=1.0-1788898579" />
 </head>
 <body>
 <header class="topbar">
@@ -53,11 +53,10 @@
   <aside id="sidebar" class="sidebar" aria-label="Task lists">
     <div class="sidebar-scroll">
       <nav class="list-nav" aria-label="Views">
-        <button id="navHome" class="list-item view-item"><span class="material-icons-outlined">home</span><span class="n">Home</span></button>
+        <button id="navHome" class="list-item view-item"><span class="material-icons-outlined">home</span><span class="n">Home</span><span class="c hidden" id="notifCount"></span></button>
         <button id="navAll" class="list-item view-item"><span class="material-icons-outlined">view_column</span><span class="n">Board</span><span class="c" id="allCount"></span></button>
         <button id="navCal" class="list-item view-item"><span class="material-icons-outlined">calendar_month</span><span class="n">Calendar</span><span class="c" id="calCount"></span></button>
         <button id="navTime" class="list-item view-item"><span class="material-icons-outlined">timer</span><span class="n">Time</span><span class="c" id="timeCount"></span></button>
-        <button id="navNotif" class="list-item view-item"><span class="material-icons-outlined">notifications</span><span class="n">Notifications</span><span class="c hidden" id="notifCount"></span></button>
       </nav>
       <div class="sidebar-head">
         <span>Lists</span>
@@ -65,6 +64,9 @@
       <nav id="listNav" class="list-nav" aria-label="Lists"></nav>
       <button id="createListBtn" class="create-list"><span class="material-icons-outlined">add</span> Create new list</button>
       <div class="sidebar-divider"></div>
+      <div class="sidebar-head filters-head">
+        <span>Filters</span>
+      </div>
       <div class="sidebar-filters">
         <div class="f-group"><span class="f-name">Color</span><div id="filterColorBtns" class="f-btns colors"></div></div>
         <div class="f-group"><span class="f-name">Weight</span><div id="filterWeightBtns" class="f-btns"></div></div>
@@ -82,8 +84,9 @@
           <a href="terms-of-services.html" target="_blank" rel="noopener">Terms</a>
           <span aria-hidden="true">·</span>
           <a href="privacy-policy.html" target="_blank" rel="noopener">Privacy</a>
+          <span aria-hidden="true">·</span>
+          <span class="made-by">Made by <a href="https://arazgray.com" target="_blank" rel="noopener">Araz Gray</a></span>
         </div>
-        <div class="made-by">Made by <a href="https://arazgray.com" target="_blank" rel="noopener">Araz Gray</a></div>
       </div>
     </div>
     <div id="sideResizer" class="resizer resizer-side" title="Drag to resize lists panel"></div>
@@ -115,6 +118,7 @@
       </div>
       <div id="homeStats" class="stat-grid"></div>
       <div class="chips" data-chips></div>
+      <section id="notifCard" class="card hidden"><h2><span class="material-icons-outlined danger">notifications</span> Notifications <span id="notifCountPill" class="count-pill"></span></h2><ul id="notifList" class="task-list"></ul></section>
       <div class="home-grid">
         <section class="card"><h2><span class="material-icons-outlined danger">warning</span> Overdue</h2><ul id="homeOverdue" class="task-list"></ul></section>
         <section class="card"><h2><span class="material-icons-outlined blue">today</span> Today's tasks</h2><ul id="homeToday" class="task-list"></ul></section>
@@ -266,16 +270,6 @@
           <p class="muted small time-hint">Play starts, pause holds, stop saves the record.</p>
         </section>
       </div>
-    </section>
-
-    <!-- NOTIFICATIONS VIEW (fired reminders) -->
-    <section id="viewNotif" class="view hidden">
-      <div class="list-header">
-        <div><h1>Notifications</h1><p class="muted small board-hint">Reminders whose time has passed — opening this page marks them read and clears the app badge.</p></div>
-        <span id="notifCountPill" class="count-pill"></span>
-      </div>
-      <div class="chips" data-chips></div>
-      <ul id="notifList" class="task-list"></ul>
     </section>
   </main>
 
@@ -510,6 +504,6 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1788897012"></script>
+<script src="app.js?v=1.0-1788898579"></script>
 </body>
 </html>

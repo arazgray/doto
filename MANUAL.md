@@ -27,7 +27,8 @@
 1. Open <https://arazgray.github.io/doto/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar — or on touch screens,
-   drag right from anywhere on the page (except the Board) — then **Create new list** for your own categories.
+   drag right starting in the left half (this also works in Board view when
+   the columns are scrolled fully left) — then **Create new list** for your own categories.
 4. Type in the **Add a task** bar and press Enter. Done — that is 90% of the app.
 
 Everything is saved automatically in your browser as you type.
@@ -72,20 +73,20 @@ How it works and what to expect:
 
 | View | What it is for |
 | ---- | -------------- |
-| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote, and sections: Overdue, Today's tasks, Most important first, Heavy lifting. |
+| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote (tap refresh for a new one), a Notifications section for fired reminders, and sections: Overdue, Today's tasks, Most important first, Heavy lifting. The Home sidebar row carries a red badge counting unseen notifications — tapping Home marks them read. |
 | **List** | One category at a time: add bar with quick presets, open tasks, collapsible Completed section. |
 | **Board** | Kanban columns — one per list. Drag tasks between columns, add per column, reorder columns by their grip. |
 | **Calendar** | Month grid with task chips, a Year overview with busy dots, and a day agenda with its own add box. Drag a task onto a day to reschedule it. |
 | **Time** | Stopwatch per task (play / pause / stop). The timer survives reloads. |
 
-Switch views from the sidebar, or press `g` then `h` / `b` / `c` / `t`.
+Switch views from the sidebar, the command palette, or press `g` then `h` / `b` / `c` / `t`.
 
 ## Tasks
 
 - **Create**: the add bar (or per-column / agenda boxes), the Home **New**
   button, the `n` key, or the command palette (`Ctrl+K`).
 - **Complete**: the circle on the row, or select it and press `x`. Deleted or completed-by-mistake items can be undone from the toast popup.
-- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, color, weight, importance, external reference (URL or ticket number), list assignment and subtasks.
+- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, color, weight, importance, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
 - **Rename inline**: double-click the title.
 - **Color**: tap the color dot on the row. Colors carry your own labels, and
   you can add fully custom colors too (Sync & Settings → Color labels, e.g.
@@ -107,10 +108,16 @@ Open Details → Reminder and pick how far in advance: 1 or 5 or 30 minutes,
 to count back from.
 
 Sign in with Google (the same **Sign in** as sync) and reminders run in the
-background — no extra Calendar setup. The event updates when you edit the
+background — no extra Calendar setup. The app keeps a dedicated **"DoTo"**
+Google calendar for them (created automatically; if your reminders previously
+fell back to your main calendar, one Sync now moves them over). The event updates when you edit the
 task and disappears when you complete or delete the task, or switch the
 reminder off. Moving the due date moves the reminder with it, and
 completing a repeating task carries the reminder to the next occurrence.
+
+Once a reminder's time passes it also shows up in the **Notifications**
+section on Home — the Home sidebar row carries a red unread badge, and
+tapping Home marks everything read and clears the app-icon badge.
 
 ## Search, filters and sorting
 
@@ -228,7 +235,7 @@ there is still no DoTo server involved.
 
 ## Data and privacy
 
-- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, color labels, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
+- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, color labels, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), notification read state (`doto-notif-seen`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
 - If a save ever fails validation (corrupted data), the app keeps a timestamped backup copy in your browser and starts fresh instead of breaking.
 - The network requests the app itself makes: Google Identity Services + Drive API (only when you use sync), and the Home weather card (Open-Meteo, BigDataCloud, ipapi.co for location fallback). Fonts and icons ship with the app and work offline. Nothing else ever leaves your device.
 

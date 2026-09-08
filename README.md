@@ -33,7 +33,7 @@
 <tr><td>Price</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Free, no account needed</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (Google account)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (MS account)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$48/yr Pro)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$60/yr Premium)</td></tr>
 <tr><td>Offline</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Excellent (local-first PWA)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ OK</td></tr>
 <tr><td>Priorities</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Weight × importance × color, all filterable</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Starred only</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Important / My Day</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 P1–P4 + labels</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Priority + tags</td></tr>
-<tr><td>Views</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Home digest, list, board, calendar, time tracker</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar, moments</td></tr>
+<tr><td>Views</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Home digest (with notifications inbox), list, board, calendar, time tracker</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar, moments</td></tr>
 <tr><td>Time tracking</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Built-in stopwatch + history</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td></tr>
 <tr><td>Privacy</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Best: local by default</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Google-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ MS-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td></tr>
 <tr><td>Open source</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Yes (MIT)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td></tr>
@@ -45,7 +45,7 @@
 <tr><td>Platforms</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Any browser (PWA install)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Web, Android, iOS</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Web, Win, Mac, Android, iOS</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Everything + wearables</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Web, Android, iOS, Mac</td></tr>
 <tr><td>Collaboration</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Minimal</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List sharing</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Teams, comments, roles</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Sharing, chat, assignment</td></tr>
 <tr><td>Natural-language input</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No (presets)</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Yes, best in class</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Partial</td></tr>
-<tr><td>Push notifications &amp; reminders</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Calendar reminders</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td></tr>
+<tr><td>Push notifications &amp; reminders</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Calendar reminders + fired-reminder inbox on Home (unread badge, clears app-icon badge)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Yes</td></tr>
 </tbody>
 </table>
 
@@ -68,7 +68,9 @@ reconnect. Details in [MANUAL.md](MANUAL.md#sync-and-settings).
 
 Ships with the app's own Google OAuth client ID — just press Sign in.
 (Repo forks need their own ID: set `GOOGLE_CLIENT_ID` in `app.js`, with the
-Drive API enabled and the site's origin added.)
+Drive + Calendar APIs enabled, the five OAuth scopes from
+[MANUAL.md](MANUAL.md#your-own-google-client-id-for-sync-on-your-host), and
+the site's origin added.)
 
 ## Install as app (PWA)
 Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
@@ -89,7 +91,9 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 - **Home** — action toolbar (Board / Calendar / Time / New), personalized
   greeting, stat cards (open / overdue / due today / completed /
-  tracked today), live weather + daily quote, and sections: Overdue, Today's
+  tracked today), live weather + daily quote (refreshable), a Notifications
+  section for fired reminders (red unread badge on the Home sidebar row;
+  tapping Home marks them read), and sections: Overdue, Today's
   tasks, Most important first, Heavy lifting.
 - **List** — a single category with an add bar, quick-add presets (due date,
   weight, importance, color), and a collapsible Completed section.
@@ -110,12 +114,19 @@ shell). Plain `file://` usage still works, minus install/offline.
 - Due date + time with overdue / today badges; recurrence (daily, weekly with
   weekday picker, monthly, yearly, or custom "every N") — completing a dated
   recurring task schedules the next occurrence, subtasks reset.
+- Reminders (Details → Reminder): Google Calendar events in a dedicated
+  "DoTo" calendar (auto-created, auto-migrated from the main-calendar
+  fallback), plus a Notifications section on Home for fired reminders.
 - Subtasks with progress badge, notes, and external reference (URL opens in a
   new tab; anything else — ticket #, file path — just shows as a badge).
-- Inline rename (double-click title), details panel for everything else.
+- Inline rename (double-click title), details panel for everything else
+  (bottom sheet sliding up on mobile; **Save** closes it and forces a sync
+  push, **Mark complete** toggles completion).
 - Drag & drop everywhere: reorder tasks, move between lists (list view, board
   columns, sidebar), reorder lists. Mouse uses HTML5 DnD, touch uses the drag
-  handle (long-press for lists).
+  handle (long-press for lists). On touch screens, drag right from the left
+  half to open the sidebar — in Board view this works once columns are
+  scrolled fully left.
 
 **Everything else**
 
@@ -169,6 +180,7 @@ Local-first in `localStorage` — no DoTo server. Optional Google Drive sync
   showCompleted, filters, colorNames, userName, prefs, dirtyAt }`
 - `doto-sync` — sync metadata: `{ fileId, base, lastSyncedAt, auto, email, token }`
 - `doto-sync-log` — recent sync events (max 50)
+- `doto-notif-seen` — last time the Notifications inbox was opened (unread badge)
 - `doto-theme` — `'dark' | 'light'`
 - `doto-loc` — weather coordinates (7-day TTL)
 - `doto-google-client-id` — per-browser OAuth client override (only for forks)
@@ -197,13 +209,13 @@ git -C doto.wiki add Home.md && git -C doto.wiki commit -m "Update manual" && gi
 ## Project layout
 
 ```
-index.html   — shell: topbar, sidebar, 5 views, detail panel, popups, dialogs
-               (palette, shortcuts help, sync & settings, sync history), toast.
-               Assets carry `?v=1.0-<ts>` cache-busters (bump on every release).
+index.html   — shell: topbar, sidebar, 6 views, detail panel, popups, dialogs
+                (palette, shortcuts help, sync & settings, sync history), toast.
+                Assets carry `?v=1.0-<ts>` cache-busters (bump on every release).
 styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark.
-               Mobile compact rules live last in file (equal-specificity overrides).
-app.js       — all logic (~2700 lines), vanilla JS. Release trio: ?v= stamps,
-               APP_VERSION, version.json — always the same `1.0-<ts>`.
+                Mobile compact rules live last in file (equal-specificity overrides).
+app.js       — all logic (~4200 lines), vanilla JS. Release trio: ?v= stamps,
+                APP_VERSION, version.json — always the same `1.0-<ts>`.
 sw.js        — offline shell + update detector bypass for version.json (stays in
                root: SW scope is limited to its own directory)
 assets/      — manifest.webmanifest + icon-*.png/svg (PWA install assets)

@@ -91,6 +91,7 @@ input,select,textarea{font:inherit;color:inherit}
 }
 .sidebar-scroll{padding:10px 8px;display:flex;flex-direction:column;min-height:100%;min-width:0;overflow-x:hidden}
 .sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-weight:500;color:var(--muted)}
+.sidebar-head.filters-head{margin:4px 0 2px}
 .list-nav{
   display:flex;flex-direction:column;gap:1px;
   & + .sidebar-head{margin-top:7px}
@@ -145,9 +146,9 @@ input,select,textarea{font:inherit;color:inherit}
 .legal-row a{font-size:11px;color:var(--muted);text-decoration:none}
 .legal-row a:hover{color:var(--blue);text-decoration:underline}
 .legal-row span{font-size:11px;color:var(--muted)}
-.made-by{text-align:center;font-size:11px;color:var(--muted);padding:2px 0 0}
-.made-by a{color:var(--blue);text-decoration:none}
-.made-by a:hover{text-decoration:underline}
+.legal-row .made-by{font-size:11px;color:var(--muted)}
+.legal-row .made-by a{color:var(--blue);text-decoration:none;font-size:11px}
+.legal-row .made-by a:hover{text-decoration:underline}
 .sidebar-foot .btn-ghost{font-size:12px;padding:8px 6px}
 .sidebar-foot .btn-ghost .material-icons-outlined{font-size:16px}
 .switch-row{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
@@ -264,6 +265,7 @@ input,select,textarea{font:inherit;color:inherit}
   & .task-list{gap:14px;margin-top:10px}
   & .task{margin:0}
 }
+#notifCard{margin-bottom:24px}
 .card{
   border:1px solid var(--line-soft);border-radius:18px;padding:22px 24px;background:var(--bg);
   & h2{

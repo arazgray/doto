@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788897012'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788898579'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -41,7 +41,7 @@ const WEIGHT_IDS = Object.keys(WEIGHTS), IMP_IDS = Object.keys(IMPORTANCE);
 function clampWeight(v) { return WEIGHT_IDS.includes(v) ? v : 'medium'; }
 function clampImp(v) { return IMP_IDS.includes(v) ? v : 'medium'; }
 const REMIND_OFFSETS = [1, 5, 30, 60, 180, 1440]; // minutes before due; '' = off
-const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__', NOTIF = '__notif__';
+const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
 
 let state = migrate(load() || seed());
 let ui = { completedOpen: false, boardDone: {}, sort: (typeof state !== 'undefined' && state.sort) || 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '', searchFromHome: false };
@@ -222,7 +222,6 @@ function isHome() { return state.activeView === HOME; }
 function isAll() { return state.activeView === ALL; }
 function isCal() { return state.activeView === CAL; }
 function isTime() { return state.activeView === TIME; }
-function isNotif() { return state.activeView === NOTIF; }
 function activeList() { return state.lists.find((l) => l.id === state.activeView) || null; }
 function fallbackList() { return state.lists[0] || null; }
 function listName(id) { const l = state.lists.find((x) => x.id === id); return l ? l.name : '(deleted)'; }
@@ -343,7 +342,6 @@ const SHORTCUTS = [
   { keys: ['g', 'then', 'b'], desc: 'Go to Board' },
   { keys: ['g', 'then', 'c'], desc: 'Go to Calendar' },
   { keys: ['g', 'then', 't'], desc: 'Go to Time tracker' },
-  { keys: ['g', 'then', 'n'], desc: 'Go to Notifications' },
   { keys: ['g', 'then', '1-9'], desc: 'Jump to list by position' },
   { keys: ['u'], desc: 'Show / hide completed tasks' },
   { keys: ['d'], desc: 'Toggle dark mode' },
@@ -385,7 +383,6 @@ function paletteCommands() {
     { icon: 'view_column', label: 'Go to Board', run: () => go(ALL) },
     { icon: 'calendar_month', label: 'Go to Calendar', run: () => go(CAL) },
     { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
-    { icon: 'notifications', label: 'Go to Notifications', run: () => { markNotifSeen(); go(NOTIF); } },
     { icon: 'add', label: 'New task', run: () => focusComposer() },
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
     { icon: 'dark_mode', label: 'Toggle dark mode', run: () => toggleTheme() },
@@ -511,7 +508,6 @@ function bindShortcuts() {
       if (gk === 'b') return go(ALL);
       if (gk === 'c') return go(CAL);
       if (gk === 't') return go(TIME);
-      if (gk === 'n') { markNotifSeen(); return go(NOTIF); }
       const n = parseInt(e.key, 10);
       if (n >= 1 && n <= 9 && state.lists[n - 1]) return go(state.lists[n - 1].id);
       return;
@@ -567,7 +563,6 @@ function renderNav() {
   $('#navAll').classList.toggle('active', isAll());
   $('#navCal').classList.toggle('active', isCal());
   $('#navTime').classList.toggle('active', isTime());
-  $('#navNotif').classList.toggle('active', isNotif());
   const unread = unreadNotifCount();
   const nc = $('#notifCount');
   nc.textContent = unread || '';
@@ -1227,7 +1222,6 @@ function renderCurrentView() {
   $('#viewAll').classList.toggle('hidden', !isAll());
   $('#viewCal').classList.toggle('hidden', !isCal());
   $('#viewTime').classList.toggle('hidden', !isTime());
-  $('#viewNotif').classList.toggle('hidden', !isNotif());
   document.body.classList.toggle('view-board', isAll());
   document.body.classList.toggle('view-cal', isCal());
   document.body.classList.toggle('view-time', isTime());
@@ -1235,15 +1229,15 @@ function renderCurrentView() {
   else if (isAll()) renderBoard();
   else if (isCal()) renderCalendar();
   else if (isTime()) renderTime();
-  else if (isNotif()) renderNotif();
   else renderSingle();
 }
 
 /* ---------- notifications (fired calendar reminders) ----------
    A reminder "fires" when its trigger time (due minus offset) has passed —
-   Google shows the popup/email, not us. This page lists those tasks so there
-   is one place to review and zero them. Opening the page marks everything
-   seen and clears the app-icon badge (Badging API, where supported). */
+   Google shows the popup/email, not us. Fired tasks are listed in a section
+   on Home, and the Home sidebar row carries a red unread badge. Tapping Home
+   marks everything seen and clears the app-icon badge (Badging API, where
+   supported). */
 const NOTIF_SEEN_KEY = 'doto-notif-seen';
 function firedReminders() {
   const now = Date.now();
@@ -1274,13 +1268,14 @@ function markNotifSeen() {
 }
 function renderNotif() {
   const list = firedReminders();
+  const card = $('#notifCard');
+  if (card) card.classList.toggle('hidden', !list.length);
   const pill = $('#notifCountPill');
-  if (pill) pill.textContent = list.length ? `${list.length} fired` : 'None fired';
+  if (pill) pill.textContent = list.length ? `${list.length} fired` : '';
   const ul = $('#notifList');
   if (!ul) return;
   ul.innerHTML = '';
-  if (!list.length) { ul.innerHTML = '<li class="palette-empty">No fired reminders — set Details → Reminder on a task and it shows up here once its time passes.</li>'; return; }
-  list.forEach((t) => ul.appendChild(taskRow(t)));
+  list.forEach((t) => ul.appendChild(taskRow(t, { showList: true })));
 }
 
 /* ---------- daily quote + weather (Home) ---------- */
@@ -1448,6 +1443,7 @@ function renderHome() {
   fill('#homeToday', today.slice(0, 10), 'Nothing due today.');
   fill('#homeImportant', important, 'No open tasks.');
   fill('#homeHeavy', heavy, 'No heavy tasks. Add weight in task details.');
+  renderNotif(); // fired-reminder section (hidden when empty)
 }
 
 function renderSingle() {
@@ -2505,7 +2501,7 @@ async function importFiles(files, mode = 'auto') {
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
-  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && state.activeView !== NOTIF && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
+  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
   if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} colors` : ''));
   if (errors.length) toast('Import issue: ' + errors[0]);
@@ -3962,11 +3958,10 @@ function bind() {
   const goHomeBrand = () => { $('#searchInput').value = ''; save(); go(HOME); };
   $('#brandHome').onclick = goHomeBrand;
   $('#brandHome').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHomeBrand(); } };
-  $('#navHome').onclick = () => go(HOME);
+  $('#navHome').onclick = () => { markNotifSeen(); go(HOME); };
   $('#navAll').onclick = () => go(ALL);
   $('#navCal').onclick = () => go(CAL);
   $('#navTime').onclick = () => go(TIME);
-  $('#navNotif').onclick = () => { markNotifSeen(); go(NOTIF); };
   $('#timeSearch').oninput = (e) => { ui.timeQuery = e.target.value; renderTime(); };
   $('#timePlay').onclick = timePlay;
   $('#timePause').onclick = timePause;
