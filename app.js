@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788904475'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788905329'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2783,10 +2783,12 @@ async function doEnsureToken(mode, needCal) {
     tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cid, scope: DRIVE_SCOPE, callback: () => {} });
     tokenClientId = cid; tokenClientScope = DRIVE_SCOPE;
   }
-  // Explicit sign-in: ONE consent popup (a silent-first attempt would burn the
-  // click's popup permission and flash a window that auto-closes).
+  // Explicit sign-in: prompt '' — Google decides: an invisible token when the
+  // session is alive (no popup at all, nothing to block), the consent window
+  // only when scopes actually need granting. Forcing 'consent' here made every
+  // post-expiry sign-in show the full scope screen again ("keeps asking").
   // Background: 'none' never shows UI.
-  const tok = mode === 'popup' ? await gisAttempt(tokenClient, 'consent', 180000) : await gisAttempt(tokenClient, 'none', 10000);
+  const tok = mode === 'popup' ? await gisAttempt(tokenClient, '', 180000) : await gisAttempt(tokenClient, 'none', 10000);
   if (!tok || !tok.access_token) {
     const code = (tok && (tok.error || tok.error_subtype)) || 'no_token';
     const desc = tok && tok.error_description ? ' — ' + tok.error_description : '';
