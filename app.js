@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788899497'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788901361'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -233,7 +233,13 @@ function go(view) {
   ui.searchFromHome = false;
   state.activeView = view;
   if (state.lists.some((l) => l.id === view)) state.lastListId = view;
-  save(); closeSidebar(); closeDetail(); renderAll(); window.scrollTo({ top: 0 });
+  save(); closeSidebar(); closeDetail();
+  // Reset window scroll BEFORE render: body.view-board locks window scrolling,
+  // so a reset attempted only after the switch may not take — leaving a stale
+  // offset that shows up as a gap at the top of the sticky desktop sidebar.
+  window.scrollTo(0, 0);
+  renderAll();
+  window.scrollTo({ top: 0 });
 }
 function setSort(v) {
   if (!['order', 'date', 'title', 'priority'].includes(v)) v = 'order';
@@ -3700,7 +3706,11 @@ function bindSync() {
   $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
   $('#signInBtn').onclick = async () => {
     if (!googleClientId()) { setSync('setup'); paintSync(); return; }
-    try { await ensureToken('popup'); }
+    // needCal=true: a still-valid token without the calendar grant must
+    // re-consent here (Sync now heals this via its calendar step; without it
+    // sign-in silently reused the scoped-down token and calendar only failed
+    // later in the background).
+    try { await ensureToken('popup', true); }
     catch (e) {
       lastSyncError = signInErrorMsg(e);
       slog('error', lastSyncError);
@@ -3710,6 +3720,11 @@ function bindSync() {
     try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
     slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
     await pullNow('popup');
+    // Same calendar verification as Sync now, so reminders work immediately
+    // instead of failing silently until the next Sync now.
+    try { await calendarReconcile('popup'); }
+    catch {}
+    paintSync();
   };
   $('#signOutBtn').onclick = () => {
     if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.token) {
