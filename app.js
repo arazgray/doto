@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1788937993'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1788905329'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2788,11 +2788,6 @@ async function doEnsureToken(mode, needCal) {
   // only when scopes actually need granting. Forcing 'consent' here made every
   // post-expiry sign-in show the full scope screen again ("keeps asking").
   // Background: 'none' never shows UI.
-  // Standalone home-screen apps can't do popups at all (see above) — redirect.
-  if (mode === 'popup' && isStandalonePWA()) {
-    startRedirectSignIn();
-    return new Promise(() => {}); // page is unloading; never settles so no error path runs
-  }
   const tok = mode === 'popup' ? await gisAttempt(tokenClient, '', 180000) : await gisAttempt(tokenClient, 'none', 10000);
   if (!tok || !tok.access_token) {
     const code = (tok && (tok.error || tok.error_subtype)) || 'no_token';
@@ -2826,69 +2821,6 @@ async function fetchEmail() {
   if (!r.ok) throw new Error('email');
   const j = await r.json();
   if (j.email && j.email !== syncMeta.email) { syncMeta.email = j.email; saveSyncMeta(); paintSync(); }
-}
-
-/* ----- standalone-PWA sign-in (redirect, not popup) -----
-   In an installed home-screen app (iOS especially) window.open popups leave
-   the app context — Safari opens instead and GIS can never post the token
-   back, so Sync now spins until timeout. There the interactive flow uses a
-   full-page redirect; boot picks the token up from the URL fragment and
-   resumes the sync. Requires the app URL in the client's Authorized redirect
-   URIs (see manual); popups stay the flow everywhere else. */
-const OAUTH_STATE = 'doto1';
-const OAUTH_PENDING_KEY = 'doto-oauth-pending';
-function isStandalonePWA() {
-  try {
-    if (window.navigator && window.navigator.standalone === true) return true; // iOS
-    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
-  } catch {}
-  return false;
-}
-function appRedirectUri() {
-  try { return location.origin + location.pathname; } // no query/hash: must match the allowlist exactly
-  catch { return ''; }
-}
-function startRedirectSignIn() {
-  const cid = googleClientId();
-  if (!cid) throw new Error('setup');
-  try { localStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({ ts: Date.now() })); } catch {}
-  const cfg = {
-    client_id: cid,
-    scope: DRIVE_SCOPE,
-    ux_mode: 'redirect',
-    redirect_uri: appRedirectUri(),
-    state: OAUTH_STATE,
-    callback: () => {},
-  };
-  if (syncMeta.email) cfg.hint = syncMeta.email; // skip the account chooser on return visits
-  google.accounts.oauth2.initTokenClient(cfg).requestAccessToken();
-}
-/* Consumes a redirect sign-in response from the URL fragment. Returns
-   'resume' (token + our pending flag → auto-sync), 'token' (token, no auto),
-   'error' (denied/foreign), or null (not a sign-in response). */
-function handleOAuthRedirect() {
-  let p = null;
-  try {
-    if (!location.hash || location.hash.length < 2) return null;
-    p = new URLSearchParams(location.hash.slice(1));
-  } catch { return null; }
-  if (!p) return null;
-  const err = p.get('error');
-  const at = p.get('access_token');
-  if (!err && !at) return null;
-  try { history.replaceState(null, '', location.pathname + location.search); } catch {}
-  let pending = null;
-  try { pending = JSON.parse(localStorage.getItem(OAUTH_PENDING_KEY)); localStorage.removeItem(OAUTH_PENDING_KEY); } catch {}
-  if (err || !at) {
-    try { slog('error', 'Google sign-in was not completed (' + (err || 'no token') + ') — try again.'); } catch {}
-    return 'error';
-  }
-  if (p.get('state') && p.get('state') !== OAUTH_STATE) return 'error'; // someone else's fragment
-  const expiresIn = parseInt(p.get('expires_in') || '3600', 10) || 3600;
-  syncMeta.token = { access_token: at, expires_at: Date.now() + expiresIn * 1000, scope: p.get('scope') || DRIVE_SCOPE };
-  syncMeta.calGranted = p.get('scope') ? tokenScopeHasCal(p.get('scope')) : true;
-  try { saveSyncMeta(); } catch {}
-  return pending ? 'resume' : 'token';
 }
 
 /* ----- Drive appDataFolder API ----- */
@@ -4387,21 +4319,8 @@ function bind() {
   });
 }
 
-// Redirect sign-in responses must be consumed before first render so the
-// fresh token (not a stale signed-out state) is what the UI starts from.
-const oauthRedirectResult = handleOAuthRedirect();
 bind();
 renderAll();
-
-// Returning from a standalone redirect sign-in: the token is already stored
-// by handleOAuthRedirect — finish with email + a full sync.
-if (oauthRedirectResult === 'resume') {
-  setTimeout(() => {
-    try { fetchEmail().catch(() => {}); } catch {}
-    try { slog('info', 'Signed in with Google — syncing'); } catch {}
-    try { syncNowFlow().catch(() => {}); } catch {}
-  }, 300);
-}
 
 window.addEventListener('storage', (e) => {
   if (e.key === LS_KEY && e.newValue) {
