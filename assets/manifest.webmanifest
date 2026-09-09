@@ -1,5 +1,5 @@
 {
-  "name": "DoTo — Task Manager, Simple.",
+  "name": "DoTo",
   "short_name": "DoTo",
   "description": "A Google Tasks-style task manager with external refs, labels, weight and importance.",
   "start_url": "../",
