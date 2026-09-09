@@ -140,7 +140,7 @@ input,select,textarea{font:inherit;color:inherit}
 }
 .sidebar-foot{margin-top:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .sidebar-foot .io-row{gap:6px}
-.legal-row{display:flex;align-items:center;justify-content:flex-start;gap:6px;padding:2px 0 0}
+.legal-row{display:flex;align-items:center;justify-content:flex-start;gap:3px;padding:2px 0 0 6px}
 .legal-row a{font-size:11px;color:var(--muted);text-decoration:none}
 .legal-row a:hover{color:var(--blue);text-decoration:underline}
 .legal-row span{font-size:11px;color:var(--muted)}
