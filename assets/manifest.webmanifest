@@ -1,7 +1,7 @@
 {
   "name": "DoTo — Task Manager, Simple.",
   "short_name": "DoTo",
-  "description": "A Google Tasks-style task manager with external refs, colors, weight and importance.",
+  "description": "A Google Tasks-style task manager with external refs, labels, weight and importance.",
   "start_url": "../",
   "scope": "../",
   "display": "standalone",

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>DoTo — Task Manager, Simple.</title>
-<meta name="description" content="DoTo — Task Manager, Simple. A Google Tasks-style task manager with external refs, colors, weight and importance." />
+<meta name="description" content="DoTo — Task Manager, Simple. A Google Tasks-style task manager with external refs, labels, weight and importance." />
 <meta name="theme-color" content="#1a73e8" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -63,7 +63,7 @@
       <button id="createListBtn" class="create-list"><span class="material-icons-outlined">add</span> Create new list</button>
       <hr class="sidebar-divider" />
       <div class="sidebar-filters">
-        <div class="f-group"><span class="f-name">Color</span><div id="filterColorBtns" class="f-btns colors"></div></div>
+        <div class="f-group"><span class="f-name">Labels</span><div id="filterColorBtns" class="f-btns colors"></div></div>
         <div class="f-group"><span class="f-name">Weight</span><div id="filterWeightBtns" class="f-btns"></div></div>
         <div class="f-group"><span class="f-name">Importance</span><div id="filterImportanceBtns" class="f-btns"></div></div>
         <button id="clearFilters" class="link-btn hidden">Clear filters</button>
@@ -166,7 +166,7 @@
           </div>
         </div>
         <div class="qa-group">
-          <span>Color</span>
+          <span>Labels</span>
           <div id="qaColors" class="qa-colors"></div>
         </div>
       </div>
@@ -287,7 +287,7 @@
         </div>
       </div>
       <div class="d-section">
-        <p class="d-label">Color <span class="hint">— also tap dot in list</span></p>
+        <p class="d-label">Labels <span class="hint">— also tap dot in list</span></p>
         <div id="dColors" class="palette"></div>
       </div>
       <div class="d-grid">
@@ -424,14 +424,14 @@
       <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
     </div>
     <div class="set-group">
-      <p class="d-label">Color labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
+      <p class="d-label">Labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
       <div id="colorNames" class="color-names"></div>
       <div class="setup-row color-add-row">
-        <input type="color" id="customColorPick" value="#1a73e8" aria-label="Custom color" />
-        <input id="customColorName" type="text" placeholder="Label, e.g. Home" maxlength="24" aria-label="Custom color label" dir="auto" />
+        <input type="color" id="customColorPick" value="#1a73e8" aria-label="Custom label color" />
+        <input id="customColorName" type="text" placeholder="Label, e.g. Home" maxlength="24" aria-label="Custom label name" dir="auto" />
         <button type="button" id="customColorAdd" class="btn-primary">Add</button>
       </div>
-      <button type="button" id="resetColorsBtn" class="link-btn hidden">Reset built-in colors</button>
+      <button type="button" id="resetColorsBtn" class="link-btn hidden">Reset built-in labels</button>
     </div>
     <div class="sidebar-divider"></div>
     <div class="io-row import-row">

@@ -670,7 +670,7 @@ function renderQuickColors() {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'f-dot' + (ui.quick.color === c.id ? ' selected' : '');
     b.style.background = c.hex;
-    b.title = colorName(c.id); b.setAttribute('aria-label', 'Color ' + colorName(c.id));
+    b.title = colorName(c.id); b.setAttribute('aria-label', 'Label ' + colorName(c.id));
     b.onclick = () => {
       ui.quick.color = ui.quick.color === c.id ? undefined : c.id;
       $$('#qaColors .f-dot').forEach((x) => x.classList.toggle('selected', x === b && !!ui.quick.color));
@@ -980,8 +980,8 @@ function taskRow(t, opts = {}) {
 
   const actions = document.createElement('div'); actions.className = 'task-actions';
   const dot = document.createElement('button');
-  dot.className = 'color-dot-btn'; dot.style.background = colorHex(t.color); dot.title = 'Change color';
-  dot.setAttribute('aria-label', 'Change color');
+  dot.className = 'color-dot-btn'; dot.style.background = colorHex(t.color); dot.title = 'Change label';
+  dot.setAttribute('aria-label', 'Change label');
   dot.onclick = (e) => { e.stopPropagation(); openColorPop(dot, t.id, opts.compact); };
   const move = document.createElement('button');
   move.className = 'icon-btn sm'; move.innerHTML = '<span class="material-icons-outlined">drive_file_move</span>'; move.title = 'Move to list';
@@ -2509,7 +2509,7 @@ async function importFiles(files, mode = 'auto') {
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
   if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
-  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} colors` : ''));
+  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} labels` : ''));
   if (errors.length) toast('Import issue: ' + errors[0]);
 }
 
@@ -2998,7 +2998,7 @@ function applyRemote(remote, remoteTime) {
 let pendingConflicts = [];
 const CONFLICT_FIELDS = {
   title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
-  done: 'Completed', color: 'Color', weight: 'Weight', importance: 'Importance',
+  done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Importance',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
   remindBefore: 'Reminder',
 };
@@ -3651,7 +3651,7 @@ function colorLabelRow(c) {
   inp.type = 'text'; inp.maxLength = 24; inp.dataset.color = c.id;
   inp.placeholder = c.name; inp.dir = 'auto';
   inp.value = (state.colorNames && state.colorNames[c.id]) || '';
-  inp.setAttribute('aria-label', 'Label for ' + c.name + ' color');
+  inp.setAttribute('aria-label', 'Name for ' + c.name + ' label');
   inp.oninput = () => {
     const v = inp.value.trim().slice(0, 24);
     if (v && v !== c.name) state.colorNames[c.id] = v;
@@ -3660,8 +3660,8 @@ function colorLabelRow(c) {
   };
   row.append(dot, inp);
   const del = document.createElement('button');
-  del.className = 'icon-btn sm'; del.title = 'Delete color';
-  del.setAttribute('aria-label', 'Delete ' + c.name);
+  del.className = 'icon-btn sm'; del.title = 'Delete label';
+  del.setAttribute('aria-label', 'Delete label ' + c.name);
   del.innerHTML = '<span class="material-icons-outlined">close</span>';
   del.onclick = () => deleteColor(c.id);
   row.appendChild(del);
@@ -3678,7 +3678,7 @@ function paintColorEditor() {
 }
 function deleteColor(id) {
   const n = state.tasks.filter((t) => t.color === id).length;
-  if (n) { toast(`Cannot delete — ${n} task${n === 1 ? '' : 's'} still use${n === 1 ? 's' : ''} this color. Change them first.`); return; }
+  if (n) { toast(`Cannot delete — ${n} task${n === 1 ? '' : 's'} still use${n === 1 ? 's' : ''} this label. Change them first.`); return; }
   if (BUILTIN_COLOR_IDS.has(id)) {
     if (!state.deletedColors.includes(id)) state.deletedColors.push(id);
   } else {
@@ -3688,12 +3688,12 @@ function deleteColor(id) {
   if (state.filters.color === id) state.filters.color = '';
   if (ui.quick.color === id) ui.quick.color = undefined;
   save(); renderAll(); paintColorEditor();
-  toast('Color deleted');
+  toast('Label deleted');
 }
 function resetColors() {
   state.deletedColors = [];
   save(); renderAll(); paintColorEditor();
-  toast('Built-in colors restored');
+  toast('Built-in labels restored');
 }
 function closeAccount() { $('#accountScrim').classList.add('hidden'); }
 function bindSync() {
@@ -3767,8 +3767,8 @@ function bindSync() {
   $('#customColorAdd').onclick = () => {
     const hex = ($('#customColorPick').value || '').toLowerCase();
     const name = $('#customColorName').value.trim().slice(0, 24);
-    if (!/^#[0-9a-f]{6}$/.test(hex) || !name) { toast('Pick a color and a label first'); return; }
-    if ((state.customColors || []).length >= 10) { toast('Color limit reached (10)'); return; }
+    if (!/^#[0-9a-f]{6}$/.test(hex) || !name) { toast('Pick a label color and name first'); return; }
+    if ((state.customColors || []).length >= 10) { toast('Label limit reached (10)'); return; }
     state.customColors.push({ id: 'c-' + uid(), name, hex });
     $('#customColorName').value = '';
     save(); renderAll(); paintColorEditor();

@@ -66,7 +66,7 @@ How it works and what to expect:
 - Sync dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
 - Import / Export live in the Sync dialog (same JSON backup as before).
 - The dialog also holds **Display** settings (show completed, dark mode),
-  **Color labels** (rename + custom colors), and your **name** (used in the
+  **Labels** (rename + custom labels), and your **name** (used in the
   Home greeting, synced across devices).
 
 ## Views
@@ -86,14 +86,14 @@ Switch views from the sidebar, the command palette, or press `g` then `h` / `b` 
 - **Create**: the add bar (or per-column / agenda boxes), the Home **New**
   button, the `n` key, or the command palette (`Ctrl+K`).
 - **Complete**: the circle on the row, or select it and press `x`. Deleted or completed-by-mistake items can be undone from the toast popup.
-- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, color, weight, importance, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
+- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, label, weight, importance, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
 - **Rename inline**: double-click the title.
-- **Color**: tap the color dot on the row. Colors carry your own labels, and
-  you can add fully custom colors too (Sync & Settings → Color labels, e.g.
-  red for Home, blue for Work, a new teal for Side projects). Any color can
-  be deleted when no task uses it (otherwise the app tells you to recolor
-  those tasks first); built-ins can be restored with Reset. Custom colors
-  and labels sync, export and import alongside everything else.
+- **Labels**: tap the label dot on the row. Labels carry your own names, and
+  you can add fully custom labels too (Sync & Settings → Labels, e.g.
+  red for Home, blue for Work, a new teal for Side projects). Any label can
+  be deleted when no task uses it (otherwise the app tells you to change
+  those tasks first); built-ins can be restored with Reset. Custom labels
+  and names sync, export and import alongside everything else.
   **Weight / Importance**: tap the badges on the row.
 - **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.
 - **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Completing a dated repeating task schedules the next occurrence and resets its subtasks.
@@ -122,7 +122,7 @@ tapping Home marks everything read and clears the app-icon badge.
 ## Search, filters and sorting
 
 - **Search** (`/`): matches titles, notes, references and subtasks across every view. Searching from Home jumps straight to Board results.
-- **Filters**: color, weight and importance in the sidebar. Active filters show as removable chips on every view.
+- **Filters**: label, weight and importance in the sidebar. Active filters show as removable chips on every view.
 - **Sorting**: My order (manual drag order), Date, Importance & weight, Title — from the sort button in the top bar.
 
 ## Keyboard shortcuts
@@ -235,7 +235,7 @@ there is still no DoTo server involved.
 
 ## Data and privacy
 
-- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, color labels, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), notification read state (`doto-notif-seen`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
+- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, label names, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), notification read state (`doto-notif-seen`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
 - If a save ever fails validation (corrupted data), the app keeps a timestamped backup copy in your browser and starts fresh instead of breaking.
 - The network requests the app itself makes: Google Identity Services + Drive API (only when you use sync), and the Home weather card (Open-Meteo, BigDataCloud, ipapi.co for location fallback). Fonts and icons ship with the app and work offline. Nothing else ever leaves your device.
 
