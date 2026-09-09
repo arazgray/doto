@@ -183,6 +183,9 @@ DoTo is installable (PWA) and works offline once installed:
 - **Desktop Chrome / Edge**: install icon in the address bar, or menu → Save and share → Install.
 - **Android Chrome**: menu → Install app / Add to Home screen.
 - **iPhone / iPad**: Share → Add to Home Screen for a fullscreen icon on your home screen.
+  In the installed app, Google sign-in uses a full-page redirect (popups
+  cannot return to a home-screen app, so Sync now would spin forever) — you
+  leave to Google and come straight back signed in and syncing.
 
 Installing requires the hosted `https://` address — it does not work from a downloaded `file://` copy.
 
@@ -222,7 +225,11 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
    application type **Web application**. Under **Authorized JavaScript
    origins** add your exact site address, e.g. `https://<you>.github.io`
-   (address only, no path at the end), then Create and copy the client ID
+   (address only, no path at the end). Under **Authorized redirect URIs**
+   add your exact app address **with** the path, e.g.
+   `https://<you>.github.io/doto/` — the installed home-screen app signs in
+   via a full-page redirect, and Google refuses it (`redirect_uri_mismatch`)
+   without this entry. Then Create and copy the client ID
    (it ends with `.apps.googleusercontent.com`).
 5. In your fork, paste it into `app.js` as `GOOGLE_CLIENT_ID` (top of the
    sync section), commit and push. Bump the release trio as usual (`?v=`
@@ -266,6 +273,12 @@ reason is recorded under Sync → History. That History page also has a
 **Copy diagnostics** button: if sync looks wrong (e.g. pill says sign-in is
 needed while the dialog shows you signed in), open it right after the failure
 and send the text — it shows token state, last sync and recent events.
+
+**Sync now spins forever on the installed home-screen app (iPhone).**
+That build cannot use popups, so sign-in goes through a full-page Google
+redirect instead. If Google answers `redirect_uri_mismatch`, the app's
+address is missing from the client's **Authorized redirect URIs** — add it
+(see Hosting above), then Sync now again.
 
 **Calendar says "needs its permission" and Sync now does nothing / nothing appears in Google Calendar / reminders land in the main calendar instead of "DoTo".**
 Only tasks with Details → Reminder set create events (in the "DoTo" Google
