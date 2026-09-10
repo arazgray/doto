@@ -51,15 +51,19 @@ How it works and what to expect:
 - The synced copy is a single file in Drive's hidden app folder — only your
   Google account can see it.
 - Merging is per item: edits made on one device at a time always merge
-  cleanly. If the same task was edited on two devices between syncs, the
-  newest version wins and the app tells you.
+  cleanly. Reordering a list, or both devices marking the same task complete,
+  never counts as a conflict.
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
-- If the same task or list was edited on two devices between syncs, the
+- If the same task, list, time record, or label was edited on two devices
+  between syncs (or edited on one side and deleted on the other), the
   newest version applies immediately — then a dialog shows each conflict
-  with a field-by-field diff so you can keep your version or take Drive's.
+  with a field-by-field diff (due date/time shown as one "Due" row; hover
+  any value for the full text) so you can keep your version or take Drive's.
+  The choice is per whole item, pre-selected to whatever is showing now.
   **Later** dismisses the dialog without changing the applied version (it
-  stays queued until you open Sync again or the next pull).
+  stays queued until you review it or the next sync). Plain settings (label
+  renames, your name) always take the newest version without asking.
 - Signing out keeps a full copy on that device; signing back in merges it.
 - **Pull to refresh**: on touch devices, drag down from the very top of any
   page and release to force a Drive sync.

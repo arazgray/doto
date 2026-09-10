@@ -923,8 +923,9 @@ a.btn-ghost{text-decoration:none}
 .conflict-list{overflow-y:auto;min-height:0;margin:6px 0 4px;display:flex;flex-direction:column;gap:12px}
 .conflict-item{border-top:1px solid var(--line-soft);padding-top:10px}
 .conflict-item:first-child{border-top:0;padding-top:0}
-.conflict-item-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.conflict-item-head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
 .conflict-item-title{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conflict-sub{margin:0 0 6px}
 .conflict-pick{margin-top:8px}
 .conflict-diff{display:grid;grid-template-columns:auto 1fr 1fr;gap:5px 12px;font-size:13px;min-height:0}
 .conflict-diff .cd-h{font-size:11px;font-weight:500;color:var(--muted)}

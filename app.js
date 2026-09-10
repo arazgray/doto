@@ -2947,53 +2947,85 @@ function mergeIdSet(baseArr, localArr, remoteArr) {
   return out;
 }
 const recEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/* Fields that must never trigger a conflict on their own: ordering,
+   sync bookkeeping (calendar link + hash), and timestamps/ids derived from
+   completing a task. Two devices marking the same task complete seconds
+   apart (different completedAt) or reordering a list mean the same thing —
+   flagging those as "device vs Drive" conflicts is noise. Content equality
+   below ignores them; the dialog's diff skips them too. */
+const VOLATILE_KEYS = new Set(['order', 'createdAt', 'completedAt', 'recId', 'spawnedId', 'calEventId', 'calRev']);
+function normRec(r) {
+  if (!r || typeof r !== 'object') return r;
+  const o = {};
+  Object.keys(r).forEach((k) => { if (!VOLATILE_KEYS.has(k)) o[k] = r[k]; });
+  return o;
+}
+const normEq = (a, b) => JSON.stringify(normRec(a)) === JSON.stringify(normRec(b));
 function mergeArrays(base, local, remote, takeRemote, collect, coll, labelOf) {
   const bi = new Map(base.map((x) => [x.id, x]));
   const li = new Map(local.map((x) => [x.id, x]));
   const ri = new Map(remote.map((x) => [x.id, x]));
   const out = [];
+  const interim = takeRemote ? 'theirs' : 'mine';
   let conflicts = 0, fromRemote = 0;
   new Set([...bi.keys(), ...li.keys(), ...ri.keys()]).forEach((id) => {
     const b = bi.get(id), l = li.get(id), r = ri.get(id);
-    if (!b) { // created on one side (ids are unique, both-sides-create is a no-op tie)
-      if (l && r && !recEq(l, r)) conflicts++;
+    if (!b) { // created while the other side couldn't see it (ids are unique,
+      // so same-id both-created is near-impossible — still surfaced, not dropped)
+      if (l && r && !normEq(l, r)) {
+        conflicts++;
+        if (collect) collect.push({ coll, id, label: labelOf(l, r), local: l, remote: r, interim, createdBoth: true });
+      }
       out.push(l || r);
       if (r && !l) fromRemote++;
       return;
     }
-    const dl = !l || !recEq(l, b); // deleted counts as changed
-    const dr = !r || !recEq(r, b);
+    const dl = !l || !normEq(l, b); // deleted counts as changed
+    const dr = !r || !normEq(r, b);
     if (!dl && !dr) { out.push(l); return; }
     if (dl && !dr) { if (l) out.push(l); return; } // kept local edit / local delete wins
     if (!dl && dr) { if (r) { out.push(r); fromRemote++; } return; } // remote edit / remote delete wins
-    conflicts++; // edited on both sides: newest file wins interim, user can override
+    // changed on BOTH sides: newest file wins interim, user can override.
+    // delete-vs-edit is a real conflict too (not just edit-vs-edit). But two
+    // branches that converged (both deleted, or same content ignoring volatile
+    // bookkeeping) are agreements, not conflicts.
+    if (!l && !r) return; // deleted on both sides: stays deleted
+    if (l && r && normEq(l, r)) { out.push(takeRemote ? r : l); if (takeRemote) fromRemote++; return; }
+    conflicts++;
     if (l && r) {
-      if (collect) collect.push({ coll, id, label: labelOf(l, r), local: l, remote: r });
+      if (collect) collect.push({ coll, id, label: labelOf(l, r), local: l, remote: r, interim });
       if (takeRemote) { out.push(r); fromRemote++; } else out.push(l);
+    } else {
+      if (collect) collect.push({ coll, id, label: labelOf(l || r, l || r), local: l || null, remote: r || null, interim, deletedOn: l ? 'theirs' : 'mine' });
+      if (r) { out.push(r); fromRemote++; }
+      else if (l) out.push(l);
+      // both deleted: stays deleted, still counts as resolved above
     }
-    else if (r) { out.push(r); fromRemote++; }
-    else if (l) out.push(l);
   });
   return { arr: out, conflicts, fromRemote };
 }
 function mergeObj(base, local, remote, takeRemote) {
+  // Plain key/value settings (label renames). Both-sides edits auto-resolve to
+  // newest — renaming a label on two devices is not worth a dialog. The caller
+  // logs these as auto-resolved instead of counting them as user conflicts.
   base = base || {}; local = local || {}; remote = remote || {};
   if (recEq(local, base) && recEq(remote, base)) return { obj: local, conflict: 0, fromRemote: 0 };
   if (!recEq(local, base) && recEq(remote, base)) return { obj: local, conflict: 0, fromRemote: 0 };
   if (recEq(local, base) && !recEq(remote, base)) return { obj: remote, conflict: 0, fromRemote: 1 };
   if (recEq(local, remote)) return { obj: local, conflict: 0, fromRemote: 0 };
   return takeRemote
-    ? { obj: remote, conflict: 1, fromRemote: 1 }
-    : { obj: local, conflict: 1, fromRemote: 0 };
+    ? { obj: remote, conflict: 0, fromRemote: 1, auto: 1 }
+    : { obj: local, conflict: 0, fromRemote: 0, auto: 1 };
 }
 function mergeScalar(base, local, remote, takeRemote) {
+  // Same newest-wins auto policy as mergeObj (currently: your name).
   if (local === base && remote === base) return { obj: local, conflict: 0, fromRemote: 0 };
   if (local !== base && remote === base) return { obj: local, conflict: 0, fromRemote: 0 };
   if (local === base && remote !== base) return { obj: remote, conflict: 0, fromRemote: 1 };
   if (local === remote) return { obj: local, conflict: 0, fromRemote: 0 };
   return takeRemote
-    ? { obj: remote, conflict: 1, fromRemote: 1 }
-    : { obj: local, conflict: 1, fromRemote: 0 };
+    ? { obj: remote, conflict: 0, fromRemote: 1, auto: 1 }
+    : { obj: local, conflict: 0, fromRemote: 0, auto: 1 };
 }
 function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
@@ -3003,11 +3035,13 @@ function applyRemote(remote, remoteTime) {
   const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], colorNames: {}, customColors: [], userName: '', deletedColors: [] };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const freshConflicts = [];
+  const timeLabel = (l) => (l && l.title) || (l && l.taskId && getTask(l.taskId) && getTask(l.taskId).title) || 'Time record';
+  const colorLabel = (l) => (l && l.name) || 'Label';
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote, freshConflicts, 'lists', (l) => l.name || '(untitled)');
   const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote, freshConflicts, 'tasks', (l) => l.title || '(untitled)');
-  const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote);
+  const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote, freshConflicts, 'times', timeLabel);
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
-  const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote);
+  const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote, freshConflicts, 'customColors', colorLabel);
   const mu = mergeScalar(typeof base.userName === 'string' ? base.userName : '', state.userName || '', typeof remote.userName === 'string' ? remote.userName : '', takeRemote);
   const mergedDeleted = mergeIdSet(base.deletedColors, state.deletedColors, remote.deletedColors);
   const mdl = { obj: mergedDeleted, conflict: 0, fromRemote: 0 };
@@ -3021,54 +3055,161 @@ function applyRemote(remote, remoteTime) {
   const okC = new Set(allColors().map((c) => c.id));
   state.tasks.forEach((t) => { if (!okC.has(t.color)) t.color = 'default'; });
   if (!okC.has(state.filters.color)) state.filters.color = '';
-  const conflicts = ml.conflicts + mt.conflicts + mm.conflicts + mc.conflict + mcc.conflicts + mu.conflict;
+  // Only queued items need the user's pick. Plain settings (label renames,
+  // your name) auto-resolve to newest and are just logged so the count in the
+  // dialog always matches what you can actually review.
+  const autoSettings = (mc.auto || 0) + (mu.auto || 0);
   const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
   saveSyncMeta();
-  pendingConflicts.push(...freshConflicts);
+  // re-pull before resolving: refresh any already-queued entry for the same
+  // item instead of stacking duplicates.
+  freshConflicts.forEach((c) => {
+    const i = pendingConflicts.findIndex((p) => p.coll === c.coll && p.id === c.id);
+    if (i >= 0) pendingConflicts[i] = c; else pendingConflicts.push(c);
+  });
+  if (autoSettings) {
+    try { slog('info', `Auto-resolved ${autoSettings} setting${autoSettings === 1 ? '' : 's'} with the newest version (no action needed)`); } catch {}
+  }
   return { conflicts: freshConflicts.length, fresh };
 }
 
-/* ----- per-conflict resolution dialog ----- */
+/* ----- per-conflict resolution dialog -----
+   Each entry is one item edited on BOTH sides between syncs (or edited on one
+   side and deleted on the other). The merged list already shows an interim
+   winner (the newest file) so nothing is lost; this dialog lets you override
+   it per item. Picks are whole-item — field rows below only explain WHAT
+   differs, they are not individually pickable. */
 let pendingConflicts = [];
+const CONFLICT_KIND = { tasks: 'Task', lists: 'List', times: 'Time record', customColors: 'Label' };
 const CONFLICT_FIELDS = {
   title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
-  tz: 'Time zone', dueUtc: 'Due moment',
+  tz: 'Time zone', dueUtc: 'Due moment', due: 'Due',
   done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Importance',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
-  remindBefore: 'Reminder',
+  remindBefore: 'Reminder', seconds: 'Duration', startedAt: 'Logged at',
+  taskId: 'Task', hex: 'Color',
 };
-function conflictVal(kind, t, k) {
-  const v = t[k];
+function shortStr(s, n) {
+  s = String(s == null ? '' : s);
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+function conflictDue(t) {
+  if (!t || typeof t !== 'object') return '—';
+  if (typeof t.date !== 'string' || !t.date) return 'No date';
+  let d = t.date, tm = t.time || '';
+  try {
+    if (typeof displayDate === 'function' && typeof displayTime === 'function' && hasClockTime(t)) {
+      d = displayDate(t) || d; tm = displayTime(t) || tm;
+    }
+  } catch {}
+  let s = d + (tm ? ' ' + tm : '');
+  if (t.tz) s += ` (${t.tz})`;
+  return s;
+}
+function conflictFull(kind, t, k) {
+  if (!t || typeof t !== 'object') return '— (deleted)';
+  const v = k === 'due' ? conflictDue(t) : t[k];
   if (v === undefined || v === null || v === '' || v === 0) return '—';
-  if (k === 'done') return v ? 'Yes' : 'No';
+  if (k === 'done') return v ? 'Completed' : 'Open';
+  if (k === 'due') return String(v);
   if (k === 'remindBefore') return typeof v === 'number' ? fmtOffset(v) : '—';
   if (k === 'dueUtc') { try { return fmtRemind(v); } catch { return String(v); } }
   if (k === 'listId') return listName(v);
   if (k === 'color') return colorName(v);
-  if (k === 'recur') return (v && v.freq ? recurLabel(v) : '—');
-  if (k === 'subtasks') return Array.isArray(v) ? `${v.filter((s) => s.done).length}/${v.length} done` : '—';
-  const s = String(v);
-  return s.length > 42 ? s.slice(0, 42) + '…' : s;
+  if (k === 'weight') return (WEIGHTS[v] && WEIGHTS[v].label) || String(v);
+  if (k === 'importance') return (IMPORTANCE[v] && IMPORTANCE[v].label) || String(v);
+  if (k === 'recur') return (v && v.freq ? recurLabel(v) : 'Does not repeat');
+  if (k === 'subtasks') {
+    if (!Array.isArray(v)) return '—';
+    const done = v.filter((s) => s.done).length;
+    const names = v.map((s) => s.title || '(untitled)').join(', ');
+    return `${done}/${v.length} done${names ? ' — ' + names : ''}`;
+  }
+  if (k === 'seconds') return fmtDur(v);
+  if (k === 'startedAt') { const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString(); }
+  if (k === 'taskId') { const t2 = getTask(v); return t2 ? t2.title || '(untitled)' : '(deleted task)'; }
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+function conflictVal(kind, t, k) {
+  return shortStr(conflictFull(kind, t, k), k === 'notes' || k === 'subtasks' || k === 'extRef' ? 120 : 60);
 }
 function conflictDiff(c) {
-  const skip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'calEventId', 'calRev', 'spawnedId']);
+  const baseSkip = new Set(['id', 'createdAt', 'order', 'completedAt', 'recId', 'calEventId', 'calRev', 'spawnedId']);
+  const skip = (c.coll === 'tasks' || c.coll === 'lists') ? baseSkip : new Set(['id', 'createdAt']);
+  // delete-vs-edit: spell out which side deleted, then show the surviving
+  // version's fields against "— (deleted)" so the choice is concrete.
+  if (!c.local || !c.remote) {
+    const rows = [[
+      'Status',
+      !c.local ? 'Deleted on this device' : 'Kept on this device',
+      !c.remote ? 'Deleted in Drive' : 'Kept in Drive',
+      !c.local ? 'Deleted on this device' : 'Kept on this device',
+      !c.remote ? 'Deleted in Drive' : 'Kept in Drive',
+    ]];
+    const survivor = c.local || c.remote;
+    const goneSide = c.local ? 'theirs' : 'mine';
+    Object.keys(survivor || {}).forEach((k) => {
+      if (skip.has(k) || k === 'dueUtc' || k === 'tz') return;
+      if (k === 'date' || k === 'time') return; // covered by the Due row
+      if (rows.length >= 9) return;
+      const full = conflictFull(c.coll, survivor, k);
+      const base = survivor[k];
+      if (base === undefined || base === null || base === '' || base === 0 || base === false) return;
+      if (Array.isArray(base) && !base.length) return;
+      rows.push([
+        CONFLICT_FIELDS[k] || k,
+        goneSide === 'mine' ? '— (deleted)' : shortStr(full, 60),
+        goneSide === 'theirs' ? '— (deleted)' : shortStr(full, 60),
+        goneSide === 'mine' ? '— (deleted)' : full,
+        goneSide === 'theirs' ? '— (deleted)' : full,
+      ]);
+    });
+    if (survivor && (survivor.date || survivor.time || survivor.tz || survivor.dueUtc)) {
+      const full = conflictDue(survivor);
+      rows.splice(1, 0, ['Due',
+        goneSide === 'mine' ? '— (deleted)' : shortStr(full, 60),
+        goneSide === 'theirs' ? '— (deleted)' : shortStr(full, 60),
+        goneSide === 'mine' ? '— (deleted)' : full,
+        goneSide === 'theirs' ? '— (deleted)' : full]);
+    }
+    return rows.slice(0, 9);
+  }
   const rows = [];
-  new Set([...Object.keys(c.local), ...Object.keys(c.remote)]).forEach((k) => {
+  const keys = new Set([...Object.keys(c.local), ...Object.keys(c.remote)]);
+  // due date/time/zone/moment are one decision ("when is it due"), not four
+  if (['date', 'time', 'tz', 'dueUtc'].some((k) => keys.has(k))) {
+    const a = conflictDue(c.local), b = conflictDue(c.remote);
+    if (a !== b) rows.push(['Due', shortStr(a, 60), shortStr(b, 60), a, b]);
+    keys.delete('date'); keys.delete('time'); keys.delete('tz'); keys.delete('dueUtc');
+  }
+  keys.forEach((k) => {
     if (skip.has(k)) return;
     if (JSON.stringify(c.local[k] ?? null) !== JSON.stringify(c.remote[k] ?? null)) {
-      rows.push([CONFLICT_FIELDS[k] || k, conflictVal(c.coll, c.local, k), conflictVal(c.coll, c.remote, k)]);
+      rows.push([CONFLICT_FIELDS[k] || k, conflictVal(c.coll, c.local, k), conflictVal(c.coll, c.remote, k), conflictFull(c.coll, c.local, k), conflictFull(c.coll, c.remote, k)]);
     }
   });
-  return rows.slice(0, 8);
+  return rows.slice(0, 12);
+}
+function conflictArr(c) {
+  if (c.coll === 'lists') return state.lists;
+  if (c.coll === 'tasks') return state.tasks;
+  if (c.coll === 'times') return state.times;
+  if (c.coll === 'customColors') return state.customColors || [];
+  return null;
 }
 function liveConflicts() {
-  // entries whose item vanished (deleted after queueing) resolve themselves
+  // entries whose item vanished on both sides (deleted after queueing, or the
+  // user deleted the surviving side) resolve themselves
   pendingConflicts = pendingConflicts.filter((c) => {
-    const arr = c.coll === 'lists' ? state.lists : state.tasks;
-    return arr.some((x) => x.id === c.id);
+    const arr = conflictArr(c);
+    if (!arr) return false;
+    if (arr.some((x) => x.id === c.id)) return true;
+    // delete-vs-edit where the survivor was since deleted: nothing left to pick
+    return false;
   });
   return pendingConflicts;
 }
@@ -3087,7 +3228,7 @@ function renderConflictList() {
   const list = $('#conflictList'); if (!list) return;
   list.innerHTML = '';
   $('#conflictTitle').textContent = `Sync conflicts (${pendingConflicts.length})`;
-  $('#conflictCount').textContent = 'Changed on this device and in Drive. Pick a winner per row, then Apply — or take one side for everything.';
+  $('#conflictCount').textContent = 'The same item was changed on this device and in Drive. The newest version is showing for now — pick which whole item to keep per row, then Apply. Later keeps the newest for now and asks again next sync.';
   pendingConflicts.forEach((c) => {
     const item = document.createElement('div');
     item.className = 'conflict-item';
@@ -3095,34 +3236,51 @@ function renderConflictList() {
     head.className = 'conflict-item-head';
     const t = document.createElement('span');
     t.className = 'conflict-item-title'; t.dir = 'auto';
-    t.textContent = `${c.coll === 'lists' ? 'List' : 'Task'} “${c.label}”`;
+    const kind = CONFLICT_KIND[c.coll] || 'Item';
+    const survivor = c.local || c.remote;
+    const headline = (c.coll === 'tasks' && survivor && survivor.title) || (c.coll === 'lists' && survivor && survivor.name)
+      || c.label || '(untitled)';
+    t.textContent = `${kind} “${headline}”`;
+    if (c.deletedOn) t.textContent += c.deletedOn === 'mine' ? ' — deleted here' : ' — deleted in Drive';
+    else if (c.createdBoth) t.textContent += ' — created on both sides';
+    t.title = t.textContent;
     head.appendChild(t);
     item.appendChild(head);
+    const sub = document.createElement('div');
+    sub.className = 'muted small conflict-sub';
+    sub.textContent = c.deletedOn
+      ? (c.deletedOn === 'mine'
+        ? 'Deleted on this device but edited in Drive. Keep Drive to restore it, or keep this device to delete it everywhere.'
+        : 'Edited on this device but deleted in Drive. Keep this device to restore it, or keep Drive to delete it everywhere.')
+      : `Currently showing ${c.interim === 'theirs' ? 'Drive’s' : 'this device’s'} version (it was newer).`;
+    item.appendChild(sub);
     const rows = conflictDiff(c);
     const dl = document.createElement('div');
     dl.className = 'conflict-diff';
     ['Field', 'This device', 'Drive'].forEach((h) => {
       const s = document.createElement('span'); s.className = 'cd-h'; s.textContent = h; dl.appendChild(s);
     });
-    const shown = rows.slice(0, 4);
-    shown.forEach(([f, a, b]) => {
-      const fEl = document.createElement('span'); fEl.className = 'cd-f'; fEl.textContent = f;
-      const aEl = document.createElement('span'); aEl.textContent = a; aEl.dir = 'auto';
-      const bEl = document.createElement('span'); bEl.textContent = b; bEl.dir = 'auto';
-      dl.append(fEl, aEl, bEl);
-    });
-    if (rows.length > shown.length) {
-      const m = document.createElement('span'); m.className = 'cd-f muted small'; m.textContent = `+${rows.length - shown.length} more`;
+    if (!rows.length) {
+      const m = document.createElement('span'); m.className = 'cd-f muted small';
+      m.textContent = 'Only ordering or sync bookkeeping differs — either side keeps your content.';
       dl.append(m, document.createElement('span'), document.createElement('span'));
     }
+    rows.forEach(([f, a, b, fa, fb]) => {
+      const fEl = document.createElement('span'); fEl.className = 'cd-f'; fEl.textContent = f; fEl.title = f;
+      const aEl = document.createElement('span'); aEl.textContent = a; aEl.dir = 'auto'; aEl.title = fa || a;
+      const bEl = document.createElement('span'); bEl.textContent = b; bEl.dir = 'auto'; bEl.title = fb || b;
+      dl.append(fEl, aEl, bEl);
+    });
     item.appendChild(dl);
     const pick = document.createElement('div');
     pick.className = 'segmented conflict-pick';
     pick.dataset.cid = `${c.coll}:${c.id}`;
+    const def = c.interim === 'theirs' ? 'theirs' : 'mine';
     [['mine', 'This device'], ['theirs', 'Drive']].forEach(([v, label]) => {
       const b = document.createElement('button');
       b.type = 'button'; b.dataset.v = v; b.textContent = label;
-      if (v === 'mine') b.classList.add('selected');
+      if (v === def) b.classList.add('selected');
+      b.title = v === def ? 'Currently showing this version' : 'Switch to this version';
       b.onclick = () => paintConflictPick(pick, v);
       pick.appendChild(b);
     });
@@ -3137,26 +3295,46 @@ function applyConflicts() {
     const sel = p.querySelector('button.selected');
     picks.set(p.dataset.cid, sel && sel.dataset.v === 'theirs');
   });
-  let mine = 0, theirs = 0;
+  let mine = 0, theirs = 0, skipped = 0;
   liveConflicts().forEach((c) => {
-    const arr = c.coll === 'lists' ? state.lists : state.tasks;
+    const arr = conflictArr(c);
+    if (!arr) return;
     const i = arr.findIndex((x) => x.id === c.id);
-    if (i < 0) return;
     const pickRemote = picks.get(`${c.coll}:${c.id}`) === true;
-    arr[i] = pickRemote ? c.remote : c.local;
+    const want = pickRemote ? c.remote : c.local;
+    if (i < 0) {
+      // item is gone now (user deleted the survivor while deciding): restoring
+      // a pick would resurrect it behind their back — only restore an explicit
+      // keep-the-other-side pick... simplest is to leave it deleted.
+      if (!want) { if (pickRemote) theirs++; else mine++; }
+      else skipped++;
+      return;
+    }
+    // edited after the sync queued this conflict: overwriting with the stale
+    // snapshot would silently drop those newer edits — keep current instead.
+    const cur = arr[i];
+    if (want && !normEq(cur, c.local) && !normEq(cur, c.remote)) { skipped++; return; }
+    if (!want) { arr.splice(i, 1); }
+    else arr[i] = want;
     if (pickRemote) theirs++; else mine++;
   });
   const n = mine + theirs;
   pendingConflicts = [];
   closeConflict();
-  if (!n) return;
+  if (!n && !skipped) return;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
   saveSyncMeta();
-  slog('info', `Resolved ${n} conflict${n === 1 ? '' : 's'} — kept ${mine} from this device, ${theirs} from Drive`);
-  toast(`Resolved ${n} conflict${n === 1 ? '' : 's'}`);
-  schedulePush();
+  if (n) {
+    slog('info', `Resolved ${n} conflict${n === 1 ? '' : 's'} — kept ${mine} from this device, ${theirs} from Drive`);
+    toast(`Resolved ${n} conflict${n === 1 ? '' : 's'}`);
+    schedulePush();
+  }
+  if (skipped) {
+    try { slog('info', `Skipped ${skipped} conflict${skipped === 1 ? '' : 's'} edited after sync — kept your latest edits`); } catch {}
+    if (!n) { try { toast('Kept your latest edits (changed after sync)'); } catch {} }
+  }
 }
 
 /* ---------- reminders (Google Calendar only) ----------
@@ -3633,8 +3811,8 @@ async function pushNow(mode) {
     const hit = await mergeRemoteIfNewer(mode);
     if (hit && hit.res) {
       if (hit.res.conflicts) {
-        toast('Sync conflict — pick which version to keep', () => pumpConflicts(), 'Review');
-        slog('conflict', `${hit.res.conflicts} conflict${hit.res.conflicts === 1 ? '' : 's'} need${hit.res.conflicts === 1 ? 's' : ''} your pick`);
+        toast('Sync conflict — the newest version is showing; pick which to keep', () => pumpConflicts(), 'Review');
+        slog('conflict', `${hit.res.conflicts} conflict${hit.res.conflicts === 1 ? '' : 's'} — newest applied for now, need${hit.res.conflicts === 1 ? 's' : ''} your pick`);
         pumpConflicts();
       }
     }
@@ -3680,13 +3858,13 @@ async function pullNow(mode) {
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
         if (res.conflicts) {
-          toast('Sync conflict — pick which version to keep', () => pumpConflicts(), 'Review');
-          slog('conflict', `${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} need${res.conflicts === 1 ? 's' : ''} your pick`);
+          toast('Sync conflict — the newest version is showing; pick which to keep', () => pumpConflicts(), 'Review');
+          slog('conflict', `${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — newest applied for now, need${res.conflicts === 1 ? 's' : ''} your pick`);
         }
         else if (res.fresh) toast(`Sync: ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
         pumpConflicts();
         if (mode !== 'silent' || res.conflicts || res.fresh) {
-          if (res.conflicts) slog('conflict', `Pulled with ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — kept newest`);
+          if (res.conflicts) slog('conflict', `Pulled with ${res.conflicts} conflict${res.conflicts === 1 ? '' : 's'} — newest applied for now, review to override`);
           else if (res.fresh) slog('ok', `Pulled ${res.fresh} change${res.fresh === 1 ? '' : 's'} from Drive`);
           else slog('ok', 'Pulled — already up to date');
         }
