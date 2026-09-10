@@ -119,6 +119,13 @@ Once a reminder's time passes it also shows up in the **Notifications**
 section on Home — the Home sidebar row carries a red unread badge, and
 tapping Home marks everything read and clears the app-icon badge.
 
+Timed tasks are timezone-aware: a due time entered in one timezone shows
+converted to local time on your other devices (e.g. 5:00 PM entered in
+Istanbul shows as 5:30 PM in Tehran) and reminders fire at the same moment
+everywhere. Date-only tasks stay on the same calendar day on all devices.
+Tasks created before this behavior need one re-save of their date/time on
+the device where the time is correct.
+
 ## Search, filters and sorting
 
 - **Search** (`/`): matches titles, notes, references and subtasks across every view. Searching from Home jumps straight to Board results.

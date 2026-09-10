@@ -105,6 +105,11 @@ function migrate(s) {
     if (typeof t.extRef !== 'string') t.extRef = '';
     if (typeof t.date !== 'string') t.date = '';
     if (typeof t.time !== 'string') t.time = '';
+    // timezone-aware due: timed tasks carry the absolute instant (dueUtc) plus
+    // the IANA zone it was entered in (tz). Legacy tasks predate these fields
+    // and stay floating until their date/time is next edited on any device.
+    if (typeof t.tz !== 'string') t.tz = '';
+    if (typeof t.dueUtc !== 'number' || isNaN(t.dueUtc)) t.dueUtc = 0;
     if (!Array.isArray(t.subtasks)) t.subtasks = [];
     if (!('recId' in t)) t.recId = '';
     if (!('recur' in t)) t.recur = null;
@@ -546,7 +551,7 @@ function sortFn() {
   const impRank = { high: 0, medium: 1, low: 2 }, wRank = { heavy: 0, medium: 1, light: 2 };
   return {
     order: (a, b) => a.order - b.order || a.createdAt - b.createdAt,
-    date: (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.order - b.order,
+    date: (a, b) => (displayDate(a) || '9999').localeCompare(displayDate(b) || '9999') || (dueTs(a) || 0) - (dueTs(b) || 0) || a.order - b.order,
     title: (a, b) => a.title.localeCompare(b.title),
     priority: (a, b) => impRank[a.importance] - impRank[b.importance] || wRank[a.weight] - wRank[b.weight] || a.order - b.order,
   }[state.sort || ui.sort] || ((a, b) => a.order - b.order);
@@ -578,7 +583,7 @@ function renderNav() {
   const openAll = state.tasks.filter((t) => !t.done).length;
   $('#allCount').textContent = openAll;
   $('#allCountPill').textContent = openAll ? `${openAll} open` : 'All done';
-  const dueToday = state.tasks.filter((t) => !t.done && t.date === todayIso()).length;
+  const dueToday = state.tasks.filter((t) => !t.done && displayDate(t) === todayIso()).length;
   $('#calCount').textContent = dueToday || '';
   const todayS = state.times.filter((r) => recDay(r) === todayIso()).reduce((a, r) => a + (r.seconds || 0), 0)
     + (state.timer ? timerElapsed() : 0);
@@ -925,11 +930,18 @@ function taskRow(t, opts = {}) {
     meta.appendChild(tag);
   }
   if (t.date) {
-    const f = fmtDate(t.date);
+    const dd = displayDate(t), dt = displayTime(t);
+    const f = fmtDate(dd);
     const b = document.createElement('span');
     b.className = 'badge date' + (f.diff < 0 && !t.done ? ' overdue' : f.diff === 0 ? ' today' : '');
     b.innerHTML = '<span class="material-icons-outlined">event</span>';
-    const s = document.createElement('span'); s.textContent = f.label + (t.time ? ' ' + t.time : ''); b.appendChild(s);
+    const s = document.createElement('span'); s.textContent = f.label + (t.time ? ' ' + dt : ''); b.appendChild(s);
+    // when the stored wall belongs to another zone, show the origin on hover
+    try {
+      const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (t.time && t.tz && localTz && t.tz !== localTz && typeof t.dueUtc === 'number' && t.dueUtc > 0)
+        b.title = `Entered as ${t.time} in ${t.tz} — showing local time`;
+    } catch {}
     meta.appendChild(b);
   }
   const doneSubs = t.subtasks.filter((s) => s.done).length;
@@ -1032,9 +1044,9 @@ function taskRow(t, opts = {}) {
 function dropOntoTask(fromId, toId, offset) {
   const from = getTask(fromId), to = getTask(toId);
   if (!from || !to || fromId === toId) return;
-  if (isCal() && to.date && from.date !== to.date) {
-    from.date = to.date; save(); renderAll();
-    toast(`Moved to ${to.date}`);
+  if (isCal() && displayDate(to) && displayDate(from) !== displayDate(to)) {
+    moveDueToDate(from, displayDate(to)); save(); renderAll();
+    toast(`Moved to ${displayDate(to)}`);
     return;
   }
   if (from.done !== to.done) {
@@ -1189,8 +1201,8 @@ function attachTaskTouchDrag(li, t, handle) {
           if (target.type === 'task') dropOntoTask(t.id, target.id, target.offset);
           else if (target.type === 'day') {
             const task = getTask(t.id);
-            if (task && task.date !== target.date) {
-              task.date = target.date; save(); renderAll();
+            if (task && displayDate(task) !== target.date) {
+              moveDueToDate(task, target.date); save(); renderAll();
               toast(`Moved to ${target.date}`);
             }
           }
@@ -1407,10 +1419,10 @@ function renderHome() {
   const t = todayIso();
   const pool = state.tasks.filter(matchesFilters);
   const open = pool.filter((x) => !x.done);
-  const overdue = open.filter((x) => x.date && x.date < t).sort(sortFn());
-  const today = open.filter((x) => x.date === t).sort(sortFn());
+  const overdue = open.filter((x) => displayDate(x) && displayDate(x) < t).sort(sortFn());
+  const today = open.filter((x) => displayDate(x) === t).sort(sortFn());
   const impRank = { high: 0, medium: 1, low: 2 }, wRank = { heavy: 0, medium: 1, light: 2 };
-  const important = [...open].sort((a, b) => impRank[a.importance] - impRank[b.importance] || wRank[a.weight] - wRank[b.weight] || (a.date || '9999').localeCompare(b.date || '9999')).slice(0, 8);
+  const important = [...open].sort((a, b) => impRank[a.importance] - impRank[b.importance] || wRank[a.weight] - wRank[b.weight] || (displayDate(a) || '9999').localeCompare(displayDate(b) || '9999')).slice(0, 8);
   const heavy = open.filter((x) => x.weight === 'heavy').sort(sortFn()).slice(0, 8);
   const doneCount = state.tasks.filter((x) => x.done).length;
 
@@ -1594,11 +1606,12 @@ function renderCalendar() {
     if (idx >= 5) s.classList.add('weekend');
     dow.appendChild(s);
   });
-  const dated = allFiltered().filter((t) => t.date && (!t.done || state.showCompleted));
+  const dated = allFiltered().filter((t) => displayDate(t) && (!t.done || state.showCompleted));
   const byDay = new Map();
   dated.forEach((t) => {
-    if (!byDay.has(t.date)) byDay.set(t.date, []);
-    byDay.get(t.date).push(t);
+    const dd = displayDate(t);
+    if (!byDay.has(dd)) byDay.set(dd, []);
+    byDay.get(dd).push(t);
   });
   const grid = $('#calGrid'); grid.innerHTML = '';
   if (gridAnim) {
@@ -1647,8 +1660,8 @@ function renderCalendar() {
     cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
     cell.addEventListener('drop', (e) => {
       e.preventDefault(); cell.classList.remove('drop-target');
-      const t = getTask(ui.dragId); if (!t || t.date === iso) return;
-      t.date = iso; save(); renderAll();
+      const t = getTask(ui.dragId); if (!t || displayDate(t) === iso) return;
+      moveDueToDate(t, iso); save(); renderAll();
       toast(`Moved to ${iso}`);
     });
     grid.appendChild(cell);
@@ -1668,8 +1681,8 @@ function renderCalendar() {
   ul.ondragover = (e) => { if (ui.dragId) e.preventDefault(); };
   ul.ondrop = (e) => {
     e.preventDefault();
-    const t = getTask(ui.dragId); if (!t || t.date === sel) return;
-    t.date = sel; save(); renderAll();
+    const t = getTask(ui.dragId); if (!t || displayDate(t) === sel) return;
+    moveDueToDate(t, sel); save(); renderAll();
     toast(`Moved to ${sel}`);
   };
 }
@@ -1677,7 +1690,7 @@ function renderYear(gridAnim) {
   if (!ui.calYear) ui.calYear = new Date().getFullYear();
   const Y = ui.calYear, tIso = todayIso();
   $('#calTitle').textContent = Y;
-  const busy = new Set(allFiltered().filter((t) => t.date && t.date.startsWith(Y + '-') && (!t.done || state.showCompleted)).map((t) => t.date));
+  const busy = new Set(allFiltered().filter((t) => displayDate(t) && displayDate(t).startsWith(Y + '-') && (!t.done || state.showCompleted)).map((t) => displayDate(t)));
   const grid = $('#calYearGrid'); grid.innerHTML = '';
   if (gridAnim) {
     grid.classList.remove('zoom-out', 'zoom-in', 'slide-l', 'slide-r');
@@ -2023,8 +2036,8 @@ function toggleDone(id) {
     if (t.spawnedId && getTask(t.spawnedId) && !getTask(t.spawnedId).done) {
       spawned = getTask(t.spawnedId);
     } else {
-      const nd = nextFutureRecurDate(t.date, t.recur);
-      if (nd && nd !== t.date) {
+      const nd = nextFutureRecurDate(displayDate(t) || t.date, t.recur);
+      if (nd && nd !== (displayDate(t) || t.date)) {
         if (!t.recId) t.recId = uid();
         spawned = {
           id: uid(), listId: t.listId, title: t.title, notes: t.notes, date: nd, time: t.time,
@@ -2032,8 +2045,18 @@ function toggleDone(id) {
           recur: t.recur ? { freq: t.recur.freq, interval: t.recur.interval || 1, ...(Array.isArray(t.recur.days) ? { days: [...t.recur.days] } : {}) } : null,
           recId: t.recId || '', done: false, completedAt: 0, order: 1e9, createdAt: Date.now(),
           subtasks: t.subtasks.map((s) => ({ id: uid(), title: s.title, done: false })),
+          tz: t.tz || '', dueUtc: 0,
         };
         if (typeof t.remindBefore === 'number') spawned.remindBefore = t.remindBefore;
+        // keep the same local time-of-day pattern across the repeat: shift the
+        // absolute instant by whole days instead of re-stamping in this zone
+        if (hasClockTime(t) && typeof t.dueUtc === 'number' && t.dueUtc > 0) {
+          const dayMs = (Date.parse(nd + 'T12:00:00Z') - Date.parse((displayDate(t) || t.date) + 'T12:00:00Z')) || 0;
+          spawned.time = displayTime(t) || t.time;
+          spawned.date = nd;
+          spawned.dueUtc = t.dueUtc + dayMs;
+          try { spawned.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || spawned.tz; } catch {}
+        }
         t.spawnedId = spawned.id;
         state.tasks.push(spawned);
       }
@@ -2041,7 +2064,7 @@ function toggleDone(id) {
   }
   [true, false].forEach((d) => listTasks(t.listId).filter((x) => x.done === d).sort((a, b) => a.order - b.order).forEach((x, i) => x.order = i));
   save(); renderAll();
-  if (spawned && becomingDone) { const f = fmtDate(spawned.date); toast(`Repeats — next: ${f ? f.label : spawned.date}`); }
+  if (spawned && becomingDone) { const f = fmtDate(displayDate(spawned) || spawned.date); toast(`Repeats — next: ${f ? f.label : (displayDate(spawned) || spawned.date)}`); }
   if (ui.detailId === id) renderDetail();
 }
 function deleteTask(id) {
@@ -2085,7 +2108,15 @@ function renderDetail() {
   $('#dList').innerHTML = ''; $('#dRecurDays').innerHTML = '';
   $('#dColors').innerHTML = ''; $('#dSubs').innerHTML = '';
   $('#dTitle').value = t.title;
-  $('#dDate').value = t.date || ''; $('#dTime').value = t.time || '';
+  // show the due moment converted to this device's timezone; edits re-stamp
+  // the absolute instant so other zones convert back correctly
+  $('#dDate').value = displayDate(t) || ''; $('#dTime').value = displayTime(t) || '';
+  try {
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const shifted = !!(t.time && t.tz && localTz && t.tz !== localTz && typeof t.dueUtc === 'number' && t.dueUtc > 0);
+    $('#dTime').title = shifted ? `Entered as ${t.time} in ${t.tz} — showing your local time` : '';
+    $('#dDate').title = shifted ? `Entered in ${t.tz} — showing your local date` : '';
+  } catch {}
   $('#dExt').value = t.extRef || '';
   $('#dListName').textContent = listName(t.listId);
   const dl = $('#dList'); dl.innerHTML = '';
@@ -2144,7 +2175,11 @@ function renderDetail() {
   function commitRecurUI() {
     const task = getTask(ui.detailId); if (!task) return;
     task.recur = readRecurUI();
-    if (task.recur && !task.date) { task.date = todayIso(); $('#dDate').value = task.date; }
+    if (task.recur && !task.date) {
+      if (hasClockTime(task)) moveDueToDate(task, todayIso());
+      else task.date = todayIso();
+      $('#dDate').value = displayDate(task) || task.date;
+    }
     save(); renderAll();
   }
 
@@ -2441,6 +2476,8 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
       state.tasks.push({
         id: nid, listId: idMap.get(t.listId) || fallbackList()?.id || state.lists[0].id,
         title: String(t.title || '(untitled)').slice(0, 200), notes: String(t.notes || ''), date: t.date || '', time: t.time || '',
+        tz: typeof t.tz === 'string' ? t.tz.slice(0, 64) : '',
+        dueUtc: typeof t.dueUtc === 'number' && t.dueUtc > 0 ? t.dueUtc : 0,
         extRef: String(t.extRef || ''), color: t.color || 'default', weight: clampWeight(t.weight), importance: clampImp(t.importance),
         recur: (t.recur && ['daily', 'weekly', 'monthly', 'yearly'].includes(t.recur.freq)) ? { freq: t.recur.freq, interval: Math.max(1, Math.min(99, t.recur.interval || 1)), ...(Array.isArray(t.recur.days) ? { days: t.recur.days.filter((x) => x >= 0 && x <= 6) } : {}) } : null,
         recId: typeof t.recId === 'string' ? t.recId : '',
@@ -2962,7 +2999,7 @@ function applyRemote(remote, remoteTime) {
   if (!remote || !Array.isArray(remote.tasks) || !Array.isArray(remote.lists)) throw new Error('drive');
   salvageState(remote);
   if (!remote.lists.length) throw new Error('drive');
-  remote.tasks.forEach((t) => { t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance); });
+  remote.tasks.forEach((t) => { t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance); if (typeof t.tz !== 'string') t.tz = ''; if (typeof t.dueUtc !== 'number' || isNaN(t.dueUtc)) t.dueUtc = 0; });
   const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], colorNames: {}, customColors: [], userName: '', deletedColors: [] };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const freshConflicts = [];
@@ -2998,15 +3035,17 @@ function applyRemote(remote, remoteTime) {
 let pendingConflicts = [];
 const CONFLICT_FIELDS = {
   title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
+  tz: 'Time zone', dueUtc: 'Due moment',
   done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Importance',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
   remindBefore: 'Reminder',
 };
 function conflictVal(kind, t, k) {
   const v = t[k];
-  if (v === undefined || v === null || v === '') return '—';
+  if (v === undefined || v === null || v === '' || v === 0) return '—';
   if (k === 'done') return v ? 'Yes' : 'No';
   if (k === 'remindBefore') return typeof v === 'number' ? fmtOffset(v) : '—';
+  if (k === 'dueUtc') { try { return fmtRemind(v); } catch { return String(v); } }
   if (k === 'listId') return listName(v);
   if (k === 'color') return colorName(v);
   if (k === 'recur') return (v && v.freq ? recurLabel(v) : '—');
@@ -3125,14 +3164,76 @@ function applyConflicts() {
    The calendar event sits AT the due time with a Google popup firing
    `remindBefore` earlier. Calendar is the only channel, so there is nothing
    that could double-notify — and nothing needs to run on the device at all. */
-/* effective due timestamp; dateless-time tasks default to 9:00 AM */
-function dueTs(t) {
-  if (!t.date || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return 0;
-  const [Y, M, D] = t.date.split('-').map(Number);
-  const tm = (t.time && /^\d{1,2}:\d{2}/.test(t.time)) ? t.time : '09:00';
+/* effective due timestamp; dateless-time tasks default to 9:00 AM.
+   Timed tasks store their absolute instant in `dueUtc` (stamped from the
+   device where the date/time was entered). Viewers in other timezones then
+   see the same moment converted to local wall time instead of the raw wall
+   repeating everywhere. Tasks without a valid stamp (legacy, or date-only)
+   fall back to floating local interpretation. */
+function parseWallMs(dateStr, timeStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return 0;
+  const [Y, M, D] = dateStr.split('-').map(Number);
+  const tm = (timeStr && /^\d{1,2}:\d{2}/.test(timeStr)) ? timeStr : '09:00';
   const [h, min] = tm.split(':').map(Number);
   const n = new Date(Y, M - 1, D, h || 0, min || 0, 0, 0).getTime();
   return isNaN(n) ? 0 : n;
+}
+function hasClockTime(t) { return !!(t.time && /^\d{1,2}:\d{2}/.test(t.time)); }
+function dueTs(t) {
+  if (!t.date || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return 0;
+  if (hasClockTime(t) && typeof t.dueUtc === 'number' && t.dueUtc > 0) return t.dueUtc;
+  return parseWallMs(t.date, t.time);
+}
+/* Record the absolute instant for the wall currently held in t.date/t.time,
+   interpreted in THIS device's timezone. Call after every date/time edit so
+   other timezones can convert. Date-only tasks stay floating (dueUtc = 0). */
+function stampDue(t) {
+  if (!t || typeof t !== 'object') return;
+  if (t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && hasClockTime(t)) {
+    t.dueUtc = parseWallMs(t.date, t.time);
+    try { t.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || t.tz || ''; }
+    catch { t.tz = t.tz || ''; }
+  } else {
+    t.dueUtc = 0;
+  }
+  // a changed moment invalidates the synced calendar event hash (only when
+  // the task actually uses calendar reminders, to avoid churning plain tasks)
+  if (typeof t.remindBefore === 'number' || t.calEventId || 'calRev' in t) t.calRev = '';
+}
+/* Move a timed task to a viewer-local calendar day, keeping the time-of-day
+   the viewer currently sees (not the raw stored wall, which may belong to a
+   different zone). Date-only tasks just change day. */
+function moveDueToDate(t, isoDate) {
+  if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate || '')) return;
+  if (hasClockTime(t)) {
+    t.time = displayTime(t) || t.time;
+    t.date = isoDate;
+    stampDue(t);
+  } else {
+    t.date = isoDate;
+  }
+}
+function isoDateOfMs(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function timeOfMs(ms) {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+/* Viewer-local calendar day for grouping/overdue checks. Timed stamped tasks
+   convert; everything else uses the stored floating date. */
+function displayDate(t) {
+  if (t && hasClockTime(t) && typeof t.dueUtc === 'number' && t.dueUtc > 0) {
+    const iso = isoDateOfMs(t.dueUtc);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  }
+  return (t && t.date) || '';
+}
+/* Viewer-local wall time. Stamped timed tasks convert; otherwise raw. */
+function displayTime(t) {
+  if (t && hasClockTime(t) && typeof t.dueUtc === 'number' && t.dueUtc > 0) return timeOfMs(t.dueUtc);
+  return (t && t.time) || '';
 }
 function triggerTs(t) {
   if (typeof t.remindBefore !== 'number' || !dueTs(t)) return 0;
@@ -3233,7 +3334,7 @@ function calEventBody(t) {
     },
   };
 }
-function calRev(t) { return JSON.stringify([t.title, t.notes, t.date, t.time, t.remindBefore, t.listId]); }
+function calRev(t) { return JSON.stringify([t.title, t.notes, t.date, t.time, t.dueUtc || 0, t.tz || '', t.remindBefore, t.listId]); }
 function needsCalEvent(t) {
   if (!calConnected() || t.done || typeof t.remindBefore !== 'number') return false;
   const due = dueTs(t);
@@ -3459,11 +3560,17 @@ function paintReminderUI(t) {
   if (!t.date) { hint.textContent = 'Add a due date first — the reminder counts back from it.'; return; }
   const when = fmtRemind(triggerTs(t));
   const timeNote = t.time ? '' : ' (due time defaults to 9:00 AM)';
-  if (!syncMeta.email) hint.textContent = `Notify ${when}${timeNote} — sign in to turn reminders on.`;
-  else if (lastCalError) hint.textContent = `Notify ${when}${timeNote} — ${lastCalError}`;
+  let tzNote = '';
+  try {
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (t.time && t.tz && localTz && t.tz !== localTz && typeof t.dueUtc === 'number' && t.dueUtc > 0)
+      tzNote = ` (entered as ${t.time} in ${t.tz})`;
+  } catch {}
+  if (!syncMeta.email) hint.textContent = `Notify ${when}${timeNote}${tzNote} — sign in to turn reminders on.`;
+  else if (lastCalError) hint.textContent = `Notify ${when}${timeNote}${tzNote} — ${lastCalError}`;
   else hint.textContent = t.calEventId
-    ? `Notify ${when}${timeNote} — in Google Calendar.`
-    : `Notify ${when}${timeNote} — saving…`;
+    ? `Notify ${when}${timeNote}${tzNote} — in Google Calendar.`
+    : `Notify ${when}${timeNote}${tzNote} — saving…`;
 }
 
 /* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
@@ -4261,8 +4368,8 @@ function bind() {
   });
   $('#dTitle').oninput = (e) => { const t = getTask(ui.detailId); if (t) { t.title = e.target.value.slice(0, 200); save(); renderAll(); } };
   $('#dList').onchange = (e) => { if (ui.detailId) moveTask(ui.detailId, e.target.value); };
-  $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
-  $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
+  $('#dDate').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.date = e.target.value; if (!t.date) t.time = ''; stampDue(t); save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
+  $('#dTime').onchange = (e) => { const t = getTask(ui.detailId); if (t) { t.time = e.target.value; if (t.time && !t.date) t.date = todayIso(); stampDue(t); save(); renderAll(); if (calConnected() && typeof t.remindBefore === 'number') { clearTimeout(calSyncTimer); calendarReconcile('silent').catch(() => {}); } } };
   $('#dRemindBefore').onchange = (e) => {
     const t = getTask(ui.detailId); if (!t) return;
     t.remindBefore = e.target.value === '' ? '' : +e.target.value;
@@ -4274,7 +4381,7 @@ function bind() {
       calendarReconcile('silent').catch(() => {});
     }
   };
-  $('#dClearDate').onclick = () => { const t = getTask(ui.detailId); if (t) { t.date = ''; t.time = ''; save(); renderAll(); } };
+  $('#dClearDate').onclick = () => { const t = getTask(ui.detailId); if (t) { t.date = ''; t.time = ''; t.dueUtc = 0; save(); renderAll(); } };
   $('#dExt').oninput = (e) => {
     const t = getTask(ui.detailId); if (!t) return;
     t.extRef = e.target.value.slice(0, 500); save();
