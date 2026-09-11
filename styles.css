@@ -338,9 +338,10 @@ input,select,textarea{font:inherit;color:inherit}
   .task{grid-template-columns:auto auto 1fr auto}
 }
 
-/* Compact mobile topbar: give the search field room */
+/* Compact mobile topbar: give the search field room — keep safe-area so
+   the bar never slides under the notch / Dynamic Island in standalone (iOS home-screen) */
 @media (max-width:699px){
-  .topbar{gap:4px;padding:0 4px}
+  .topbar{gap:4px;padding:var(--safe-t) max(4px,var(--safe-r)) 0 max(4px,var(--safe-l))}
   .brand-name{font-size:17px}
   .search-wrap{height:38px}
   .topbar .icon-btn{width:36px;height:36px}
