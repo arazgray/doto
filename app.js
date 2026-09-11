@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789110476'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789112108'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -4406,7 +4406,7 @@ function setTheme(dark, persist) {
   // every other path (startup, OS change, other tabs) keeps auto.
   try { localStorage.setItem(THEME_KEY, persist ? (dark ? 'dark' : 'light') : 'auto'); } catch {}
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#131314' : '#1a73e8');
+  if (meta) meta.setAttribute('content', dark ? '#131314' : '#ffffff');
   const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (apple) apple.setAttribute('content', dark ? 'black' : 'default');
 }
