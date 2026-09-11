@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789073788'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789107637'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2760,6 +2760,7 @@ function paintSync() {
 
 /* ----- Google auth (GIS token flow, client-side only) ----- */
 let gisReady = null, tokenClient = null, tokenClientId = '', tokenClientScope = '';
+let gisLoadError = '';
 function gisLoad() {
   if (gisReady) return gisReady;
   gisReady = new Promise((res, rej) => {
@@ -2768,10 +2769,21 @@ function gisLoad() {
     sc.src = 'https://accounts.google.com/gsi/client';
     sc.async = true; sc.defer = true;
     sc.onload = () => res();
-    sc.onerror = () => rej(new Error('net'));
+    sc.onerror = () => { gisLoadError = 'net'; rej(new Error('net')); };
     document.head.appendChild(sc);
   });
+  gisReady.catch(() => {});
   return gisReady;
+}
+// Preload GIS immediately so the first user tap doesn't pay the network cost
+// and — crucially — so `requestAccessToken` can stay inside the click's
+// user-activation window (any `await` before it breaks popups in iOS Safari).
+try { gisLoad(); } catch {}
+function isIOSStandalone() {
+  const ua = navigator.userAgent || '';
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  return !!(ios && standalone);
 }
 function tokenValid() {
   const t = syncMeta.token;
@@ -2813,7 +2825,34 @@ async function doEnsureToken(mode, needCal) {
   // re-consent popup when the calendar grant is unverified. (Forcing it for
   // Drive too caused double popups and still never retried the calendar.)
   if (tokenValid() && (mode !== 'popup' || !needCal || tokenHasCal())) return syncMeta.token.access_token;
-  await gisLoad();
+  if (mode === 'popup' && isIOSStandalone() && /iPhone|iPad|iPod/.test(navigator.userAgent || '')) {
+    // Best-effort hint: iOS home-screen (standalone) WebViews often block the
+    // OAuth popup outright — the tap looks dead. We still try, but log a hint
+    // so the user's History explains what happened.
+    try { slog('info', 'iOS home-screen app detected — if sign-in does nothing, open DoTo in Safari instead'); } catch {}
+  }
+  // For popup, avoid any `await` before `requestAccessToken` if GIS is already
+  // ready — iOS Safari invalidates user activation after an async gap, so the
+  // popup gets blocked and the tap looks dead until the 3-minute timeout.
+  const gisAlreadyReady = !!(window.google && window.google.accounts && window.google.accounts.oauth2);
+  if (!gisAlreadyReady) {
+    // GIS is still loading (cold start or flaky network). Don't hang the UI
+    // for 3 minutes behind a blocked popup — fail fast so the button can
+    // explain and the user can retry once GIS is ready.
+    try { await gisLoad(); } catch (e) {
+      if (mode === 'popup') { gisLoadError = 'net'; throw new Error('net'); }
+      throw e;
+    }
+    if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
+      if (mode === 'popup') throw new Error('net');
+      throw new Error('net');
+    }
+    // We had to await before the popup, so the activation is already lost on
+    // iOS. Surface a clear message instead of a silent 3-minute hang.
+    if (mode === 'popup' && !gisAlreadyReady) {
+      try { slog('info', 'Google sign-in was still loading — tap again'); } catch {}
+    }
+  }
   const cid = googleClientId();
   if (!cid) throw new Error('setup');
   if (!tokenClient || tokenClientId !== cid || tokenClientScope !== DRIVE_SCOPE) {
@@ -2825,7 +2864,7 @@ async function doEnsureToken(mode, needCal) {
   // only when scopes actually need granting. Forcing 'consent' here made every
   // post-expiry sign-in show the full scope screen again ("keeps asking").
   // Background: 'none' never shows UI.
-  const tok = mode === 'popup' ? await gisAttempt(tokenClient, '', 180000) : await gisAttempt(tokenClient, 'none', 10000);
+  const tok = mode === 'popup' ? await gisAttempt(tokenClient, '', 60000) : await gisAttempt(tokenClient, 'none', 10000);
   if (!tok || !tok.access_token) {
     const code = (tok && (tok.error || tok.error_subtype)) || 'no_token';
     const desc = tok && tok.error_description ? ' — ' + tok.error_description : '';
@@ -3889,11 +3928,19 @@ async function pullNow(mode) {
   }
 }
 function signInErrorMsg(e) {
+  if (e && e.message === 'net') return 'Could not load Google sign-in — check connection or ad-blocker, then try again.';
   const code = e && e.gis ? String(e.gis) : '';
   // timeout = the Google window never answered (closed too early, popup
   // blocked, or third-party cookies refused for accounts.google.com — the
   // login then cannot report back to the app).
-  if (code === 'timeout') return 'Google sign-in timed out — finish the Google window, allow popups for this site and third-party cookies for accounts.google.com, then try again.';
+  if (code === 'timeout') {
+    if (isIOSStandalone()) return 'Google sign-in timed out — iOS home-screen apps often block the popup. Open DoTo in Safari to sign in, then return.';
+    return 'Google sign-in timed out — finish the Google window, allow popups for this site and third-party cookies for accounts.google.com, then try again.';
+  }
+  if (code === 'popup_failed' || code === 'popup_closed') {
+    if (isIOSStandalone()) return 'Popup blocked — open DoTo in Safari to sign in (iOS home-screen apps block Google popups).';
+    return 'Popup blocked — allow popups for this site and try again.';
+  }
   return code
     ? 'Google sign-in failed (' + code + '). Allow popups for this site and try again.'
     : 'Sign-in failed — try again.';
@@ -3992,26 +4039,39 @@ function bindSync() {
   $('#accountClose').onclick = closeAccount;
   $('#accountScrim').onclick = (e) => { if (e.target === $('#accountScrim')) closeAccount(); };
   $('#signInBtn').onclick = async () => {
-    if (!googleClientId()) { setSync('setup'); paintSync(); return; }
-    // needCal=true: a still-valid token without the calendar grant must
-    // re-consent here (Sync now heals this via its calendar step; without it
-    // sign-in silently reused the scoped-down token and calendar only failed
-    // later in the background).
-    try { await ensureToken('popup', true); }
-    catch (e) {
-      lastSyncError = signInErrorMsg(e);
-      slog('error', lastSyncError);
-      setSync('error'); paintSync();
-      return;
+    const btn = $('#signInBtn');
+    if (btn) { btn.disabled = true; btn.classList.add('busy'); }
+    try {
+      if (!googleClientId()) { setSync('setup'); paintSync(); try { toast('Set a Google client ID first'); } catch {} return; }
+      if (isIOSStandalone()) {
+        try { toast('Opening Google — if nothing happens, open DoTo in Safari to sign in'); } catch {}
+      } else {
+        try { toast('Opening Google…'); } catch {}
+      }
+      // needCal=true: a still-valid token without the calendar grant must
+      // re-consent here (Sync now heals this via its calendar step; without it
+      // sign-in silently reused the scoped-down token and calendar only failed
+      // later in the background).
+      try { await ensureToken('popup', true); }
+      catch (e) {
+        lastSyncError = signInErrorMsg(e);
+        slog('error', lastSyncError);
+        setSync('error'); paintSync();
+        try { toast(lastSyncError); } catch {}
+        return;
+      }
+      try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
+      slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
+      try { toast('Signed in — syncing…'); } catch {}
+      await pullNow('popup');
+      // Same calendar verification as Sync now, so reminders work immediately
+      // instead of failing silently until the next Sync now.
+      try { await calendarReconcile('popup'); }
+      catch {}
+      paintSync();
+    } finally {
+      if (btn) { btn.disabled = false; btn.classList.remove('busy'); }
     }
-    try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
-    slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
-    await pullNow('popup');
-    // Same calendar verification as Sync now, so reminders work immediately
-    // instead of failing silently until the next Sync now.
-    try { await calendarReconcile('popup'); }
-    catch {}
-    paintSync();
   };
   $('#signOutBtn').onclick = () => {
     if (window.google && google.accounts && google.accounts.oauth2 && syncMeta.token) {
@@ -4024,7 +4084,13 @@ function bindSync() {
     slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');
   };
-  $('#syncNowBtn').onclick = () => { syncNowFlow().catch(() => {}); };
+  $('#syncNowBtn').onclick = () => {
+    const b = $('#syncNowBtn'); if (b) { b.disabled = true; b.classList.add('busy'); }
+    try { toast('Syncing…'); } catch {}
+    syncNowFlow().catch((e) => {
+      try { toast(signInErrorMsg(e) || 'Sync failed'); } catch {}
+    }).finally(() => { if (b) { b.disabled = false; b.classList.remove('busy'); } });
+  };
   $('#logOpenBtn').onclick = openLog;
   $('#logClose').onclick = closeLog;
   $('#logClear').onclick = () => { syncLog = []; saveSyncLog(); paintLog(); };

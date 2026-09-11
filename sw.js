@@ -1,7 +1,7 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v8';
+const CACHE = 'doto-v9';
 const CORE = [
   './',
   'index.html',
@@ -70,21 +70,26 @@ self.addEventListener('fetch', (e) => {
           }
           return res;
         })
-        .catch(() => caches.match(request).then((r) => r || caches.match(request, { ignoreSearch: true }).then((r2) => r2 || caches.match('index.html').then((r3) => r3 || caches.match('./')))))
+        .catch(() => caches.match(request)
+          .then((r) => r || caches.match(request, { ignoreSearch: false }).then((r2) => r2
+            // versioned URL ?v= may not be cached yet: fall back to bare file
+            || caches.match(url.pathname, { ignoreSearch: true })
+            || caches.match('index.html').then((r3) => r3 || caches.match('./')))))
     );
     return;
   }
   e.respondWith(
-    caches.match(request, { ignoreSearch: true }).then(
+    caches.match(request).then(
       (hit) =>
         hit ||
-        fetch(request).then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
+        caches.match(request, { ignoreSearch: true }).then((hit2) => hit2 ||
+          fetch(request).then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(request, copy));
+            }
+            return res;
+          }))
     )
   );
 });
