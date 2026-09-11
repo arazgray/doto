@@ -1,7 +1,7 @@
 /* DoTo service worker — offline-first app shell for installability */
 'use strict';
 
-const CACHE = 'doto-v10';
+const CACHE = 'doto-v11';
 const CORE = [
   './',
   'index.html',

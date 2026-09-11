@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789108864'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789109720'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -4408,7 +4408,7 @@ function setTheme(dark, persist) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#131314' : '#1a73e8');
   const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-  if (apple) apple.setAttribute('content', 'black-translucent');
+  if (apple) apple.setAttribute('content', dark ? 'black' : 'default');
 }
 function applySystemTheme() {
   // explicit pick wins; otherwise track the OS live
