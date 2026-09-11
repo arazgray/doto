@@ -18,20 +18,12 @@
   --topbar-h:calc(58px + env(safe-area-inset-top,0px));
   --side-w:280px; --detail-w:440px;
 }
-/* iOS 26.1 PWA regression (WebKit bug 301994): env(safe-area-inset-top)
-   returns 0 in standalone, so the status bar draws a solid/blurred strip
-   over the header. Pure-CSS fallback forces the island notch height. */
-@supports (-webkit-touch-callout: none) {
-  @media (display-mode: standalone) {
-    :root{
-      --safe-t: max(env(safe-area-inset-top, 0px), 59px);
-      --safe-r: max(env(safe-area-inset-right, 0px), 0px);
-      --safe-b: max(env(safe-area-inset-bottom, 0px), 0px);
-      --safe-l: max(env(safe-area-inset-left, 0px), 0px);
-      --topbar-h: calc(58px + max(env(safe-area-inset-top, 0px), 59px));
-    }
-  }
-}
+/* iOS 26.1+ PWA regression (WebKit bug 301994): in Home Screen standalone
+   mode the system draws an opaque status-bar strip and pushes the web
+   content below it, while env(safe-area-inset-top) returns 0 — which is
+   correct, since no extra padding is needed there. Do NOT force a fixed
+   safe-area height: it stacks on top of the system offset and leaves an
+   unwanted empty band at the top of the app. */
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) var(--scroll-track)}
 html,body{height:100%;overflow-x:hidden;overflow-x:clip}
 body{
