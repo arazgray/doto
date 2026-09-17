@@ -3,7 +3,7 @@
 > DoTo — Task Manager, Simple. A ridiculously fast, light and powerful task
 > manager that lives entirely in your browser. No account, no server, no build step.
 >
-> Live app: <https://arazgray.github.io/doto/>
+> Live app: <https://doto.arazgray.com/>
 
 ## Contents
 
@@ -24,7 +24,7 @@
 
 ## Getting started
 
-1. Open <https://arazgray.github.io/doto/> in any modern browser.
+1. Open <https://doto.arazgray.com/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar — or on touch screens,
    drag right starting in the left half (this also works in Board view when
@@ -100,7 +100,7 @@ Switch views from the sidebar, the command palette, or press `g` then `h` / `b` 
   and names sync, export and import alongside everything else.
   **Weight / Importance**: tap the badges on the row.
 - **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.
-- **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Completing a dated repeating task schedules the next occurrence and resets its subtasks.
+- **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Repeating tasks appear on every matching day in the Calendar (computed forever — daily ones show every day at their time; picking Daily hides the date field and keeps only the time). Completing a dated repeating task schedules the next occurrence and resets its subtasks.
 - **Subtasks**: in the details panel, with a `done/total` progress badge on the row.
   The first few subtasks also show under the task title everywhere — tap one to toggle it.
 
@@ -228,8 +228,10 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
      (lets the app create its own secondary "DoTo" calendar via
      `calendars.insert` — without it reminders fall back to your main
      calendar.)
-   - Under Test users, add your Gmail address. New projects start in Testing
-     mode — only listed users can sign in, and sign-in expires about weekly.
+    - Publish the project if prompted (Production mode) so sign-in stays
+      persistent — Testing mode limits sign-in to listed users and expires
+      about weekly. The shipped app at <https://doto.arazgray.com/> already
+      runs in Production, so it stays signed in; forks should publish too.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
    application type **Web application**. Under **Authorized JavaScript
    origins** add your exact site address, e.g. `https://<you>.github.io`
@@ -257,9 +259,11 @@ Only from a JSON export or your Drive sync copy (re-sign-in re-pulls it). Export
 
 **Does it sync between phone and desktop?**
 Yes — via Sync & Settings (Google Drive). Sign in on each device and both stay merged.
-Google's login lasts about an hour; the app renews it silently when it can
-(on iOS silent renewal is often refused — then just tap Sync now when
-prompted).
+The OAuth client runs in Production, so the grant persists — there is no
+weekly expiry and no background refresh loop. The app reuses its token and
+renews it silently on demand whenever Drive/Calendar answers 401; if that
+silent step is refused (notably iOS home-screen WebViews), just tap Sync now
+once to re-auth.
 
 **Can I share a list with someone?**
 Not yet — export the JSON and send them the file; they can import it.

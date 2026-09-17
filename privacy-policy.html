@@ -58,7 +58,7 @@ td:last-child{white-space:normal}
   <ul>
     <li>Only if you sign in with Google: the app requests five scopes — <code>drive.appdata</code> (hidden app folder), <code>userinfo.email</code> (display only), <code>calendar.events</code> (create/edit reminder events), <code>calendar.calendarlist.readonly</code> (find the target calendar — <code>calendar.events</code> alone cannot list calendars) and <code>calendar.app.created</code> (create the dedicated "DoTo" calendar; without it reminders fall back to your main calendar).</li>
     <li>A copy of your lists/tasks is stored in your own Drive's hidden app folder (<code>doto-state.json</code>). Sync traffic goes directly between your browser and Google's APIs; no intermediary server is involved.</li>
-    <li>Access tokens live about an hour in your browser only. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
+    <li>Sign-in runs in Production mode, so the grant persists. Short-lived access tokens stay in your browser only and are renewed silently on demand. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
   </ul>
 
   <h2>4. Google Calendar reminders (optional)</h2>

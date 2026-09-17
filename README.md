@@ -5,7 +5,7 @@
 
 <p align="center">
   <strong>Personal Task Manager. Ridiculously fast, lightweight, privacy-first and offline-first.<br>Hosted on GitHub & Synced with your own Google Drive & Google Calendar.</strong><br>
-  <a href="https://arazgray.github.io/doto/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
+  <a href="https://doto.arazgray.com/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@ Drive + Calendar APIs enabled, the five OAuth scopes from
 the site's origin added.)
 
 ## Install as app (PWA)
-Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
+Served over HTTPS (e.g. `https://doto.arazgray.com/`) the app is
 installable and works offline:
 
 - **Desktop Chrome / Edge** — open the site, then *Install DoTo…* from the
@@ -112,8 +112,9 @@ shell). Plain `file://` usage still works, minus install/offline.
   Weight (light / medium / heavy), Importance (low / medium / high)
   — all inline-editable from the row via popups, and filterable.
 - Due date + time with overdue / today badges; recurrence (daily, weekly with
-  weekday picker, monthly, yearly, or custom "every N") — completing a dated
-  recurring task schedules the next occurrence, subtasks reset.
+  weekday picker, monthly, yearly, or custom "every N") — repeats render on
+  every matching calendar day (daily shows every day at its time),
+  completing a dated recurring task schedules the next occurrence, subtasks reset.
 - Reminders (Details → Reminder): Google Calendar events in a dedicated
   "DoTo" calendar (auto-created, auto-migrated from the main-calendar
   fallback), plus a Notifications section on Home for fired reminders.
@@ -198,7 +199,7 @@ Corrupted saves are detected on load: the raw data is stashed under a
 ## Manual & wiki
 
 Full user manual: [MANUAL.md](MANUAL.md), also readable
-[in-app](https://arazgray.github.io/doto/manual.html) (sidebar → **Manual**)
+[in-app](https://doto.arazgray.com/manual.html) (sidebar → **Manual**)
 and on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
 
 <!-- Maintainer: after editing MANUAL.md, re-publish the wiki from the nested clone:

@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789112109'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789626984'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -583,7 +583,7 @@ function renderNav() {
   const openAll = state.tasks.filter((t) => !t.done).length;
   $('#allCount').textContent = openAll;
   $('#allCountPill').textContent = openAll ? `${openAll} open` : 'All done';
-  const dueToday = state.tasks.filter((t) => !t.done && displayDate(t) === todayIso()).length;
+  const dueToday = state.tasks.filter((t) => !t.done && (displayDate(t) === todayIso() || (t.recur && t.recur.freq && RECUR_UNITS[t.recur.freq] && recurOccursOn(t, todayIso())))).length;
   $('#calCount').textContent = dueToday || '';
   const todayS = state.times.filter((r) => recDay(r) === todayIso()).reduce((a, r) => a + (r.seconds || 0), 0)
     + (state.timer ? timerElapsed() : 0);
@@ -858,6 +858,59 @@ function recurLabel(r) {
     return [...r.days].sort((a, b) => a - b).map((x) => WEEKDAYS[x]).join(', ');
   if (n === 1) return { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' }[r.freq];
   return `Every ${n} ${RECUR_UNITS[r.freq]}s`;
+}
+/* Virtual occurrences: a repeating task shows on every matching day in the
+   calendar (forever, computed — nothing is materialized). Anchor is the
+   task's current display date; days before it never match. Daily hides the
+   date field in the editor and appears every day at its time. */
+function recurStartOf(t) {
+  try {
+    const dd = displayDate(t);
+    if (dd && /^\d{4}-\d{2}-\d{2}$/.test(dd)) return dd;
+  } catch {}
+  return (t && t.date) || '';
+}
+function recurOccursOn(t, iso) {
+  if (!t || !t.recur || !t.recur.freq || !RECUR_UNITS[t.recur.freq]) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return false;
+  const start = recurStartOf(t);
+  if (!start || iso < start) return false;
+  if (iso === start) return true;
+  const n = Math.max(1, Math.min(99, t.recur.interval || 1));
+  const f = t.recur.freq;
+  if (f === 'daily') {
+    const diff = Math.round((new Date(iso + 'T12:00:00') - new Date(start + 'T12:00:00')) / 864e5);
+    return diff >= 0 && diff % n === 0;
+  }
+  if (f === 'weekly') {
+    const days = Array.isArray(t.recur.days) ? t.recur.days.filter((x) => x >= 0 && x <= 6) : [];
+    if (!days.length) {
+      const diff = Math.round((new Date(iso + 'T12:00:00') - new Date(start + 'T12:00:00')) / 864e5);
+      return diff >= 0 && diff % (7 * n) === 0;
+    }
+    const want = new Set(days);
+    const d = new Date(iso + 'T12:00:00');
+    if (!want.has(d.getDay())) return false;
+    const weekStart = (dt) => {
+      const x = new Date(dt + 'T12:00:00');
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+      return x.getTime();
+    };
+    const apart = Math.round((weekStart(iso) - weekStart(start)) / 6048e5);
+    return apart >= 0 && (apart % n === 0 || (apart === 0 && iso !== start));
+  }
+  if (f === 'monthly' || f === 'yearly') {
+    const step = f === 'monthly' ? n : n * 12;
+    const c = new Date(start + 'T12:00:00');
+    for (let k = 0; k < 1200; k++) {
+      const cur = isoOf(c);
+      if (cur === iso) return true;
+      if (cur > iso) return false;
+      addMonthsClamped(c, step);
+    }
+    return false;
+  }
+  return false;
 }
 
 /* ---------- task rows ---------- */
@@ -1419,8 +1472,8 @@ function renderHome() {
   const t = todayIso();
   const pool = state.tasks.filter(matchesFilters);
   const open = pool.filter((x) => !x.done);
-  const overdue = open.filter((x) => displayDate(x) && displayDate(x) < t).sort(sortFn());
-  const today = open.filter((x) => displayDate(x) === t).sort(sortFn());
+  const overdue = open.filter((x) => displayDate(x) && displayDate(x) < t && !(x.recur && x.recur.freq && RECUR_UNITS[x.recur.freq])).sort(sortFn());
+  const today = open.filter((x) => displayDate(x) === t || (x.recur && x.recur.freq && RECUR_UNITS[x.recur.freq] && recurOccursOn(x, t))).sort(sortFn());
   const impRank = { high: 0, medium: 1, low: 2 }, wRank = { heavy: 0, medium: 1, light: 2 };
   const important = [...open].sort((a, b) => impRank[a.importance] - impRank[b.importance] || wRank[a.weight] - wRank[b.weight] || (displayDate(a) || '9999').localeCompare(displayDate(b) || '9999')).slice(0, 8);
   const heavy = open.filter((x) => x.weight === 'heavy').sort(sortFn()).slice(0, 8);
@@ -1613,6 +1666,17 @@ function renderCalendar() {
     if (!byDay.has(dd)) byDay.set(dd, []);
     byDay.get(dd).push(t);
   });
+  // virtual repeat occurrences: repeating tasks appear on every matching day
+  // of the visible month (computed forever — nothing is materialized)
+  dated.filter((t) => t.recur && t.recur.freq && RECUR_UNITS[t.recur.freq]).forEach((t) => {
+    for (let dn = 1; dn <= days; dn++) {
+      const iso = `${Y}-${String(M).padStart(2, '0')}-${String(dn).padStart(2, '0')}`;
+      if (iso === displayDate(t)) continue; // real instance already listed
+      if (!recurOccursOn(t, iso)) continue;
+      if (!byDay.has(iso)) byDay.set(iso, []);
+      if (!byDay.get(iso).some((x) => x.id === t.id)) byDay.get(iso).push(t);
+    }
+  });
   const grid = $('#calGrid'); grid.innerHTML = '';
   if (gridAnim) {
     grid.classList.remove('zoom-out', 'zoom-in', 'slide-l', 'slide-r');
@@ -1691,6 +1755,17 @@ function renderYear(gridAnim) {
   const Y = ui.calYear, tIso = todayIso();
   $('#calTitle').textContent = Y;
   const busy = new Set(allFiltered().filter((t) => displayDate(t) && displayDate(t).startsWith(Y + '-') && (!t.done || state.showCompleted)).map((t) => displayDate(t)));
+  // virtual repeat occurrences count as busy too
+  allFiltered().filter((t) => t.recur && t.recur.freq && RECUR_UNITS[t.recur.freq] && (!t.done || state.showCompleted)).forEach((t) => {
+    const start = recurStartOf(t);
+    if (!start || start > `${Y}-12-31`) return;
+    const from = start.startsWith(Y + '-') ? start : `${Y}-01-01`;
+    const d0 = new Date(from + 'T12:00:00'), d1 = new Date(`${Y}-12-31T12:00:00`);
+    for (let d = new Date(d0); d <= d1; d.setDate(d.getDate() + 1)) {
+      const iso = isoOf(d);
+      if (!busy.has(iso) && recurOccursOn(t, iso)) busy.add(iso);
+    }
+  });
   const grid = $('#calYearGrid'); grid.innerHTML = '';
   if (gridAnim) {
     grid.classList.remove('zoom-out', 'zoom-in', 'slide-l', 'slide-r');
@@ -1927,9 +2002,10 @@ function renderTime() {
   if (todayRs.length) { dayHead('Today', todayRs); todayRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
   if (prevRs.length) { dayHead('Previously', null); prevRs.forEach((r) => ul.appendChild(timeRecRow(r))); }
   // middle: searchable tasks with totals
+  // picker never shows completed tasks — it is for tracking open work
   const q = (ui.timeQuery || '').trim().toLowerCase();
   const tasks = state.tasks
-    .filter((t) => !t.done || state.showCompleted)
+    .filter((t) => !t.done)
     .filter(matchesFilters)
     .filter((t) => !q || (t.title + ' ' + t.notes).toLowerCase().includes(q))
     .sort((a, b) => {
@@ -2144,10 +2220,11 @@ function renderDetail() {
     const sel = new Set(r && r.freq === 'weekly' && Array.isArray(r.days) ? r.days : []);
     ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((ch, day) => {
       const b = document.createElement('button');
+      b.type = 'button';
       b.textContent = ch; b.dataset.day = day; b.title = WEEKDAYS[day];
       b.setAttribute('aria-label', WEEKDAYS[day]);
       b.className = sel.has(day) ? 'selected' : '';
-      b.onclick = () => { b.classList.toggle('selected'); commitRecurUI(); };
+      b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); b.classList.toggle('selected'); commitRecurUI(); };
       dc.appendChild(b);
     });
   }
@@ -2158,6 +2235,12 @@ function renderDetail() {
     const nx = nextRecurDate(t.date, readRecurUI());
     hint.textContent = nx ? `Next after ${t.date}: ${nx}` : '';
   }
+  // daily repeats live on time-of-day: the date field hides, the task shows
+  // every day in the calendar at its time (anchor stays stored for ordering)
+  const effDaily = fq.value === 'daily' || (fq.value === 'custom' && $('#dRecurUnit').value === 'daily');
+  $('#dDate').style.display = effDaily ? 'none' : '';
+  $('#dClearDate').style.display = effDaily ? 'none' : '';
+  if (effDaily) hint.textContent = (t.time ? `Shows every day at ${displayTime(t) || t.time}.` : 'Shows every day — set a time.') + (hint.textContent ? ' ' + hint.textContent : '');
   fq.onchange = commitRecurUI;
   $('#dRecurN').onchange = commitRecurUI;
   $('#dRecurUnit').onchange = commitRecurUI;
@@ -2590,7 +2673,7 @@ function renderAll() {
    push to Drive's hidden app folder (debounced) and pull on launch,
    focus and reconnect. Merge is per-item, three-way against the last
    synced snapshot; both-sides-edited items resolve newest-wins. */
-const GOOGLE_CLIENT_ID = '1053076438888-73jt7847277sev0oq6eaesn4g63v91do.apps.googleusercontent.com'; // app-owned; per-browser override in the Account dialog
+const GOOGLE_CLIENT_ID = '1053076438888-vgota4q9t6j5647of50008a9asitbrns.apps.googleusercontent.com'; // app-owned (production); per-browser override in the Account dialog
 const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.app.created'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT; creating the dedicated "DoTo" calendar via calendars.insert needs calendar.app.created — without it everything falls back to the primary calendar)
 const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.app.created'];
@@ -3790,27 +3873,27 @@ function paintReminderUI(t) {
     : `Notify ${when}${timeNote}${tzNote} — saving…`;
 }
 
-/* Google access tokens live ~1h and pure SPAs get no refresh token, so renew
-   proactively in the last 10 minutes (while the session is still warm) instead
-   of waiting for expiry. iOS WebViews often refuse silent renewal entirely —
-   then nudge once per expiry instead of dying quietly. */
-let lastRefreshTry = 0, nudgeForExpiry = 0, syncStartAt = 0;
+/* Production OAuth client: the Google Cloud project is published, so grants
+   persist — no weekly test-mode expiry and no 60-minute refresh loop. Access
+   tokens are still short-lived by design; the app simply reuses the cached
+   token until Google answers 401, then renews silently on demand inside
+   ensureToken('silent') (drive/calendar calls + the one-retry rule). This
+   helper is only a cheap opportunistic top-up on online/focus/visible — it
+   never polls on a timer and never nags. If silent renewal fails (e.g. iOS
+   refusing it, revoked access), the next real sync surfaces it and Sync now
+   re-auths with one popup. */
+let lastRefreshTry = 0, syncStartAt = 0;
 async function maybeRefreshToken() {
   if (!syncMeta.email || !syncMeta.token || !navigator.onLine) return;
-  const left = syncMeta.token.expires_at - Date.now();
-  if (left > 10 * 60000 || left < -12 * 3600000) return;
-  if (Date.now() - lastRefreshTry < 5 * 60000) return;
+  if (tokenValid()) return;
+  if (Date.now() - lastRefreshTry < 30000) return;
   lastRefreshTry = Date.now();
   const epoch = syncMeta.token.expires_at;
   try {
     await ensureToken('silent');
     if (syncMeta.token.expires_at > epoch) slog('info', 'Token renewed silently');
   } catch {
-    if (document.visibilityState === 'visible' && nudgeForExpiry !== epoch) {
-      nudgeForExpiry = epoch;
-      try { toast('Sync paused — open Sync & Settings and tap Sync now'); } catch {}
-      slog('info', 'Token expired and silent renewal failed — tap Sync now');
-    }
+    slog('info', 'Token renewal needs interaction — tap Sync now when ready');
   }
 }
 let syncing = false, lastPullAt = 0, pushTimer = 0;
@@ -4148,7 +4231,6 @@ function bindSync() {
         sessionStorage.removeItem('doto-updated');
         slog('info', 'Updated — re-checking Drive sync');
         setTimeout(() => {
-          if (syncMeta.email && !tokenValid()) setSync('signedout');
           paintSync();
         }, 1500);
       }
@@ -4158,7 +4240,6 @@ function bindSync() {
   bindEdgeSwipe();
   bindDetailSwipe();
   setInterval(() => { paintSync(); syncWatchdog(); }, 5000);
-  setInterval(() => { maybeRefreshToken().catch(() => {}); }, 60000);
   paintSync();
 }
 
@@ -4438,7 +4519,12 @@ function bind() {
   document.addEventListener('click', (e) => {
     if (!ui.detailId) return;
     const t = e.target;
-    if (t && t.closest && t.closest('#detail,.task,.cal-chip,.cal-more,.cal-num,.menu,.modal-scrim,.toast')) return;
+    if (!t || !t.closest) return;
+    // a panel button that re-rendered the detail synchronously (label, weekday
+    // chip, …) is detached by the time the event bubbles here — it was still
+    // an inside click, so never treat it as outside
+    if (!t.isConnected) return;
+    if (t.closest('#detail,.task,.cal-chip,.cal-more,.cal-num,.menu,.modal-scrim,.toast')) return;
     closeDetail();
   });
   const goHomeBrand = () => { $('#searchInput').value = ''; save(); go(HOME); };
