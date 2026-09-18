@@ -871,7 +871,7 @@ a.btn-ghost{text-decoration:none}
 .trash-btn .c{position:absolute;top:-5px;right:-5px;font-size:10px;line-height:16px;min-width:16px;text-align:center;background:var(--blue);color:#fff;border-radius:10px;padding:0 4px}
 
 /* Account dialog */
-.account-modal{width:min(600px,100%);max-height:min(92dvh,800px);overflow-y:auto}
+.account-modal{width:min(600px,100%);max-height:min(92dvh,800px);overflow-y:auto; min-height: 440px;}
 .set-group{margin:6px 0}
 .set-group .d-label{margin-bottom:10px}
 .color-names{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 10px}
@@ -945,7 +945,7 @@ a.btn-ghost{text-decoration:none}
 .conflict-actions{flex-wrap:wrap}
 
 /* Settings tabs (Sync first, then Labels, Home page, General) */
-.set-tabs{display:flex;gap:4px;background:var(--bg2);border-radius:14px;padding:3px;margin:4px 0 12px;overflow-x:auto}
+.set-tabs{display:flex;gap:4px;background:var(--bg2);border-radius:14px;padding:3px;margin:4px -10px 12px;overflow-x:auto}
 .set-tabs button{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border-radius:11px;padding:8px 6px;white-space:nowrap;flex:1;justify-content:center;min-width:0}
 .set-tabs button .material-icons-outlined{font-size:18px}
 .set-tabs button.selected{background:var(--bg);color:var(--text);box-shadow:var(--shadow);font-weight:500}
