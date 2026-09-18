@@ -962,10 +962,10 @@ a.btn-ghost{text-decoration:none}
 .notes-search:focus-within{border-color:var(--blue)}
 .note-add{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}
 .note-add input,.note-add textarea{width:100%;border:0;outline:0;background:transparent;font:inherit;resize:vertical}
-.note-add input{font-weight:500;font-size:16px;margin-bottom:6px}
+.note-add input{font-weight:500;font-size:16px;margin-bottom:10px}
 .note-add textarea{font-size:16px;min-height:160px}
 .note-add-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:nowrap}
-.note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center;flex:1;min-width:0;overflow-x:auto;padding:4px 2px}
+.note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center;flex:1;min-width:0;overflow-x:auto;padding:4px}
 .note-add-row .add-note-btn{flex:none;width:40px;height:40px;border-radius:50%;padding:0;justify-content:center}
 .notes-head{font-size:13px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;margin:18px 0 10px}
 .notes-head .material-icons-outlined{font-size:17px}
