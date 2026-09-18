@@ -1035,7 +1035,6 @@ a.btn-ghost{text-decoration:none}
   #viewTrash .list-header > div{min-width:0}
   #viewTrash .list-header .board-hint{display:none}
   #emptyTrashBtn{width:110px;height:40px;padding:0;justify-content:center}
-  #emptyTrashBtn .btn-label{display:none}
 }
 
 /* Compact mobile task cards: badges own the full top row, actions sit on the
