@@ -990,10 +990,26 @@ a.btn-ghost{text-decoration:none}
 .palette-dot.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--blue)}
 .note-modal input.d-title,.note-modal textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;background:var(--bg);color:var(--text);outline:0}
 .note-modal input.d-title:focus,.note-modal textarea:focus{border-color:var(--blue)}
-.note-modal textarea{resize:vertical;margin-top:8px;min-height:160px}
+.note-modal textarea{resize:vertical;margin-top:8px;min-height:min(46dvh,420px)}
+/* Compact options row: swatches + icon toggles share one line */
+.note-options{display:flex;align-items:center;gap:6px;min-width:0}
+.note-options .palette{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px}
+.note-options .spacer{flex:1}
+.note-options .palette-dot{width:18px;height:18px;flex:none}
+.switch-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;cursor:pointer;color:var(--muted);flex:none;position:relative}
+.switch-icon:hover{background:var(--bg2);color:var(--text)}
+.switch-icon input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}
+.switch-icon .material-icons-outlined{font-size:19px;pointer-events:none}
+.switch-icon input:checked ~ .material-icons-outlined{color:var(--blue)}
+.switch-icon input:focus-visible ~ .material-icons-outlined{box-shadow:0 0 0 2px var(--blue-soft)}
 .note-modal .palette{margin:6px 0}
-.note-modal .d-label{margin:12px 0 4px}
 .note-actions .spacer{flex:1}
+/* Note editor: bottom sheet on mobile, like the task detail panel */
+@keyframes noteSheetIn{from{transform:translateY(100%)}to{transform:none}}
+@media (max-width:1023px){
+  #noteScrim{align-items:flex-end;padding:0}
+  .note-modal{width:100%;max-width:none;border-radius:20px 20px 0 0;border:0;border-top:1px solid var(--line-soft);box-shadow:var(--shadow-lg);max-height:92dvh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));animation:noteSheetIn .3s cubic-bezier(.32,.72,0,1)}
+}
 .btn-ghost.sm{font-size:12px;padding:5px 10px}
 .btn-ghost.danger{color:var(--danger);border-color:var(--danger)}
 .btn-ghost.danger:hover{border-color:var(--danger);color:var(--danger)}
@@ -1014,6 +1030,13 @@ a.btn-ghost{text-decoration:none}
 .trash-actions{display:flex;align-items:center;gap:4px}
 .trash-actions .material-icons-outlined{font-size:18px}
 #viewTrash .notes-head{margin-top:22px}
+/* Trash header fits one line on narrow screens: icon-only button beside the title */
+@media (max-width:600px){
+  #viewTrash .list-header > div{min-width:0}
+  #viewTrash .list-header .board-hint{display:none}
+  #emptyTrashBtn{width:40px;height:40px;padding:0;justify-content:center}
+  #emptyTrashBtn .btn-label{display:none}
+}
 
 /* Compact mobile task cards: badges own the full top row, actions sit on the
    title row where the space is. Must stay last in file: equal-specificity

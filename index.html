@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1789740211" />
-<link rel="stylesheet" href="styles.css?v=1.0-1789740211" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1789759467" />
+<link rel="stylesheet" href="styles.css?v=1.0-1789759467" />
 </head>
 <body>
 <header class="topbar">
@@ -305,7 +305,7 @@
         <div><h1>Trash</h1><p class="muted small board-hint">Deleted tasks and notes stay here until you restore them or empty the trash.</p></div>
         <div class="list-header-actions">
           <span id="trashCountPill" class="count-pill"></span>
-          <button id="emptyTrashBtn" class="btn-ghost danger"><span class="material-icons-outlined">delete_forever</span> Empty trash</button>
+          <button id="emptyTrashBtn" class="btn-ghost danger" aria-label="Empty trash"><span class="material-icons-outlined">delete_forever</span><span class="btn-label">Empty trash</span></button>
         </div>
       </div>
       <h2 class="notes-head"><span class="material-icons-outlined">task</span> Tasks</h2>
@@ -320,7 +320,7 @@
   <aside id="detail" class="detail hidden" aria-label="Task details">
     <div id="detailResizer" class="resizer resizer-detail" title="Drag to resize details panel"></div>
     <div class="detail-head">
-      <button id="detailBack" class="icon-btn" aria-label="Close details"><span class="material-icons-outlined">arrow_back</span></button>
+      <button id="detailBack" class="icon-btn" aria-label="Close details"><span class="material-icons-outlined">arrow_downward</span></button>
       <span class="detail-title">Details</span>
       <span id="dListName" class="count-pill muted"></span>
       <button id="detailDelete" class="icon-btn" aria-label="Delete task"><span class="material-icons-outlined">delete</span></button>
@@ -563,10 +563,12 @@
   <div class="modal note-modal" role="dialog" aria-modal="true" aria-label="Edit note">
     <input id="noteEditTitle" type="text" class="d-title" placeholder="Title" maxlength="120" dir="auto" />
     <textarea id="noteEditBody" rows="6" placeholder="Take a note…" dir="auto"></textarea>
-    <p class="d-label">Color</p>
-    <div id="noteEditColors" class="palette"></div>
-    <label class="switch-row"><input type="checkbox" id="noteEditPinned" /> Pinned</label>
-    <label class="switch-row"><input type="checkbox" id="noteEditHome" /> Show on Home page</label>
+    <div class="note-options">
+      <div id="noteEditColors" class="palette"></div>
+      <span class="spacer"></span>
+      <label class="switch-icon" title="Pinned"><input type="checkbox" id="noteEditPinned" /><span class="material-icons-outlined">push_pin</span></label>
+      <label class="switch-icon" title="Show on Home page"><input type="checkbox" id="noteEditHome" /><span class="material-icons-outlined">home</span></label>
+    </div>
     <div class="modal-actions note-actions">
       <button type="button" id="noteDeleteBtn" class="btn-ghost danger"><span class="material-icons-outlined">delete</span> Delete</button>
       <span class="spacer"></span>
@@ -589,6 +591,6 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1789740211"></script>
+<script src="app.js?v=1.0-1789759467"></script>
 </body>
 </html>
