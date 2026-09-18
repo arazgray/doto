@@ -127,7 +127,7 @@ input,select,textarea{font:inherit;color:inherit}
 .f-group{display:flex;align-items:center;gap:8px;margin:1px 0 8px;min-width:0}
 .f-name{flex:0 0 68px;width:68px;font-size:12px;color:var(--muted);margin:0 0 0 10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .f-btns{
-  display:flex;gap:6px;padding:0 10px 0 0;flex-wrap:nowrap;flex:1;min-width:0;align-items:center;
+  display:flex;gap:6px;padding:0 5px 0 0;flex-wrap:nowrap;flex:1;min-width:0;align-items:center;
   &.colors{gap:2px;flex-wrap:wrap;justify-content:flex-end}
   &.colors .f-dot{width:22px;height:22px}
 }
@@ -620,7 +620,7 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
 @media (min-width:1024px){
   @keyframes detailIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 }
-/* Weight + Importance side-by-side only when the panel itself is wide enough */
+/* Weight + Priority side-by-side only when the panel itself is wide enough */
 @container detail (min-width:430px){
   .d-grid{grid-template-columns:1fr 1fr}
 }
@@ -883,7 +883,7 @@ a.btn-ghost{text-decoration:none}
 .color-row .icon-btn.sm .material-icons-outlined{font-size:15px}
 .color-add-row{margin-top:8px;gap:6px;align-items:center}
 .color-add-row input[type="color"]{width:28px;height:28px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:none;cursor:pointer}
-.color-add-row #customColorName{padding:6px 10px;font-size:13px}
+.color-add-row #customColorName{padding:6px 10px;font-size:16px}
 .color-add-row #customColorAdd{padding:6px 10px;font-size:13px}
 .sync-err{color:var(--danger);font-size:13px;margin:6px 0 0}
 .account-actions{justify-content:flex-start;flex-wrap:wrap}
@@ -964,8 +964,9 @@ a.btn-ghost{text-decoration:none}
 .note-add input,.note-add textarea{width:100%;border:0;outline:0;background:transparent;font:inherit;resize:vertical}
 .note-add input{font-weight:500;font-size:16px;margin-bottom:6px}
 .note-add textarea{font-size:16px;min-height:160px}
-.note-add-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
-.note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center}
+.note-add-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:nowrap}
+.note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center;flex:1;min-width:0;overflow-x:auto;padding:4px 2px}
+.note-add-row .add-note-btn{flex:none;width:40px;height:40px;border-radius:50%;padding:0;justify-content:center}
 .notes-head{font-size:13px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;margin:18px 0 10px}
 .notes-head .material-icons-outlined{font-size:17px}
 .notes-grid{display:flex;flex-direction:column;gap:12px}

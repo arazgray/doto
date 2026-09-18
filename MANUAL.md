@@ -81,7 +81,7 @@ How it works and what to expect:
 
 | View | What it is for |
 | ---- | -------------- |
-| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote (tap refresh for a new one), a Pinned notes section (editable inline), a Notifications section for fired reminders, and sections: Overdue, Today's tasks, Most important first, Heavy lifting. The Home sidebar row carries a red badge counting unseen notifications — tapping Home marks them read. Which sections appear is configurable under Sync & Settings → Home. |
+| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote (tap refresh for a new one), a Pinned notes section (editable inline), a Notifications section for fired reminders, and sections: Overdue, Today's tasks, Highest priority first, Heavy lifting. The Home sidebar row carries a red badge counting unseen notifications — tapping Home marks them read. Which sections appear is configurable under Sync & Settings → Home. |
 | **List** | One category at a time: add bar with quick presets, open tasks, collapsible Completed section. |
 | **Board** | Kanban columns — one per list. Drag tasks between columns, add per column, reorder columns by their grip. |
 | **Calendar** | Month grid with task chips, a Year overview with busy dots, and a day agenda with its own add box. Drag a task onto a day to reschedule it. |
@@ -96,7 +96,7 @@ Switch views from the sidebar, the command palette, or press `g` then `h` / `b` 
 - **Create**: the add bar (or per-column / agenda boxes), the Home **New**
   button, the `n` key, or the command palette (`Ctrl+K`).
 - **Complete**: the circle on the row, or select it and press `x`. Completed-by-mistake items can be undone from the toast popup; deleted items go to [Trash](#trash) and can be restored from there.
-- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, label, weight, importance, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
+- **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, label, weight, priority, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
 - **Rename inline**: double-click the title.
 - **Labels**: tap the label dot on the row. Labels carry your own names, and
   you can add fully custom labels too (Sync & Settings → Labels, e.g.
@@ -104,7 +104,7 @@ Switch views from the sidebar, the command palette, or press `g` then `h` / `b` 
   be deleted when no task uses it (otherwise the app tells you to change
   those tasks first); built-ins can be restored with Reset. Custom labels
   and names sync, export and import alongside everything else.
-  **Weight / Importance**: tap the badges on the row.
+  **Weight / Priority**: tap the badges on the row.
 - **Move**: drag onto another task, board column, sidebar list or the empty list area — or the move button on the row (desktop), or the List selector in details.
 - **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Repeating tasks appear on every matching day in the Calendar (computed forever — daily ones show every day at their time; picking Daily hides the date field and keeps only the time). Completing a dated repeating task schedules the next occurrence and resets its subtasks.
 - **Subtasks**: in the details panel, with a `done/total` progress badge on the row.
@@ -173,8 +173,8 @@ the device where the time is correct.
 ## Search, filters and sorting
 
 - **Search** (`/`): matches titles, notes, references and subtasks across every view. Searching from Home jumps straight to Board results. Notes have their own search box on the Notes page.
-- **Filters**: label, weight and importance in the sidebar. Active filters show as removable chips on every view.
-- **Sorting**: My order (manual drag order), Date, Importance & weight, Title — from the sort button in the top bar.
+- **Filters**: label, weight and priority in the sidebar. Active filters show as removable chips on every view.
+- **Sorting**: My order (manual drag order), Date, Priority & weight, Title — from the sort button in the top bar.
 
 ## Keyboard shortcuts
 
@@ -227,7 +227,7 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing 
 - **Export** (Sync & Settings → Data → Export): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks, notes, trash, time records and labels. Back these up — your data lives in this browser plus, if enabled, your Drive sync copy.
 - **Import** (same tab, multi-select): pick the source — **Auto-detect**,
   **DoTo backup**, or **Google Tasks** — then choose files. Accepts DoTo exports
-  (appended as new lists; notes and trash merge by id, so re-importing your own backup is a no-op instead of doubling everything) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
+  (appended as new lists; notes and trash merge by id, so re-importing your own backup is a no-op instead of doubling everything) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high priority, links become external references, parents become subtasks, recurring series collapse to one repeating task.
 
 ## Installing the app
 

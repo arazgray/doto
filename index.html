@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>DoTo</title>
-<meta name="description" content="DoTo — Task Manager, Simple. A Google Tasks-style task manager with external refs, labels, weight and importance." />
+<meta name="description" content="DoTo — Task Manager, Simple. A Google Tasks-style task manager with external refs, labels, weight and priority." />
 <meta name="theme-color" content="#ffffff" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -41,7 +41,7 @@
     <div id="sortMenu" class="menu hidden" role="menu">
       <button data-sort="order" role="menuitemradio" aria-checked="true"><span class="material-icons-outlined">drag_handle</span> My order</button>
       <button data-sort="date" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">event</span> Date</button>
-      <button data-sort="priority" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">flag</span> Importance &amp; weight</button>
+      <button data-sort="priority" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">flag</span> Priority &amp; weight</button>
       <button data-sort="title" role="menuitemradio" aria-checked="false"><span class="material-icons-outlined">sort_by_alpha</span> Title</button>
     </div>
   </div>
@@ -66,7 +66,7 @@
       <div class="sidebar-filters">
         <div class="f-group"><span class="f-name">Labels</span><div id="filterColorBtns" class="f-btns colors"></div></div>
         <div class="f-group"><span class="f-name">Weight</span><div id="filterWeightBtns" class="f-btns"></div></div>
-        <div class="f-group"><span class="f-name">Importance</span><div id="filterImportanceBtns" class="f-btns"></div></div>
+        <div class="f-group"><span class="f-name">Priority</span><div id="filterImportanceBtns" class="f-btns"></div></div>
         <button id="clearFilters" class="link-btn hidden">Clear filters</button>
       </div>
       <div class="sidebar-foot">
@@ -106,7 +106,7 @@
           <button id="homeBoardBtn" class="btn-ghost"><span class="material-icons-outlined">view_column</span> Board</button>
           <button id="homeCalBtn" class="btn-ghost"><span class="material-icons-outlined">calendar_month</span> Calendar</button>
           <button id="homeTimeBtn" class="btn-ghost"><span class="material-icons-outlined">timer</span> Time</button>
-          <button id="homeAddBtn" class="btn-primary"><span class="material-icons-outlined">add</span><span class="full-t">New task</span><span class="short-t">New</span></button>
+          <button id="homeAddBtn" class="btn-primary"><span class="material-icons-outlined">add</span><span class="full-t" style="margin-left: -5px;">New task</span><span class="short-t">New</span></button>
         </div>
       </div>
       <div class="home-meta">
@@ -124,7 +124,7 @@
       <div class="home-grid">
         <section class="card"><h2><span class="material-icons-outlined danger">warning</span> Overdue</h2><ul id="homeOverdue" class="task-list"></ul></section>
         <section class="card"><h2><span class="material-icons-outlined blue">today</span> Today's tasks</h2><ul id="homeToday" class="task-list"></ul></section>
-        <section class="card"><h2><span class="material-icons-outlined red">priority_high</span> Most important first</h2><ul id="homeImportant" class="task-list"></ul></section>
+        <section class="card"><h2><span class="material-icons-outlined red">priority_high</span> Highest priority first</h2><ul id="homeImportant" class="task-list"></ul></section>
         <section class="card"><h2><span class="material-icons-outlined purple">fitness_center</span> Heavy lifting</h2><ul id="homeHeavy" class="task-list"></ul></section>
       </div>
     </section>
@@ -165,8 +165,8 @@
           </div>
         </div>
         <div class="qa-group">
-          <span>Importance</span>
-          <div class="qa-seg" id="qaImportance" role="radiogroup" aria-label="Importance">
+          <span>Priority</span>
+          <div class="qa-seg" id="qaImportance" role="radiogroup" aria-label="Priority">
             <button type="button" data-v="low" title="Low"><span class="material-icons-outlined">arrow_downward</span></button>
             <button type="button" data-v="medium" title="Medium"><span class="material-icons-outlined">remove</span></button>
             <button type="button" data-v="high" title="High"><span class="material-icons-outlined">arrow_upward</span></button>
@@ -289,7 +289,7 @@
         <textarea id="noteAddBody" rows="2" placeholder="Take a note…" aria-label="Note text" dir="auto"></textarea>
         <div class="note-add-row">
           <div id="noteAddColors" class="qa-colors"></div>
-          <button type="submit" class="btn-primary"><span class="material-icons-outlined">add</span> Add note</button>
+          <button type="submit" class="btn-primary add-note-btn" aria-label="Add note"><span class="material-icons-outlined">add</span></button>
         </div>
       </form>
       <h2 id="notesPinnedHead" class="notes-head"><span class="material-icons-outlined">push_pin</span> Pinned</h2>
@@ -357,8 +357,8 @@
           </div>
         </div>
         <div class="d-section">
-          <p class="d-label">Importance</p>
-          <div id="dImportance" class="segmented importance" role="radiogroup" aria-label="Importance">
+          <p class="d-label">Priority</p>
+          <div id="dImportance" class="segmented importance" role="radiogroup" aria-label="Priority">
             <button data-v="low" role="radio"><span class="material-icons-outlined">arrow_downward</span>Low</button>
             <button data-v="medium" role="radio"><span class="material-icons-outlined">remove</span>Medium</button>
             <button data-v="high" role="radio"><span class="material-icons-outlined">arrow_upward</span>High</button>

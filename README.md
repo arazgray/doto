@@ -32,7 +32,7 @@
 <tbody>
 <tr><td>Price</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Free, no account needed</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (Google account)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (MS account)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$48/yr Pro)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$60/yr Premium)</td></tr>
 <tr><td>Offline</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Excellent (local-first PWA)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ OK</td></tr>
-<tr><td>Priorities</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Weight × importance × labels, all filterable</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Starred only</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Important / My Day</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 P1–P4 + labels</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Priority + tags</td></tr>
+<tr><td>Priorities</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Weight × priority × labels, all filterable</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Starred only</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Important / My Day</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 P1–P4 + labels</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Priority + tags</td></tr>
 <tr><td>Views</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Home digest (pinned notes, notifications inbox), list, board, calendar, time tracker, notes, trash</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar, moments</td></tr>
 <tr><td>Time tracking</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Built-in stopwatch + history</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td></tr>
 <tr><td>Privacy</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Best: local by default</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Google-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ MS-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td></tr>
@@ -94,10 +94,10 @@ shell). Plain `file://` usage still works, minus install/offline.
   tracked today), live weather + daily quote (refreshable), an inline-editable
   Pinned notes section, a Notifications section for fired reminders (red
   unread badge on the Home sidebar row; tapping Home marks them read), and
-  sections: Overdue, Today's tasks, Most important first, Heavy lifting.
+  sections: Overdue, Today's tasks, Highest priority first, Heavy lifting.
   Visible sections are configurable (Sync & Settings → Home).
 - **List** — a single category with an add bar, quick-add presets (due date,
-  weight, importance, labels), and a collapsible Completed section.
+  weight, priority, labels), and a collapsible Completed section.
 - **Board** — one column per list (kanban style): add tasks per column, drag
   tasks between columns, collapse completed per column, reorder columns.
 - **Calendar** — Monday-first month grid with task chips, a Year view of 12
@@ -115,7 +115,7 @@ shell). Plain `file://` usage still works, minus install/offline.
 **Tasks**
 
 - Labels (7) with renameable names (Sync & Settings → Labels),
-  Weight (light / medium / heavy), Importance (low / medium / high)
+  Weight (light / medium / heavy), Priority (low / medium / high)
   — all inline-editable from the row via popups, and filterable.
 - Due date + time with overdue / today badges; recurrence (daily, weekly with
   weekday picker, monthly, yearly, or custom "every N") — repeats render on
@@ -137,8 +137,8 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 **Everything else**
 
-- Search + label/weight/importance filters apply across all views, with clear
-  chips shown on every view. Sort by My order / Date / Importance & weight / Title.
+- Search + label/weight/priority filters apply across all views, with clear
+  chips shown on every view. Sort by My order / Date / Priority & weight / Title.
 - Light & dark theme (persisted; toggled in Sync & Settings → Options, `d` key, or palette).
 - Sync & Settings dialog with tabs: **Sync** (account, name, sync controls),
   **Labels**, **Home** (section visibility), **Options** (show completed,
@@ -176,7 +176,7 @@ app). The highlights:
   - Google Takeout Tasks — full backup (`tasks#taskLists`), per-list files
     (`tasks#tasks`), or bare task arrays
   - Google mapping: title/notes, status→done, `scheduled_time`/`due`→date+time
-    (read as-written, no timezone shift), `starred`→high importance,
+    (read as-written, no timezone shift), `starred`→high priority,
     `links[0]`→external ref, `parent`→subtasks, and recurring instances are
     collapsed to a single task carrying the repeat rule.
 

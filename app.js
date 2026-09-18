@@ -50,7 +50,7 @@ const HOME_SECTIONS = [
   { key: 'notes', label: 'Pinned notes' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'today', label: "Today's tasks" },
-  { key: 'important', label: 'Most important' },
+  { key: 'important', label: 'Highest priority' },
   { key: 'heavy', label: 'Heavy lifting' },
 ];
 function defaultHomeShow() { const o = {}; HOME_SECTIONS.forEach((s) => o[s.key] = true); return o; }
@@ -103,7 +103,7 @@ function migrate(s) {
   delete s.activeListId;
   if (!s.prefs) s.prefs = { sideW: 280, detailW: 440 };
   // one-time fix: the old default (360px) was too narrow and clipped
-  // Weight/Importance controls — widen it unless the user resized manually
+  // Weight/Priority controls — widen it unless the user resized manually
   if (s.prefs.detailW === 360) s.prefs.detailW = 440;
   if (!s.filters || typeof s.filters !== 'object') s.filters = { color: '', weight: '', importance: '' };
   if (typeof s.filters.color !== 'string') s.filters.color = '';
@@ -442,7 +442,7 @@ function paletteCommands() {
     { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
     { icon: 'swap_vert', label: 'Sort by My order', run: () => setSort('order') },
     { icon: 'event', label: 'Sort by Date', run: () => setSort('date') },
-    { icon: 'flag', label: 'Sort by Importance and weight', run: () => setSort('priority') },
+    { icon: 'flag', label: 'Sort by Priority and weight', run: () => setSort('priority') },
     { icon: 'sort_by_alpha', label: 'Sort by Title', run: () => setSort('title') },
     { icon: 'upload', label: 'Import JSON', run: () => $('#importFile').click() },
     { icon: 'download', label: 'Export JSON', run: () => exportJSON() },
@@ -743,7 +743,7 @@ function renderChips() {
   if (q) chips.push({ label: `“${q}”`, clear: () => { $('#searchInput').value = ''; $('#clearSearch').classList.add('hidden'); } });
   if (state.filters.color) chips.push({ label: colorName(state.filters.color), dot: colorHex(state.filters.color), clear: () => state.filters.color = '' });
   if (state.filters.weight) chips.push({ label: 'Weight: ' + WEIGHTS[state.filters.weight].label, clear: () => state.filters.weight = '' });
-  if (state.filters.importance) chips.push({ label: 'Importance: ' + IMPORTANCE[state.filters.importance].label, clear: () => state.filters.importance = '' });
+  if (state.filters.importance) chips.push({ label: 'Priority: ' + IMPORTANCE[state.filters.importance].label, clear: () => state.filters.importance = '' });
   hosts.forEach((host) => {
     host.innerHTML = '';
     host.style.display = chips.length ? '' : 'none';
@@ -1080,7 +1080,7 @@ function taskRow(t, opts = {}) {
   meta.appendChild(w);
   const im = document.createElement('button'); im.type = 'button'; im.className = 'badge imp-' + t.importance + ' clickable';
   im.innerHTML = `<span class="material-icons-outlined">${IMPORTANCE[t.importance].icon}</span>${opts.compact ? IMPORTANCE[t.importance].label[0] : IMPORTANCE[t.importance].label}`;
-  im.title = 'Change importance (now: ' + IMPORTANCE[t.importance].label + ')';
+  im.title = 'Change priority (now: ' + IMPORTANCE[t.importance].label + ')';
   im.onclick = (e) => { e.stopPropagation(); openImportancePop(im, t.id); };
   meta.appendChild(im);
   if (t.recur && t.recur.freq) {
@@ -1167,7 +1167,7 @@ function dropOntoTask(fromId, toId, offset) {
   }
   if (from.listId !== to.listId) { moveTask(fromId, to.listId, toId, offset); return; }
   // same list reorder — only meaningful in My-order sort. In Date / Title /
-  // Importance sorts the position is derived, so ask before switching.
+  // Priority sorts the position is derived, so ask before switching.
   const group = listTasks(to.listId).filter((x) => x.done === to.done).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
   const without = group.filter((x) => x.id !== from.id);
   let idx = without.findIndex((x) => x.id === to.id) + offset;
@@ -3664,7 +3664,7 @@ const CONFLICT_KIND = { tasks: 'Task', lists: 'List', times: 'Time record', note
 const CONFLICT_FIELDS = {
   title: 'Title', name: 'Name', notes: 'Notes', body: 'Text', date: 'Due date', time: 'Time',
   tz: 'Time zone', dueUtc: 'Due moment', due: 'Due',
-  done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Importance',
+  done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Priority',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
   remindBefore: 'Reminder', seconds: 'Duration', startedAt: 'Logged at',
   taskId: 'Task', hex: 'Color', pinned: 'Pinned', showOnHome: 'Show on Home',
@@ -5169,7 +5169,7 @@ function bind() {
     $('#listMenu').classList.add('hidden');
     $('#sortBtn').setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
   };
-  $$('#sortMenu button').forEach((b) => b.onclick = () => { const label = { order: 'My order', date: 'Date', priority: 'Importance & weight', title: 'Title' }[b.dataset.sort] || b.dataset.sort; setSort(b.dataset.sort); $('#sortMenu').classList.add('hidden'); toast('Sorted: ' + label); });
+  $$('#sortMenu button').forEach((b) => b.onclick = () => { const label = { order: 'My order', date: 'Date', priority: 'Priority & weight', title: 'Title' }[b.dataset.sort] || b.dataset.sort; setSort(b.dataset.sort); $('#sortMenu').classList.add('hidden'); toast('Sorted: ' + label); });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#sortMenu') && !e.target.closest('#sortBtn')) {
       $('#sortMenu').classList.add('hidden');
@@ -5216,7 +5216,7 @@ function bind() {
 
   // add task (single list view) — options + save always visible
   const form = $('#addForm'), inp = $('#addInput');
-  // quick composer: due date + weight + importance presets, persistent
+  // quick composer: due date + weight + priority presets, persistent
   // across adds for rapid entry (toggle again to clear)
   const qaDate = $('#qaDate');
   const tomIso = () => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
