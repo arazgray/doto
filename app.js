@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789759471'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789771400'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -2795,7 +2795,7 @@ function download(filename, text) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function exportJSON() {
-  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [], notes: state.notes || [], trash: state.trash || [], homeShow: state.homeShow || defaultHomeShow(), customColors: state.customColors || [], colorNames: state.colorNames || {} };
+  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), ...snapState(state) };
   download(`doto-export-${todayIso()}.json`, JSON.stringify(payload, null, 2));
   toast(`Exported ${state.tasks.length} tasks`);
 }
@@ -3465,6 +3465,12 @@ async function driveDownload(id, mode) {
   return r.json();
 }
 function stateForDrive(s) {
+  // Push EVERYTHING, literally: the full state object (lists, tasks + every
+  // property, notes + every property, times, trash, labels, renames, Home
+  // layout, view settings, prefs). Only device-ephemeral bits are stripped:
+  // running timer (other devices must not inherit our stopwatch) — dirtyAt
+  // rides along harmlessly (receivers keep their own dirtyAt; freshness uses
+  // Drive's modifiedTime, not this field).
   const copy = JSON.parse(JSON.stringify(s));
   copy.timer = null; // running timer is device-local
   return copy;
@@ -3494,7 +3500,15 @@ async function driveUpload(data, mode) {
   return j;
 }
 
-/* ----- three-way merge (base = last synced snapshot) ----- */
+/* ----- three-way merge (base = last synced snapshot) -----
+   Sync covers EVERYTHING data-related, literally: lists (+ their order),
+   tasks (+ every property: title/notes/date/time/tz/dueUtc/extRef/color/
+   weight/importance/recur/done/completedAt/order/subtasks/remindBefore/
+   recId/spawnedId/calendar link), notes (+ title/body/color/pinned/
+   showOnHome/order/updatedAt), time records, trash, custom labels +
+   renames + deletions, your name, Home layout, AND view settings
+   (showCompleted, filters, sort, panel sizes, active view, last list).
+   Only device-ephemeral bits stay local: running timer + dirtyAt. */
 function snapState(s) {
   return JSON.parse(JSON.stringify({
     lists: s.lists || [], tasks: s.tasks || [], times: s.times || [],
@@ -3502,7 +3516,24 @@ function snapState(s) {
     colorNames: s.colorNames || {}, homeShow: s.homeShow || defaultHomeShow(),
     customColors: s.customColors || [], userName: s.userName || '',
     deletedColors: s.deletedColors || [],
+    showCompleted: typeof s.showCompleted === 'boolean' ? s.showCompleted : true,
+    filters: s.filters && typeof s.filters === 'object'
+      ? { color: s.filters.color || '', weight: s.filters.weight || '', importance: s.filters.importance || '' }
+      : { color: '', weight: '', importance: '' },
+    sort: s.sort || 'order',
+    prefs: s.prefs && typeof s.prefs === 'object'
+      ? { sideW: s.prefs.sideW || 280, detailW: s.prefs.detailW || 440 }
+      : { sideW: 280, detailW: 440 },
+    activeView: typeof s.activeView === 'string' ? s.activeView : HOME,
+    lastListId: typeof s.lastListId === 'string' ? s.lastListId : '',
   }));
+}
+// Defaults for pre-upgrade snapshots / remote files that predate the
+// full-settings sync: every missing key falls back exactly like migrate().
+function baseSettings(b, key, fallback) {
+  const v = b ? b[key] : undefined;
+  if (v !== undefined) return v;
+  return JSON.parse(JSON.stringify(fallback));
 }
 function mergeIdSet(baseArr, localArr, remoteArr) {
   const B = new Set(baseArr || []), L = new Set(localArr || []), R = new Set(remoteArr || []);
@@ -3574,6 +3605,26 @@ function mergeArrays(base, local, remote, takeRemote, collect, coll, labelOf) {
   });
   return { arr: out, conflicts, fromRemote };
 }
+/* Lists (and label order) live in ARRAY position — there is no order field.
+   mergeArrays above iterates union keys in base order, so a pure reorder on
+   one side would be silently dropped. Re-sequence the merged set to the
+   winner's order (newest file), appending items the winner never saw. */
+function orderLikeWinner(merged, localArr, remoteArr, takeRemote) {
+  const winner = takeRemote ? (remoteArr || []) : (localArr || []);
+  const byId = new Map(merged.map((x) => [x && x.id, x]));
+  const out = [];
+  winner.forEach((w) => {
+    if (w && byId.has(w.id)) { out.push(byId.get(w.id)); byId.delete(w.id); }
+  });
+  // items only on the other side (created concurrently) keep their side's
+  // relative order at the end instead of vanishing.
+  const other = takeRemote ? (localArr || []) : (remoteArr || []);
+  other.forEach((o) => {
+    if (o && byId.has(o.id)) { out.push(byId.get(o.id)); byId.delete(o.id); }
+  });
+  byId.forEach((v) => out.push(v));
+  return out;
+}
 function mergeObj(base, local, remote, takeRemote) {
   // Plain key/value settings (label renames). Both-sides edits auto-resolve to
   // newest — renaming a label on two devices is not worth a dialog. The caller
@@ -3602,7 +3653,7 @@ function applyRemote(remote, remoteTime) {
   salvageState(remote);
   if (!remote.lists.length) throw new Error('drive');
   remote.tasks.forEach((t) => { t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance); if (typeof t.tz !== 'string') t.tz = ''; if (typeof t.dueUtc !== 'number' || isNaN(t.dueUtc)) t.dueUtc = 0; });
-  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], notes: [], trash: [], colorNames: {}, homeShow: defaultHomeShow(), customColors: [], userName: '', deletedColors: [] };
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : snapState({ lists: [], tasks: [], times: [], notes: [], trash: [], colorNames: {}, homeShow: defaultHomeShow(), customColors: [], userName: '', deletedColors: [] });
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const freshConflicts = [];
   const timeLabel = (l) => (l && l.title) || (l && l.taskId && getTask(l.taskId) && getTask(l.taskId).title) || 'Time record';
@@ -3610,16 +3661,27 @@ function applyRemote(remote, remoteTime) {
   const noteLabel = (l) => (l && (l.title || l.body)) || 'Note';
   const trashLabel = (l) => (l && l.data && (l.data.title || l.data.body)) || 'Trash item';
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote, freshConflicts, 'lists', (l) => l.name || '(untitled)');
+  ml.arr = orderLikeWinner(ml.arr, state.lists, remote.lists || [], takeRemote);
   const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote, freshConflicts, 'tasks', (l) => l.title || '(untitled)');
   const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote, freshConflicts, 'times', timeLabel);
   const mn = mergeArrays(base.notes || [], state.notes || [], remote.notes || [], takeRemote, freshConflicts, 'notes', noteLabel);
   const mtr = mergeArrays(base.trash || [], state.trash || [], remote.trash || [], takeRemote, freshConflicts, 'trash', trashLabel);
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
-  const mhs = mergeObj(base.homeShow, state.homeShow || defaultHomeShow(), remote.homeShow, takeRemote);
+  const mhs = mergeObj(baseSettings(base, 'homeShow', defaultHomeShow()), state.homeShow || defaultHomeShow(), remote.homeShow, takeRemote);
   const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote, freshConflicts, 'customColors', colorLabel);
+  mcc.arr = orderLikeWinner(mcc.arr, state.customColors || [], remote.customColors || [], takeRemote);
   const mu = mergeScalar(typeof base.userName === 'string' ? base.userName : '', state.userName || '', typeof remote.userName === 'string' ? remote.userName : '', takeRemote);
   const mergedDeleted = mergeIdSet(base.deletedColors, state.deletedColors, remote.deletedColors);
   const mdl = { obj: mergedDeleted, conflict: 0, fromRemote: 0 };
+  // View settings: whole-object / scalar newest-wins (no conflict dialog —
+  // same policy as label renames / your name). Missing keys in old remotes
+  // fall back to migrate() defaults so legacy files never wipe local state.
+  const mShow = mergeScalar(baseSettings(base, 'showCompleted', true), typeof state.showCompleted === 'boolean' ? state.showCompleted : true, typeof remote.showCompleted === 'boolean' ? remote.showCompleted : baseSettings(base, 'showCompleted', true), takeRemote);
+  const mFilt = mergeObj(baseSettings(base, 'filters', { color: '', weight: '', importance: '' }), state.filters || { color: '', weight: '', importance: '' }, remote.filters && typeof remote.filters === 'object' ? remote.filters : baseSettings(base, 'filters', { color: '', weight: '', importance: '' }), takeRemote);
+  const mSort = mergeScalar(baseSettings(base, 'sort', 'order'), state.sort || 'order', typeof remote.sort === 'string' ? remote.sort : baseSettings(base, 'sort', 'order'), takeRemote);
+  const mPrefs = mergeObj(baseSettings(base, 'prefs', { sideW: 280, detailW: 440 }), state.prefs || { sideW: 280, detailW: 440 }, remote.prefs && typeof remote.prefs === 'object' ? remote.prefs : baseSettings(base, 'prefs', { sideW: 280, detailW: 440 }), takeRemote);
+  const mView = mergeScalar(baseSettings(base, 'activeView', HOME), state.activeView || HOME, typeof remote.activeView === 'string' ? remote.activeView : baseSettings(base, 'activeView', HOME), takeRemote);
+  const mLast = mergeScalar(baseSettings(base, 'lastListId', ''), state.lastListId || '', typeof remote.lastListId === 'string' ? remote.lastListId : baseSettings(base, 'lastListId', ''), takeRemote);
   const timer = state.timer; // timer is device-local
   state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
   state.notes = mn.arr; state.trash = mtr.arr;
@@ -3628,15 +3690,26 @@ function applyRemote(remote, remoteTime) {
   state.customColors = mcc.arr;
   state.userName = mu.obj;
   state.deletedColors = (mdl.obj || []).filter((id) => BUILTIN_COLOR_IDS.has(id));
+  state.showCompleted = mShow.obj;
+  state.filters = { color: '', weight: '', importance: '', ...(mFilt.obj || {}) };
+  state.sort = ['order', 'date', 'title', 'priority'].includes(mSort.obj) ? mSort.obj : 'order';
+  ui.sort = state.sort;
+  state.prefs = { sideW: 280, detailW: 440, ...(mPrefs.obj || {}) };
+  state.activeView = typeof mView.obj === 'string' ? mView.obj : HOME;
+  state.lastListId = typeof mLast.obj === 'string' ? mLast.obj : '';
+  // a synced view pointing at a list this device doesn't have (deleted
+  // elsewhere, or a legacy id) falls back to Home instead of a blank screen.
+  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && state.activeView !== NOTES && state.activeView !== TRASH && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
+  if (state.lastListId && !state.lists.some((l) => l.id === state.lastListId)) state.lastListId = (state.lists[0] && state.lists[0].id) || '';
   // a color deleted on another device must not leave tasks stranded
   const okC = new Set(allColors().map((c) => c.id));
   state.tasks.forEach((t) => { if (!okC.has(t.color)) t.color = 'default'; });
   if (!okC.has(state.filters.color)) state.filters.color = '';
   // Only queued items need the user's pick. Plain settings (label renames,
-  // your name) auto-resolve to newest and are just logged so the count in the
-  // dialog always matches what you can actually review.
-  const autoSettings = (mc.auto || 0) + (mu.auto || 0) + (mhs.auto || 0);
-  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mn.fromRemote + mtr.fromRemote + mc.fromRemote + mhs.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote;
+  // your name, view prefs) auto-resolve to newest and are just logged so the
+  // count in the dialog always matches what you can actually review.
+  const autoSettings = (mc.auto || 0) + (mu.auto || 0) + (mhs.auto || 0) + (mShow.auto || 0) + (mFilt.auto || 0) + (mSort.auto || 0) + (mPrefs.auto || 0) + (mView.auto || 0) + (mLast.auto || 0);
+  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mn.fromRemote + mtr.fromRemote + mc.fromRemote + mhs.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote + mShow.fromRemote + mFilt.fromRemote + mSort.fromRemote + mPrefs.fromRemote + mView.fromRemote + mLast.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
@@ -4423,7 +4496,7 @@ async function pushNow(mode) {
     syncMeta.base = snapState(state);
     syncMeta.lastSyncedAt = Date.now();
     saveSyncMeta();
-    if (mode !== 'silent') slog('ok', `Pushed to Drive (${state.tasks.length} tasks, ${state.lists.length} lists)`);
+    if (mode !== 'silent') slog('ok', `Pushed to Drive (${state.tasks.length} tasks, ${state.lists.length} lists, ${state.notes.length} notes, ${state.times.length} time records)`);
     setSync('ok');
   } catch (e) {
     handleSyncFailure(e, mode, syncMeta.lastSyncedAt ? 'ok' : 'signedout', false);
@@ -4456,7 +4529,7 @@ async function pullNow(mode) {
         const remote = await driveDownload(found.id, mode);
         const res = applyRemote(remote, remoteTime);
         const merged = snapState(state);
-        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], notes: remote.notes || [], trash: remote.trash || [], colorNames: remote.colorNames || {}, homeShow: remote.homeShow || defaultHomeShow(), customColors: remote.customColors || [], userName: remote.userName || '', deletedColors: remote.deletedColors || [] };
+        const rsnap = snapState(remote);
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
