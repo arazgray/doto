@@ -1057,7 +1057,7 @@ a.btn-ghost{text-decoration:none}
   .card h2{margin:0 0 10px}
 }
 
-.viewHome .card {
+#viewHome .card {
   border: none;
   padding: 0;
 }
