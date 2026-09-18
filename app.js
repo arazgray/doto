@@ -4800,8 +4800,15 @@ function bindEdgeSwipe() {
   document.addEventListener('touchstart', (e) => {
     reset();
     clearTimeout(fadeT); // a new gesture wins over a pending scrim fade
-    if (e.touches.length !== 1 || blocked() || field(e.target)) return;
+    if (e.touches.length !== 1 || blocked()) return;
     const t = e.touches[0], open = sb().classList.contains('open');
+    // Text fields normally keep the gesture (caret, selection) — except in
+    // the narrow left-edge drawer zone, where a rightward swipe is
+    // near-certainly meant for the sidebar. Without this, field-dense pages
+    // like Notes would have almost no spot to start the drawer gesture.
+    // (A plain tap still focuses the field: the drawer only takes over after
+    // 24px of horizontal movement.)
+    if (!(!open && t.clientX >= 20 && t.clientX <= 72) && field(e.target)) return;
     if (!open) {
       if (t.clientX < 20) return; // system back-gesture strip
       if (t.target && t.target.closest && t.target.closest('.drag')) return;

@@ -660,7 +660,7 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;
   & input[type="date"],& input[type="time"]{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0;flex:1}
   & input[type="time"]{flex:0 1 128px}
-  & input[type="date"]{flex:1 1 170px;min-width:0}
+  & input[type="date"]{flex:1 1 140px;min-width:0}
   & select{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0}
 }
 #dRecurN{
@@ -947,6 +947,9 @@ a.btn-ghost{text-decoration:none}
 /* Settings tabs (Sync first, then Labels, Home page, General) */
 .set-tabs{display:flex;gap:4px;background:var(--bg2);border-radius:14px;padding:3px;margin:4px -10px 12px;overflow-x:auto}
 .set-tabs button{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border-radius:11px;padding:8px 6px;white-space:nowrap;flex:1;justify-content:center;min-width:0}
+@media (max-width:400px){
+  .set-tabs button .material-icons-outlined{display:none}
+}
 .set-tabs button .material-icons-outlined{font-size:18px}
 .set-tabs button.selected{background:var(--bg);color:var(--text);box-shadow:var(--shadow);font-weight:500}
 .set-pane{display:flex;flex-direction:column;gap:8px}
@@ -959,8 +962,8 @@ a.btn-ghost{text-decoration:none}
 .notes-search:focus-within{border-color:var(--blue)}
 .note-add{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}
 .note-add input,.note-add textarea{width:100%;border:0;outline:0;background:transparent;font:inherit;resize:vertical}
-.note-add input{font-weight:500;font-size:15px;margin-bottom:6px}
-.note-add textarea{font-size:14px;min-height:160px}
+.note-add input{font-weight:500;font-size:16px;margin-bottom:6px}
+.note-add textarea{font-size:16px;min-height:160px}
 .note-add-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
 .note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center}
 .notes-head{font-size:13px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;margin:18px 0 10px}
@@ -979,8 +982,8 @@ a.btn-ghost{text-decoration:none}
 .note-foot .icon-btn.sm.on{color:var(--blue)}
 .note-foot .btn-ghost.sm{font-size:12px;padding:5px 10px}
 .note-title-input,.note-body-input{width:100%;border:0;outline:0;background:transparent;font:inherit;color:var(--text);resize:vertical}
-.note-title-input{font-weight:500;font-size:14px;margin:0 26px 4px 0;width:calc(100% - 30px)}
-.note-body-input{font-size:13px;min-height:160px}
+.note-title-input{font-weight:500;font-size:16px;margin:0 26px 4px 0;width:calc(100% - 30px)}
+.note-body-input{font-size:16px;min-height:160px}
 .note-title-input:focus,.note-body-input:focus{background:var(--bg2);border-radius:8px}
 .palette-dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line);padding:0}
 .palette-dot.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--blue)}
