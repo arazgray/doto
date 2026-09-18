@@ -458,9 +458,9 @@
     <div class="set-tabs" role="tablist" aria-label="Settings sections">
       <button type="button" data-settab="sync" role="tab" class="selected" aria-selected="true"><span class="material-icons-outlined">sync</span> Sync</button>
       <button type="button" data-settab="labels" role="tab" aria-selected="false"><span class="material-icons-outlined">label</span> Labels</button>
-      <button type="button" data-settab="home" role="tab" aria-selected="false"><span class="material-icons-outlined">home</span> Home page</button>
+      <button type="button" data-settab="home" role="tab" aria-selected="false"><span class="material-icons-outlined">home</span> Home</button>
       <button type="button" data-settab="options" role="tab" aria-selected="false"><span class="material-icons-outlined">tune</span> Options</button>
-      <button type="button" data-settab="io" role="tab" aria-selected="false"><span class="material-icons-outlined">swap_vert</span> Import &amp; Export</button>
+      <button type="button" data-settab="io" role="tab" aria-selected="false"><span class="material-icons-outlined">swap_vert</span> Data</button>
     </div>
     <div class="set-pane" data-setpane="sync" role="tabpanel">
       <p id="accountEmail" class="muted small">Not signed in.</p>
@@ -493,7 +493,7 @@
     </div>
     <div class="set-pane hidden" data-setpane="home" role="tabpanel">
       <div class="set-group">
-        <p class="d-label">Home page <span class="hint">— pick which sections appear</span></p>
+        <p class="d-label">Home <span class="hint">— pick which sections appear</span></p>
         <div id="homeToggles"></div>
       </div>
     </div>
@@ -505,7 +505,7 @@
     </div>
     <div class="set-pane hidden" data-setpane="io" role="tabpanel">
       <div class="set-group">
-        <p class="d-label">Import &amp; Export <span class="hint">— JSON backups, Google Tasks</span></p>
+        <p class="d-label">Data <span class="hint">— JSON backups, Google Tasks</span></p>
         <div class="io-row import-row">
           <select id="importMode" aria-label="Import source">
             <option value="auto">Auto-detect</option>

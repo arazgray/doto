@@ -33,7 +33,7 @@
 <tr><td>Price</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Free, no account needed</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (Google account)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Free (MS account)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$48/yr Pro)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Freemium (~$60/yr Premium)</td></tr>
 <tr><td>Offline</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Excellent (local-first PWA)</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Good</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ OK</td></tr>
 <tr><td>Priorities</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Weight × importance × labels, all filterable</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Starred only</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Important / My Day</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 P1–P4 + labels</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Priority + tags</td></tr>
-<tr><td>Views</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Home digest (with notifications inbox), list, board, calendar, time tracker</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar, moments</td></tr>
+<tr><td>Views</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Home digest (pinned notes, notifications inbox), list, board, calendar, time tracker, notes, trash</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Lists only</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 Lists, My Day, Planned</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar</td><td bgcolor="#d4edda" style="background-color:#d4edda;">🟢 List, board, calendar, moments</td></tr>
 <tr><td>Time tracking</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Built-in stopwatch + history</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ None</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Via integrations</td></tr>
 <tr><td>Privacy</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Best: local by default</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Google-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ MS-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ Cloud-profiled</td></tr>
 <tr><td>Open source</td><td bgcolor="#a9dfb2" style="background-color:#a9dfb2;">🟩 Yes (MIT)</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td><td bgcolor="#e9ecef" style="background-color:#e9ecef;">⬜ No</td></tr>
@@ -91,10 +91,11 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 - **Home** — action toolbar (Board / Calendar / Time / New), personalized
   greeting, stat cards (open / overdue / due today / completed /
-  tracked today), live weather + daily quote (refreshable), a Notifications
-  section for fired reminders (red unread badge on the Home sidebar row;
-  tapping Home marks them read), and sections: Overdue, Today's
-  tasks, Most important first, Heavy lifting.
+  tracked today), live weather + daily quote (refreshable), an inline-editable
+  Pinned notes section, a Notifications section for fired reminders (red
+  unread badge on the Home sidebar row; tapping Home marks them read), and
+  sections: Overdue, Today's tasks, Most important first, Heavy lifting.
+  Visible sections are configurable (Sync & Settings → Home).
 - **List** — a single category with an add bar, quick-add presets (due date,
   weight, importance, labels), and a collapsible Completed section.
 - **Board** — one column per list (kanban style): add tasks per column, drag
@@ -105,6 +106,11 @@ shell). Plain `file://` usage still works, minus install/offline.
 - **Time tracker** — searchable task picker with per-task totals, a stopwatch
   (play / pause / stop) that survives page reloads, and logged time records
   grouped by Today / Previously.
+- **Notes** — Keep-style quick notes (title + text, label colors, pinning,
+  per-note search, full editor dialog). Notes can be flagged to show on Home,
+  where they stay editable inline; the color dot on any note recolors it in place.
+- **Trash** — deleted tasks and notes land here (icon button next to Sync &
+  Settings) with Restore, Delete forever, and Empty trash.
 
 **Tasks**
 
@@ -133,15 +139,17 @@ shell). Plain `file://` usage still works, minus install/offline.
 
 - Search + label/weight/importance filters apply across all views, with clear
   chips shown on every view. Sort by My order / Date / Importance & weight / Title.
-- Light & dark theme (persisted; toggled in Sync & Settings, `d` key, or palette).
-- Sync & Settings dialog: Google account, your name (used in greetings),
-  display toggles, labels, Import/Export, sync history log.
+- Light & dark theme (persisted; toggled in Sync & Settings → Options, `d` key, or palette).
+- Sync & Settings dialog with tabs: **Sync** (account, name, sync controls),
+  **Labels**, **Home** (section visibility), **Options** (show completed,
+  dark mode), **Data** (import & export).
 - Forced updates: sidebar → Update wipes the offline cache and reloads the
-  newest release; the app also auto-detects new releases (`version.json`)
-  and offers a one-tap Update.
+  newest release — styles and scripts included, via per-release cache-buster
+  URLs; the app also auto-detects new releases (`version.json`) and offers a
+  one-tap Update.
 - Resizable sidebar and details panel on desktop (persisted).
-- Undo toasts for destructive actions (delete task/list, clear completed,
-  time-record delete, duplicate cleanup).
+- Trash + undo toasts for destructive actions (deleted tasks/notes are
+  restorable; emptying trash and per-item deletes stay undoable via toast).
 - RTL-friendly: all user text uses `dir="auto"`.
 
 ## Keyboard shortcuts
@@ -155,16 +163,16 @@ app). The highlights:
 | `/` | Focus search |
 | `n` | New task |
 | `j` / `k`, `Enter`, `x`, `Del` | Select, open, complete, delete |
-| `g` then `h` / `b` / `c` / `t` | Go Home / Board / Calendar / Time |
+| `g` then `h` / `b` / `c` / `t` / `n` / `r` | Go Home / Board / Calendar / Time / Notes / Trash |
 | `g` then `1`–`9` | Jump to list by position |
 | `u`, `d`, `?`, `Esc` | Completed visibility, dark mode, help, close |
 
 ## Import / Export
 
-- **Export** — Sync & Settings → *Export*: `doto-export-YYYY-MM-DD.json` including
-  lists, tasks, and time records.
+- **Export** — Sync & Settings → Data → *Export*: `doto-export-YYYY-MM-DD.json` including
+  lists, tasks, notes, trash, and time records.
 - **Import** — multi-select `.json`, accepts:
-  - DoTo native exports (appended as new lists)
+  - DoTo native exports (appended as new lists; notes and trash merge by id)
   - Google Takeout Tasks — full backup (`tasks#taskLists`), per-list files
     (`tasks#tasks`), or bare task arrays
   - Google mapping: title/notes, status→done, `scheduled_time`/`due`→date+time
@@ -177,8 +185,8 @@ app). The highlights:
 Local-first in `localStorage` — no DoTo server. Optional Google Drive sync
 (see above) keeps an encrypted-in-transit copy in Drive's hidden app folder:
 
-- `doto-v1` — app state: `{ lists, tasks, times, timer, activeView,
-  showCompleted, filters, colorNames, userName, prefs, dirtyAt }`
+- `doto-v1` — app state: `{ lists, tasks, notes, trash, times, timer, activeView,
+  showCompleted, filters, colorNames, homeShow, userName, prefs, dirtyAt }`
 - `doto-sync` — sync metadata: `{ fileId, base, lastSyncedAt, auto, email, token }`
 - `doto-sync-log` — recent sync events (max 50)
 - `doto-notif-seen` — last time the Notifications inbox was opened (unread badge)
@@ -210,8 +218,9 @@ git -C doto.wiki add Home.md && git -C doto.wiki commit -m "Update manual" && gi
 ## Project layout
 
 ```
-index.html   — shell: topbar, sidebar, 6 views, detail panel, popups, dialogs
-                (palette, shortcuts help, sync & settings, sync history), toast.
+index.html   — shell: topbar, sidebar, 7 views, detail panel, popups, dialogs
+                 (palette, shortcuts help, sync & settings, sync history,
+                 note editor), toast.
                 Assets carry `?v=1.0-<ts>` cache-busters (bump on every release).
 styles.css   — native nested CSS, CSS variables theming, dark mode via body.dark.
                 Mobile compact rules live last in file (equal-specificity overrides).

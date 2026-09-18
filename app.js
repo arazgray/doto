@@ -5088,7 +5088,7 @@ function bind() {
   };
   $('#notesSearch').oninput = () => renderNotes();
   $('#emptyTrashBtn').onclick = emptyTrash;
-  // settings tabs (Sync, Labels, Home page, Options, Import & Export)
+  // settings tabs (Sync, Labels, Home, Options, Data)
   $$('[data-settab]').forEach((b) => b.onclick = () => switchSetTab(b.dataset.settab));
   // note editor dialog
   $('#noteEditSave').onclick = saveNoteEditor;

@@ -11,6 +11,8 @@
 - [Sync and settings](#sync-and-settings)
 - [Views](#views)
 - [Tasks](#tasks)
+- [Notes](#notes)
+- [Trash](#trash)
 - [Reminders](#reminders)
 - [Search, filters and sorting](#search-filters-and-sorting)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -55,41 +57,45 @@ How it works and what to expect:
   never counts as a conflict.
 - Deletes sync too. The navbar pill shows `Not synced yet`, `Syncing…`,
   or `Synced Xs ago`.
-- If the same task, list, time record, or label was edited on two devices
-  between syncs (or edited on one side and deleted on the other), the
-  newest version applies immediately — then a dialog shows each conflict
-  with a field-by-field diff (due date/time shown as one "Due" row; hover
-  any value for the full text) so you can keep your version or take Drive's.
-  The choice is per whole item, pre-selected to whatever is showing now.
-  **Later** dismisses the dialog without changing the applied version (it
-  stays queued until you review it or the next sync). Plain settings (label
-  renames, your name) always take the newest version without asking.
+- If the same task, list, note, trash item, time record, or label was edited
+  on two devices between syncs (or edited on one side and deleted on the
+  other), the newest version applies immediately — then a dialog shows each
+  conflict with a field-by-field diff (due date/time shown as one "Due" row;
+  hover any value for the full text) so you can keep your version or take
+  Drive's. The choice is per whole item, pre-selected to whatever is showing
+  now. **Later** dismisses the dialog without changing the applied version
+  (it stays queued until you review it or the next sync). Plain settings
+  (label renames, your name, Home layout) always take the newest version
+  without asking.
 - Signing out keeps a full copy on that device; signing back in merges it.
 - **Pull to refresh**: on touch devices, drag down from the very top of any
   page and release to force a Drive sync.
-- Sync dialog → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
-- Import / Export live in the Sync dialog (same JSON backup as before).
-- The dialog also holds **Display** settings (show completed, dark mode),
-  **Labels** (rename + custom labels), and your **name** (used in the
-  Home greeting, synced across devices).
+- Sync tab → **History** shows a log of recent sync events (pushes, pulls, conflicts, errors).
+- The dialog is split into tabs: **Sync** (account, name, sync controls),
+  **Labels** (rename + custom labels), **Home** (which Home sections
+  show), **Options** (show completed, dark mode), and **Data**
+  (JSON backups, Google Tasks import). Your **name** is used in the Home
+  greeting and synced across devices.
 
 ## Views
 
 | View | What it is for |
 | ---- | -------------- |
-| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote (tap refresh for a new one), a Notifications section for fired reminders, and sections: Overdue, Today's tasks, Most important first, Heavy lifting. The Home sidebar row carries a red badge counting unseen notifications — tapping Home marks them read. |
+| **Home** | Greeting, stat cards (open / overdue / due today / completed / tracked today), today's weather, a daily quote (tap refresh for a new one), a Pinned notes section (editable inline), a Notifications section for fired reminders, and sections: Overdue, Today's tasks, Most important first, Heavy lifting. The Home sidebar row carries a red badge counting unseen notifications — tapping Home marks them read. Which sections appear is configurable under Sync & Settings → Home. |
 | **List** | One category at a time: add bar with quick presets, open tasks, collapsible Completed section. |
 | **Board** | Kanban columns — one per list. Drag tasks between columns, add per column, reorder columns by their grip. |
 | **Calendar** | Month grid with task chips, a Year overview with busy dots, and a day agenda with its own add box. Drag a task onto a day to reschedule it. |
 | **Time** | Stopwatch per task (play / pause / stop). The timer survives reloads. |
+| **Notes** | Google Keep-style quick notes: title + text, label colors, pinning, and a flag to show a note on Home. |
+| **Trash** | Deleted tasks and notes, restorable or deletable forever. The Trash button is the delete icon next to Sync & Settings at the bottom of the sidebar. |
 
-Switch views from the sidebar, the command palette, or press `g` then `h` / `b` / `c` / `t`.
+Switch views from the sidebar, the command palette, or press `g` then `h` / `b` / `c` / `t` / `n` (Notes) / `r` (Trash).
 
 ## Tasks
 
 - **Create**: the add bar (or per-column / agenda boxes), the Home **New**
   button, the `n` key, or the command palette (`Ctrl+K`).
-- **Complete**: the circle on the row, or select it and press `x`. Deleted or completed-by-mistake items can be undone from the toast popup.
+- **Complete**: the circle on the row, or select it and press `x`. Completed-by-mistake items can be undone from the toast popup; deleted items go to [Trash](#trash) and can be restored from there.
 - **Details**: click a row (or select + `Enter`) for notes, due date + time, repeat rules, label, weight, importance, external reference (URL or ticket number), list assignment and subtasks. On mobile the panel slides up as a bottom sheet. Everything saves as you type; **Save** closes the panel and forces a sync push, while **Mark complete** toggles completion.
 - **Rename inline**: double-click the title.
 - **Labels**: tap the label dot on the row. Labels carry your own names, and
@@ -103,6 +109,40 @@ Switch views from the sidebar, the command palette, or press `g` then `h` / `b` 
 - **Repeat**: daily, weekly (optionally on chosen weekdays), monthly, yearly, or custom "every N days/weeks/months/years". Repeating tasks appear on every matching day in the Calendar (computed forever — daily ones show every day at their time; picking Daily hides the date field and keeps only the time). Completing a dated repeating task schedules the next occurrence and resets its subtasks.
 - **Subtasks**: in the details panel, with a `done/total` progress badge on the row.
   The first few subtasks also show under the task title everywhere — tap one to toggle it.
+- **Delete**: the trash icon on the row, `Del` on a selected task, or the list
+  menu's Delete options. Deleted tasks are not gone — they move to
+  [Trash](#trash), with an undo toast right after.
+
+## Notes
+
+Keep-style quick notes for anything that is not a task. Open **Notes** from
+the sidebar (`g` then `n`):
+
+- **Create**: title + text at the top, pick a label color, press Add note
+  (or the palette's New note command). The text box starts tall (160px) and
+  stays resizable.
+- **Organize**: tap the pin to keep a note on top (Pinned section). Tap the
+  color dot on any note row to recolor it without opening it. Search filters
+  notes by title and text.
+- **Show on Home**: tap the home icon and the note appears in the Pinned
+  notes section on Home — **before** Notifications — where both title and
+  text stay editable inline.
+- **Edit**: click a note row for the full editor (title, text, color, pin,
+  show-on-home, delete).
+- Notes sync, export and import alongside everything else.
+
+## Trash
+
+Deleting a task (single, completed-bulk, or a whole list's tasks) or a note
+moves it to **Trash** instead of erasing it — open it via the delete icon
+next to Sync & Settings at the bottom of the sidebar:
+
+- Each entry shows what it was and when it was deleted, with **Restore**
+  (tasks return to their list, or General if that list is gone) and
+  **Delete forever**.
+- **Empty trash** permanently deletes everything after a confirmation (still
+  undoable from the toast right after).
+- The trash holds the last 300 deleted items; older ones fall off automatically.
 
 ## Reminders
 
@@ -132,7 +172,7 @@ the device where the time is correct.
 
 ## Search, filters and sorting
 
-- **Search** (`/`): matches titles, notes, references and subtasks across every view. Searching from Home jumps straight to Board results.
+- **Search** (`/`): matches titles, notes, references and subtasks across every view. Searching from Home jumps straight to Board results. Notes have their own search box on the Notes page.
 - **Filters**: label, weight and importance in the sidebar. Active filters show as removable chips on every view.
 - **Sorting**: My order (manual drag order), Date, Importance & weight, Title — from the sort button in the top bar.
 
@@ -154,6 +194,8 @@ Shortcuts work when you are not typing in a field. Press `?` anywhere to see thi
 | `g` then `b` | Go to Board |
 | `g` then `c` | Go to Calendar |
 | `g` then `t` | Go to Time tracker |
+| `g` then `n` | Go to Notes |
+| `g` then `r` | Go to Trash |
 | `g` then `1`–`9` | Jump to list by position |
 | `u` | Show / hide completed tasks |
 | `d` | Toggle dark mode |
@@ -164,7 +206,7 @@ Shortcuts work when you are not typing in a field. Press `?` anywhere to see thi
 
 Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing to filter:
 
-- **Commands**: jump to any view, new task / new list, sorting, theme, import / export, this manual.
+- **Commands**: jump to any view (including Notes and Trash), new task / new note / new list, sorting, theme, import / export, this manual.
 - **Lists**: jump straight to a list.
 - **Tasks**: jump straight to a task's details.
 
@@ -182,10 +224,10 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) — it works even while typing. Start typing 
 
 ## Import and export
 
-- **Export** (Sync dialog → Export): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks and time records. Back these up — your data lives in this browser plus, if enabled, your Drive sync copy.
-- **Import** (Sync dialog, multi-select): pick the source — **Auto-detect**,
+- **Export** (Sync & Settings → Data → Export): downloads `doto-export-YYYY-MM-DD.json` with lists, tasks, notes, trash, time records and labels. Back these up — your data lives in this browser plus, if enabled, your Drive sync copy.
+- **Import** (same tab, multi-select): pick the source — **Auto-detect**,
   **DoTo backup**, or **Google Tasks** — then choose files. Accepts DoTo exports
-  (appended as new lists) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
+  (appended as new lists; notes and trash merge by id, so re-importing your own backup is a no-op instead of doubling everything) and Google Takeout Tasks exports (full backups, per-list files, or bare arrays). Starred Google tasks become high importance, links become external references, parents become subtasks, recurring series collapse to one repeating task.
 
 ## Installing the app
 
@@ -248,7 +290,7 @@ there is still no DoTo server involved.
 
 ## Data and privacy
 
-- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, time records, view, filters, label names, your name and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), notification read state (`doto-notif-seen`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
+- All data lives in your browser's `localStorage` (`doto-v1`): lists, tasks, notes, trash, time records, view, filters, label names, your name, Home layout and panel sizes. Sync metadata (`doto-sync`), sync history (`doto-sync-log`), notification read state (`doto-notif-seen`), theme (`doto-theme`) and weather location (`doto-loc`, 7-day cache) are stored separately. With Drive sync enabled, an additional copy lives in your Drive's hidden app folder.
 - If a save ever fails validation (corrupted data), the app keeps a timestamped backup copy in your browser and starts fresh instead of breaking.
 - The network requests the app itself makes: Google Identity Services + Drive API (only when you use sync), and the Home weather card (Open-Meteo, BigDataCloud, ipapi.co for location fallback). Fonts and icons ship with the app and work offline. Nothing else ever leaves your device.
 
@@ -294,6 +336,13 @@ under Sync → History.
 
 **The weather card is empty.**
 It needs location permission (or IP-based fallback) and internet. Everything else works offline.
+
+**Does the Update button refresh the styles (CSS) too?**
+Yes. Update unregisters the offline worker, wipes the whole offline cache
+(styles included), and reloads with a one-time URL so no cached page can
+survive — then the page pulls its stylesheet, script and fonts under fresh
+per-release URLs. The only requirement is that a release bumps those URLs,
+which is part of the normal release step.
 
 **My phone shows an old version of the app.**
 Open the app with internet — it checks for updates on launch and shows an

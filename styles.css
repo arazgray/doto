@@ -681,7 +681,7 @@ body.dark .cal-chip:hover{filter:brightness(1.25)}
 }
 .muted{color:var(--muted)} .small{font-size:12px}
 #dNotes{
-  width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);resize:vertical;outline:0;
+  width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);resize:vertical;outline:0;min-height:160px;
   &:focus{border-color:var(--blue)}
 }
 .sub-list{
@@ -871,7 +871,7 @@ a.btn-ghost{text-decoration:none}
 .trash-btn .c{position:absolute;top:-5px;right:-5px;font-size:10px;line-height:16px;min-width:16px;text-align:center;background:var(--blue);color:#fff;border-radius:10px;padding:0 4px}
 
 /* Account dialog */
-.account-modal{width:min(460px,100%);max-height:min(86dvh,700px);overflow-y:auto}
+.account-modal{width:min(600px,100%);max-height:min(92dvh,800px);overflow-y:auto}
 .set-group{margin:6px 0}
 .set-group .d-label{margin-bottom:10px}
 .color-names{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 10px}
@@ -946,7 +946,7 @@ a.btn-ghost{text-decoration:none}
 
 /* Settings tabs (Sync first, then Labels, Home page, General) */
 .set-tabs{display:flex;gap:4px;background:var(--bg2);border-radius:14px;padding:3px;margin:4px 0 12px;overflow-x:auto}
-.set-tabs button{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border-radius:11px;padding:8px 12px;white-space:nowrap;flex:1;justify-content:center}
+.set-tabs button{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border-radius:11px;padding:8px 6px;white-space:nowrap;flex:1;justify-content:center;min-width:0}
 .set-tabs button .material-icons-outlined{font-size:18px}
 .set-tabs button.selected{background:var(--bg);color:var(--text);box-shadow:var(--shadow);font-weight:500}
 .set-pane{display:flex;flex-direction:column;gap:8px}
@@ -960,7 +960,7 @@ a.btn-ghost{text-decoration:none}
 .note-add{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}
 .note-add input,.note-add textarea{width:100%;border:0;outline:0;background:transparent;font:inherit;resize:vertical}
 .note-add input{font-weight:500;font-size:15px;margin-bottom:6px}
-.note-add textarea{font-size:14px;min-height:44px}
+.note-add textarea{font-size:14px;min-height:160px}
 .note-add-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
 .note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center}
 .notes-head{font-size:13px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;margin:18px 0 10px}
@@ -980,13 +980,13 @@ a.btn-ghost{text-decoration:none}
 .note-foot .btn-ghost.sm{font-size:12px;padding:5px 10px}
 .note-title-input,.note-body-input{width:100%;border:0;outline:0;background:transparent;font:inherit;color:var(--text);resize:vertical}
 .note-title-input{font-weight:500;font-size:14px;margin:0 26px 4px 0;width:calc(100% - 30px)}
-.note-body-input{font-size:13px;min-height:52px}
+.note-body-input{font-size:13px;min-height:160px}
 .note-title-input:focus,.note-body-input:focus{background:var(--bg2);border-radius:8px}
 .palette-dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line);padding:0}
 .palette-dot.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--blue)}
 .note-modal input.d-title,.note-modal textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;background:var(--bg);color:var(--text);outline:0}
 .note-modal input.d-title:focus,.note-modal textarea:focus{border-color:var(--blue)}
-.note-modal textarea{resize:vertical;margin-top:8px}
+.note-modal textarea{resize:vertical;margin-top:8px;min-height:160px}
 .note-modal .palette{margin:6px 0}
 .note-modal .d-label{margin:12px 0 4px}
 .note-actions .spacer{flex:1}
