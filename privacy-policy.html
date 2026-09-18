@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>DoTo — Privacy Policy</title>
-<meta name="description" content="DoTo privacy policy: what data stays in your browser, what goes to Google when you enable sync, and what never leaves your device." />
+<meta name="description" content="DoTo privacy policy: what Google user data the app accesses, how it uses, stores, shares and protects it, retention and deletion, and your controls." />
 <meta name="theme-color" content="#1a73e8" />
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
@@ -24,9 +24,11 @@ li{margin:.3em 0}
 a{color:var(--blue)}
 code{font-family:Consolas,monospace;font-size:.88em;background:var(--bg2);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px}
 table{width:100%;border-collapse:collapse;margin:1em 0;font-size:14px;display:block;overflow-x:auto}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
-th{color:var(--muted);font-weight:500}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+th{color:var(--muted);font-weight:500;white-space:nowrap}
 td:last-child{white-space:normal}
+td code{word-break:break-all}
+.notice{background:var(--bg2);border:1px solid var(--line-soft);border-radius:10px;padding:12px 16px;margin:1em 0}
 </style>
 </head>
 <body>
@@ -35,60 +37,101 @@ td:last-child{white-space:normal}
 </header>
 <article>
   <h1>Privacy Policy</h1>
-  <p class="muted">Last updated: September 8, 2026. Short version: DoTo has no server and collects nothing. Your data stays in your browser unless you turn on Google Drive sync or Google Calendar reminders, which talk directly to Google.</p>
+  <p class="muted">Last updated: September 18, 2026. Short version: DoTo has no server and collects nothing itself. Your tasks stay in your browser unless you turn on Google Drive sync or Google Calendar reminders, which communicate directly between your browser and Google. This policy explains exactly which Google user data the app accesses, how it uses it, whom it shares it with, how long it keeps it, and how it protects it.</p>
 
   <h2>1. Data DoTo itself collects</h2>
-  <p>None. There is no analytics, no tracking, no crash reporting, no advertising, and no DoTo account. The authors of DoTo cannot see your tasks because they never leave your device except as described below.</p>
+  <p>None. There is no DoTo account, no analytics, no tracking, no crash reporting, and no advertising. The authors of DoTo cannot see your tasks because there is no DoTo server — data moves only between your browser and Google's APIs (when you enable sync/reminders), or to the weather providers for the Home weather card (see §9).</p>
 
-  <h2>2. Data stored in your browser</h2>
-  <p>Everything the app needs is kept in your browser's <code>localStorage</code> on your own device:</p>
+  <h2>2. Google user data the app accesses</h2>
+  <p>DoTo accesses Google user data <strong>only after you press "Sign in with Google"</strong> and grant consent on Google's OAuth consent screen. The app requests these five OAuth scopes, and no others:</p>
+  <table>
+    <thead><tr><th>Scope</th><th>Google user data accessed</th><th>Why it is needed (use)</th></tr></thead>
+    <tbody>
+      <tr><td><code>https://www.googleapis.com/auth/drive.appdata</code></td><td>Hidden per-app folder in your Google Drive (<code>appDataFolder</code>); the file <code>doto-state.json</code> containing your lists, tasks, subtasks and time records.</td><td>Multi-device sync. The app reads this file to pull changes and writes it to push changes. It cannot see any other Drive file. This is the narrowest Drive scope available for app-private storage.</td></tr>
+      <tr><td><code>https://www.googleapis.com/auth/userinfo.email</code></td><td>Your Google account email address.</td><td>Display only ("Signed in as …") and to detect account switches. Never used for marketing or shared with anyone.</td></tr>
+      <tr><td><code>https://www.googleapis.com/auth/calendar.events</code></td><td>Calendar events the app itself creates/updates/deletes for your task reminders (title, notes, list name, due time, popup/email offsets).</td><td>Reminder feature (Details → Reminder). Creating, updating and deleting reminder events requires this scope. The app never reads events it did not create.</td></tr>
+      <tr><td><code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code></td><td>Read-only list of your calendars (IDs and names), to locate the dedicated "DoTo" calendar.</td><td>Finding the reminder calendar via <code>calendarList.list</code>. <code>calendar.events</code> alone cannot call this endpoint (Google answers 403 <code>ACCESS_TOKEN_SCOPE_INSUFFICIENT</code>), so this read-only scope is the minimum addition. It does not read event contents.</td></tr>
+      <tr><td><code>https://www.googleapis.com/auth/calendar.app.created</code></td><td>Secondary calendars created by this app (the dedicated "DoTo" calendar) and events on them.</td><td>Creating the dedicated "DoTo" calendar via <code>calendars.insert</code> so reminders stay separate from your personal calendar. Without it, reminders fall back to your primary calendar. This is narrower than full Calendar access.</td></tr>
+    </tbody>
+  </table>
+  <p>The app does <strong>not</strong> request full Gmail, Contacts, full Drive (<code>drive</code>, <code>drive.file</code>, <code>drive.readonly</code>), full Calendar (<code>calendar</code>, <code>calendar.readonly</code>), or any other Google data.</p>
+
+  <h2>3. How the app uses Google user data</h2>
+  <ul>
+    <li><strong>Drive sync (optional):</strong> when you sign in, a copy of your lists/tasks is stored in your own Drive's hidden app folder (<code>doto-state.json</code>). Sync traffic goes directly between your browser and Google's Drive API; no intermediary server is involved. Data is used solely to provide the user-facing sync feature: uploading your edits, downloading edits from your other devices, and merging them.</li>
+    <li><strong>Email address:</strong> shown in the Sync &amp; Settings dialog ("Signed in as …") so you can confirm which account is syncing. It is not used for any other purpose.</li>
+    <li><strong>Calendar reminders (optional):</strong> only tasks where you set Details → Reminder create events, in the "DoTo" calendar in your Google account (or your primary calendar if calendar creation is not permitted). Events contain the task title, notes, list name, due time and reminder offsets. Completing, deleting, or un-setting the reminder deletes the event. Reminder data is used solely to provide the user-facing reminder feature.</li>
+    <li><strong>What never happens:</strong> no advertising (including retargeting, personalized, or interest-based ads), no sale or rental of data to data brokers, resellers, or ad platforms, no credit-worthiness or lending decisions, no user profiling beyond the features above, and no training of generalized AI/ML models. Google Workspace APIs are not used to develop, improve, or train generalized (non-personalized) AI and/or ML models.</li>
+  </ul>
+  <div class="notice"><strong>Limited Use disclosure:</strong> DoTo's use and transfer to any other app of information received from Google APIs will adhere to <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Data is used only to provide or improve the user-facing features described above, as visible in the app's interface.</div>
+
+  <h2>4. Sharing, transfer, and disclosure of Google user data</h2>
+  <ul>
+    <li><strong>No sale or sharing:</strong> we do not sell, rent, or share Google user data with third parties such as advertising platforms, data brokers, or information resellers.</li>
+    <li><strong>Transfers occur only:</strong> (a) between your browser and Google's own APIs to provide the sync/reminder features you requested, with your consent; (b) for security purposes (e.g. investigating abuse); (c) to comply with applicable law; or (d) as part of a merger, acquisition, or sale of assets, only with your explicit prior consent.</li>
+    <li><strong>No human access:</strong> the app's authors never see your Google data — there is no server to send it to. No human reads the data except as strictly necessary for security, legal compliance, or with your affirmative agreement for a specific support case (e.g. diagnostics text you choose to copy from Sync → History and send).</li>
+    <li><strong>Agents/contractors:</strong> there are none with access. Any future employee, agent, contractor, or successor will comply with this policy and the Google API Services User Data Policy.</li>
+  </ul>
+
+  <h2>5. Data retention and deletion</h2>
+  <ul>
+    <li><strong>In your browser:</strong> app state (<code>doto-v1</code>), sync metadata (<code>doto-sync</code>: email, access token, Drive file id, last-synced snapshot), sync history (<code>doto-sync-log</code>, last ~50 events), calendar link (<code>doto-cal</code>, deletion queue), theme, and weather cache are kept in your browser's <code>localStorage</code> until you clear site data or sign out. Clearing site data deletes all of it.</li>
+    <li><strong>In your Google account:</strong> the sync file (<code>doto-state.json</code> in Drive's hidden app folder) and any reminder events (in your "DoTo" or primary calendar) persist until you delete them. Completing/deleting a task or switching its reminder off deletes its event. Signing out of DoTo keeps your local copy but stops all network access; to erase the cloud copies, delete <code>doto-state.json</code> from Drive (Settings → Manage apps → DoTo → Delete hidden app data, or via Drive API) and delete the "DoTo" calendar's events. Revoking access in your <a href="https://myaccount.google.com/permissions">Google account permissions</a> immediately stops future access.</li>
+    <li><strong>Access tokens:</strong> short-lived (~1 hour) OAuth access tokens are kept only in your browser and renewed silently on demand. There is no DoTo-side retention — we have no server copy to retain.</li>
+    <li><strong>Deletion requests:</strong> because there is no DoTo server, there is nothing to request from us. Delete local data via clearing site data, and cloud data via your Google account as described above. Questions: see §11.</li>
+  </ul>
+
+  <h2>6. Data protection mechanisms</h2>
+  <ul>
+    <li><strong>Encryption in transit:</strong> all communication with Google (sign-in, Drive, Calendar, userinfo) uses HTTPS/TLS. OAuth tokens are sent only in <code>Authorization: Bearer</code> headers over HTTPS, never in URLs or plaintext.</li>
+    <li><strong>Encryption at rest:</strong> Google-side copies are protected by Google's infrastructure encryption. Browser-side copies rely on your device's storage protections; the app never writes tokens or task data to any third-party server.</li>
+    <li><strong>Least privilege:</strong> the app requests only the five narrow scopes in §2 and stores OAuth tokens only in your own browser's <code>localStorage</code>. Tokens expire after ~1 hour, are refreshed only when needed, and are deleted from the browser on sign-out. Revoked or expired tokens are discarded and never reused.</li>
+    <li><strong>No credential exposure:</strong> the OAuth client ID is public by design (it identifies the app); the client secret pattern is not used in this pure client-side app, and access tokens are never embedded in shared URLs, logs, or exports. The diagnostics view (Sync → History → Copy diagnostics) shows only token presence/expiry, never token values.</li>
+    <li><strong>Access control:</strong> with no DoTo backend, there is no third party that can access your data. Sync and reminder requests originate from your browser under your own Google grant, which you can revoke at any time in your Google account security settings.</li>
+    <li><strong>Secure development:</strong> the app is fully open source (<a href="https://github.com/arazgray/doto">github.com/arazgray/doto</a>) so all data handling is auditable; dependencies are limited to Google Identity Services and Google APIs loaded over HTTPS.</li>
+  </ul>
+
+  <h2>7. Data stored in your browser</h2>
   <table>
     <thead><tr><th>Key</th><th>Contents</th></tr></thead>
     <tbody>
       <tr><td><code>doto-v1</code></td><td>Lists, tasks, subtasks, time records, view, filters, color labels, your name, panel sizes</td></tr>
-      <tr><td><code>doto-sync</code></td><td>Google sync metadata: your email, access token, Drive file id, last-synced snapshot</td></tr>
-      <tr><td><code>doto-sync-log</code></td><td>Recent sync history (last ~50 events, kept for diagnostics)</td></tr>
+      <tr><td><code>doto-sync</code></td><td>Google sync metadata: your email, short-lived access token + expiry, Drive file id, last-synced snapshot</td></tr>
+      <tr><td><code>doto-sync-log</code></td><td>Recent sync history (last ~50 events, kept for diagnostics; contains no token values)</td></tr>
       <tr><td><code>doto-cal</code>, <code>doto-cal-queue</code></td><td>Linked Google Calendar id and pending calendar deletions</td></tr>
       <tr><td><code>doto-theme</code>, <code>doto-loc</code></td><td>Theme choice; weather location (7-day cache)</td></tr>
     </tbody>
   </table>
   <p>Clearing your browser's site data deletes all of this. Export a JSON backup first (Sync dialog → Export) if it matters to you.</p>
 
-  <h2>3. Google Drive sync (optional)</h2>
+  <h2>8. Google Drive sync (optional) — details</h2>
   <ul>
-    <li>Only if you sign in with Google: the app requests five scopes — <code>drive.appdata</code> (hidden app folder), <code>userinfo.email</code> (display only), <code>calendar.events</code> (create/edit reminder events), <code>calendar.calendarlist.readonly</code> (find the target calendar — <code>calendar.events</code> alone cannot list calendars) and <code>calendar.app.created</code> (create the dedicated "DoTo" calendar; without it reminders fall back to your main calendar).</li>
-    <li>A copy of your lists/tasks is stored in your own Drive's hidden app folder (<code>doto-state.json</code>). Sync traffic goes directly between your browser and Google's APIs; no intermediary server is involved.</li>
-    <li>Sign-in runs in Production mode, so the grant persists. Short-lived access tokens stay in your browser only and are renewed silently on demand. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
+    <li>Only if you sign in with Google. Sign-in runs in Production mode, so the grant persists. Short-lived access tokens stay in your browser only and are renewed silently on demand. Signing out (or revoking access in your Google account) stops all sync; your local copy stays on the device.</li>
+    <li>A single file (<code>doto-state.json</code>) in your Drive's hidden app folder holds your lists/tasks. Nothing else in your Drive is accessible to the app.</li>
   </ul>
 
-  <h2>4. Google Calendar reminders (optional)</h2>
+  <h2>9. Google Calendar reminders (optional) — details</h2>
   <ul>
-    <li>Only tasks where you set Details → Reminder create events, in a "DoTo" calendar in your Google account (or your main calendar if creation isn't permitted).</li>
-    <li>Events contain the task title, notes, list name, due time and popup/email offsets. Completing, deleting or un-setting the reminder deletes the event.</li>
+    <li>Only tasks where you set Details → Reminder create events. Completing, deleting, or un-setting the reminder deletes the event. Moving the due date moves the event.</li>
+    <li>The app reads only your calendar list (to find the "DoTo" calendar) and manages only events it created. It does not read your other calendar events.</li>
   </ul>
 
-  <h2>5. Weather card (Home view)</h2>
+  <h2>10. Weather card (Home view)</h2>
   <ul>
     <li>The weather card fetches forecasts from Open-Meteo and resolves location via the browser geolocation API with BigDataCloud/ipapi.co fallback. This is the only non-Google network traffic the app makes, and only for that card.</li>
-    <li>Location is cached for 7 days (<code>doto-loc</code>) and never sent anywhere except those weather providers.</li>
+    <li>Location is cached for 7 days (<code>doto-loc</code>) and never sent anywhere except those weather providers. No Google user data is ever sent to weather providers.</li>
   </ul>
 
-  <h2>6. What never happens</h2>
+  <h2>11. Your control</h2>
   <ul>
-    <li>No sale, rental or sharing of personal data — there is nothing to share.</li>
-    <li>No cross-site tracking. Fonts and icons ship with the app and load offline.</li>
-    <li>No children's-data collection beyond what any user types into their own tasks.</li>
+    <li>Work fully offline and never sign in — then nothing leaves the device at all (except the weather card if you view Home with internet).</li>
+    <li>Export or delete your data any time (Sync dialog → Export; clearing site data removes everything local).</li>
+    <li>Revoke Google access any time in your <a href="https://myaccount.google.com/permissions">Google account security settings</a>; already-created calendar events and the Drive sync file stay in your Google account until you delete them (see §5).</li>
+    <li>Review or revoke the app's scopes at any time on Google's consent screen; removing a scope disables the feature that needs it (e.g. removing Calendar scopes disables reminders).</li>
   </ul>
 
-  <h2>7. Your control</h2>
-  <ul>
-    <li>Work fully offline and never sign in — nothing leaves the device at all.</li>
-    <li>Export or delete your data any time (Sync dialog → Export; clearing site data removes everything).</li>
-    <li>Revoke Google access any time in your Google account security settings; already-created calendar events stay in your calendar until you delete them.</li>
-  </ul>
-
-  <h2>8. Changes and contact</h2>
-  <p>This policy may be updated; the date above will change. Questions: open an issue at <a href="https://github.com/arazgray/doto/issues">github.com/arazgray/doto/issues</a>. Also see the <a href="terms-of-services.html">Terms of Service</a> and the in-app <a href="manual.html">Manual</a>.</p>
+  <h2>12. Changes and contact</h2>
+  <p>This policy may be updated when the app's data use changes; the date above will change and the app will request your consent to the updated policy before using data in any new way. Questions or deletion help: open an issue at <a href="https://github.com/arazgray/doto/issues">github.com/arazgray/doto/issues</a>. Also see the <a href="terms-of-services.html">Terms of Service</a> and the in-app <a href="manual.html">Manual</a>.</p>
 </article>
 </body>
 </html>
