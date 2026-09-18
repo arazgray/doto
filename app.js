@@ -623,7 +623,9 @@ function renderNav() {
   $('#notesCount').textContent = state.notes.length || '';
   $('#notesCountPill').textContent = state.notes.length ? `${state.notes.length} note${state.notes.length === 1 ? '' : 's'}` : 'No notes';
   const trashN = state.trash.length;
-  $('#trashCount').textContent = trashN || '';
+  const tc = $('#trashCount');
+  tc.textContent = trashN > 99 ? '99+' : (trashN || '');
+  tc.classList.toggle('hidden', !trashN);
   $('#trashCountPill').textContent = trashN ? `${trashN} item${trashN === 1 ? '' : 's'}` : 'Empty';
   const unread = unreadNotifCount();
   const nc = $('#notifCount');
@@ -1780,6 +1782,11 @@ function noteCard(n, opts = {}) {
     };
     foot.append(rb, db);
   } else {
+    const dot = document.createElement('button');
+    dot.className = 'color-dot-btn'; dot.style.background = colorHex(n.color || 'default');
+    dot.title = 'Change color (now: ' + colorName(n.color || 'default') + ')';
+    dot.setAttribute('aria-label', 'Change note color');
+    dot.onclick = (e) => { e.stopPropagation(); openNoteColorPop(dot, n.id); };
     const home = document.createElement('button');
     home.className = 'icon-btn sm' + (n.showOnHome ? ' on' : '');
     home.innerHTML = '<span class="material-icons-outlined">home</span>';
@@ -1790,7 +1797,7 @@ function noteCard(n, opts = {}) {
     del.className = 'icon-btn sm'; del.innerHTML = '<span class="material-icons-outlined">delete</span>';
     del.title = 'Move to trash'; del.setAttribute('aria-label', 'Delete note');
     del.onclick = (e) => { e.stopPropagation(); deleteNote(n.id); };
-    foot.append(home, del);
+    foot.append(dot, home, del);
   }
   card.appendChild(foot);
   pin.onclick = (e) => {
@@ -2643,9 +2650,33 @@ function renderDetail() {
 }
 
 /* ---------- popups ---------- */
+let colorPopNoteId = null; // when set, the shared label popup edits a note, not a task
+function openNoteColorPop(anchor, noteId) {
+  clearTimeout(pendingDetailTimer);
+  closeMovePop(); closeWeightPop(); closeImportancePop();
+  colorPopNoteId = noteId;
+  const pop = $('#colorPop'); pop.innerHTML = '';
+  pop.classList.remove('mini');
+  allColors().forEach((c) => {
+    const b = document.createElement('button');
+    b.className = 'swatch-wrap'; b.style.background = c.hex; b.title = colorName(c.id);
+    b.setAttribute('aria-label', colorName(c.id));
+    const lb = document.createElement('span');
+    lb.className = 'swatch-label'; lb.textContent = colorName(c.id);
+    lb.style.color = contrastText(c.hex);
+    b.appendChild(lb);
+    b.onclick = (e) => { e.stopPropagation(); const n = getNote(noteId); if (n) { n.color = c.id; n.updatedAt = Date.now(); save(); renderAll(); } colorPopNoteId = null; closeColorPop(); };
+    pop.appendChild(b);
+  });
+  pop.classList.remove('hidden');
+  const r = anchor.getBoundingClientRect();
+  pop.style.top = Math.min(window.innerHeight - 90, r.bottom + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - 320, r.left - 240)) + 'px';
+}
 function openColorPop(anchor, taskId, mini) {
   clearTimeout(pendingDetailTimer);
   closeMovePop(); closeWeightPop(); closeImportancePop();
+  colorPopNoteId = null;
   const pop = $('#colorPop'); pop.innerHTML = '';
   pop.classList.toggle('mini', !!mini);
   allColors().forEach((c) => {
@@ -2664,7 +2695,7 @@ function openColorPop(anchor, taskId, mini) {
   pop.style.top = Math.min(window.innerHeight - 90, r.bottom + 6) + 'px';
   pop.style.left = Math.max(8, Math.min(window.innerWidth - 320, r.left - 240)) + 'px';
 }
-function closeColorPop() { $('#colorPop').classList.add('hidden'); }
+function closeColorPop() { colorPopNoteId = null; $('#colorPop').classList.add('hidden'); }
 function placePop(pop, anchor, maxW) {
   pop.classList.remove('hidden');
   const r = anchor.getBoundingClientRect();
@@ -5057,7 +5088,7 @@ function bind() {
   };
   $('#notesSearch').oninput = () => renderNotes();
   $('#emptyTrashBtn').onclick = emptyTrash;
-  // settings tabs (Sync first, then Labels, Home page, General)
+  // settings tabs (Sync, Labels, Home page, Options, Import & Export)
   $$('[data-settab]').forEach((b) => b.onclick = () => switchSetTab(b.dataset.settab));
   // note editor dialog
   $('#noteEditSave').onclick = saveNoteEditor;

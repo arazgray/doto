@@ -865,6 +865,10 @@ a.btn-ghost{text-decoration:none}
   & .t{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   & .s{font-size:11px;font-weight:400;opacity:.85;flex:none}
 }
+.account-row{display:flex;gap:8px;align-items:center}
+.account-row .btn-account{flex:1;min-width:0}
+.trash-btn{position:relative;flex:none;border:1px solid var(--line);margin-top:6px}
+.trash-btn .c{position:absolute;top:-5px;right:-5px;font-size:10px;line-height:16px;min-width:16px;text-align:center;background:var(--blue);color:#fff;border-radius:10px;padding:0 4px}
 
 /* Account dialog */
 .account-modal{width:min(460px,100%);max-height:min(86dvh,700px);overflow-y:auto}
@@ -961,8 +965,9 @@ a.btn-ghost{text-decoration:none}
 .note-add-row .qa-colors{display:inline-flex;gap:8px;align-items:center}
 .notes-head{font-size:13px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;margin:18px 0 10px}
 .notes-head .material-icons-outlined{font-size:17px}
-.notes-grid{column-width:240px;column-gap:14px}
-.note-card{break-inside:avoid;display:inline-block;width:100%;margin:0 0 14px;border:1px solid var(--line);border-left:6px solid var(--note-c,#9aa0a6);border-radius:12px;padding:12px 12px 8px;background:var(--bg);cursor:pointer;position:relative;vertical-align:top}
+.notes-grid{display:flex;flex-direction:column;gap:12px}
+.note-card{display:block;width:auto;margin:0;border:1px solid var(--line);border-left:6px solid var(--note-c,#9aa0a6);border-radius:0 12px 12px 0;padding:12px 12px 8px;background:var(--bg);cursor:pointer;position:relative}
+.note-foot .color-dot-btn{margin-right:auto}
 .note-card:hover{box-shadow:var(--shadow)}
 .note-card h3{margin:0 26px 6px 0;font-size:15px;font-weight:500}
 .note-card .note-body{margin:0;font-size:14px;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:12;-webkit-box-orient:vertical;overflow:hidden}
@@ -993,8 +998,8 @@ a.btn-ghost{text-decoration:none}
 
 /* Home pinned notes */
 #homeNotesCard{margin-bottom:24px}
-.home-notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
-.home-notes .note-card{margin:0;cursor:default}
+.home-notes{display:flex;flex-direction:column;gap:12px}
+.home-notes .note-card{cursor:default}
 
 /* Trash */
 .trash-row{align-items:center}

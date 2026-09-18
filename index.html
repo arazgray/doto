@@ -69,12 +69,11 @@
         <div class="f-group"><span class="f-name">Importance</span><div id="filterImportanceBtns" class="f-btns"></div></div>
         <button id="clearFilters" class="link-btn hidden">Clear filters</button>
       </div>
-      <hr class="sidebar-divider" />
-      <nav class="list-nav" aria-label="Trash">
-        <button id="navTrash" class="list-item view-item"><span class="material-icons-outlined">delete</span><span class="n">Trash</span><span class="c" id="trashCount"></span></button>
-      </nav>
       <div class="sidebar-foot">
-        <button id="accountBtn" class="btn-account"><span class="material-icons-outlined">cloud</span><span class="t">Sync &amp; Settings</span><span id="accountState" class="s"></span></button>
+        <div class="account-row">
+          <button id="accountBtn" class="btn-account"><span class="material-icons-outlined">cloud</span><span class="t">Sync &amp; Settings</span><span id="accountState" class="s"></span></button>
+          <button id="navTrash" class="icon-btn trash-btn" aria-label="Trash" title="Trash"><span class="material-icons-outlined">delete</span><span class="c hidden" id="trashCount"></span></button>
+        </div>
         <div class="io-row">
           <a id="manualBtn" class="btn-ghost" href="manual.html" target="_blank" rel="noopener"><span class="material-icons-outlined">menu_book</span> Manual</a>
           <button id="shortcutsBtn" class="btn-ghost"><span class="material-icons-outlined">keyboard</span> Shortcuts</button>
@@ -120,8 +119,8 @@
       </div>
       <div id="homeStats" class="stat-grid"></div>
       <div class="chips" data-chips></div>
-      <section id="notifCard" class="card hidden"><h2><span class="material-icons-outlined danger">notifications</span> Notifications <span id="notifCountPill" class="count-pill"></span></h2><ul id="notifList" class="task-list"></ul></section>
       <section id="homeNotesCard" class="card"><h2><span class="material-icons-outlined purple">push_pin</span> Pinned notes <span id="homeNotesCount" class="count-pill"></span></h2><div id="homeNotes" class="home-notes"></div></section>
+      <section id="notifCard" class="card hidden"><h2><span class="material-icons-outlined danger">notifications</span> Notifications <span id="notifCountPill" class="count-pill"></span></h2><ul id="notifList" class="task-list"></ul></section>
       <div class="home-grid">
         <section class="card"><h2><span class="material-icons-outlined danger">warning</span> Overdue</h2><ul id="homeOverdue" class="task-list"></ul></section>
         <section class="card"><h2><span class="material-icons-outlined blue">today</span> Today's tasks</h2><ul id="homeToday" class="task-list"></ul></section>
@@ -460,7 +459,8 @@
       <button type="button" data-settab="sync" role="tab" class="selected" aria-selected="true"><span class="material-icons-outlined">sync</span> Sync</button>
       <button type="button" data-settab="labels" role="tab" aria-selected="false"><span class="material-icons-outlined">label</span> Labels</button>
       <button type="button" data-settab="home" role="tab" aria-selected="false"><span class="material-icons-outlined">home</span> Home page</button>
-      <button type="button" data-settab="general" role="tab" aria-selected="false"><span class="material-icons-outlined">tune</span> General</button>
+      <button type="button" data-settab="options" role="tab" aria-selected="false"><span class="material-icons-outlined">tune</span> Options</button>
+      <button type="button" data-settab="io" role="tab" aria-selected="false"><span class="material-icons-outlined">swap_vert</span> Import &amp; Export</button>
     </div>
     <div class="set-pane" data-setpane="sync" role="tabpanel">
       <p id="accountEmail" class="muted small">Not signed in.</p>
@@ -497,20 +497,25 @@
         <div id="homeToggles"></div>
       </div>
     </div>
-    <div class="set-pane hidden" data-setpane="general" role="tabpanel">
+    <div class="set-pane hidden" data-setpane="options" role="tabpanel">
       <div class="set-group">
         <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed tasks</label>
         <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
       </div>
-      <div class="sidebar-divider"></div>
-      <div class="io-row import-row">
-        <select id="importMode" aria-label="Import source">
-          <option value="auto">Auto-detect</option>
-          <option value="doto">DoTo backup</option>
-          <option value="google">Google Tasks</option>
-        </select>
-        <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
-        <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export</button>
+    </div>
+    <div class="set-pane hidden" data-setpane="io" role="tabpanel">
+      <div class="set-group">
+        <p class="d-label">Import &amp; Export <span class="hint">— JSON backups, Google Tasks</span></p>
+        <div class="io-row import-row">
+          <select id="importMode" aria-label="Import source">
+            <option value="auto">Auto-detect</option>
+            <option value="doto">DoTo backup</option>
+            <option value="google">Google Tasks</option>
+          </select>
+          <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
+          <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export</button>
+        </div>
+        <p class="muted small">Exports include lists, tasks, notes, time records and labels. Re-importing your own backup skips duplicates.</p>
       </div>
     </div>
     <div class="modal-actions">
