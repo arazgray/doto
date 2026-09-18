@@ -1027,7 +1027,7 @@ a.btn-ghost{text-decoration:none}
 .trash-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trash-sub{margin-top:2px}
 .trash-row .restore-btn{flex:none}
-.trash-actions{display:flex;align-items:center;gap:4px}
+.trash-actions{display:flex;align-items:center;gap:4px;justify-content: right;}
 .trash-actions .material-icons-outlined{font-size:18px}
 #viewTrash .notes-head{margin-top:22px}
 /* Trash header fits one line on narrow screens: icon-only button beside the title */
