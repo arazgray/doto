@@ -2708,7 +2708,22 @@ const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.app.created'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT; creating the dedicated "DoTo" calendar via calendars.insert needs calendar.app.created — without it everything falls back to the primary calendar)
 const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.app.created'];
 const CAL_SCOPE = CAL_SCOPES[0]; // legacy alias: calendar.events (kept for scope-string cleanup)
-function tokenScopeHasCal(scope) { return typeof scope === 'string' && CAL_SCOPES.every((s) => scope.indexOf(s) >= 0); }
+// Only events + calendarlist.readonly are required. calendar.app.created is
+// optional: ensureCalCalendar() already falls back to the primary calendar
+// when creating the dedicated "DoTo" calendar is not permitted, so demanding
+// app.created here caused a re-consent loop for a state we handle gracefully.
+const CAL_REQUIRED_SCOPES = [CAL_SCOPES[0], CAL_SCOPES[1]];
+function tokenScopeHasCal(scope) { return typeof scope === 'string' && CAL_REQUIRED_SCOPES.every((s) => scope.indexOf(s) >= 0); }
+// Max one consent popup per user gesture: a popup that just ran (within
+// POPUP_COALESCE_MS) satisfies later popup-mode acquisitions while the token
+// is still valid, instead of opening another window per Calendar call.
+let lastPopupAt = 0;
+const POPUP_COALESCE_MS = 30000;
+function popupOpenedRecently() { return Date.now() - lastPopupAt < POPUP_COALESCE_MS; }
+// 401 retries must not open a second popup inside a gesture that already
+// showed one — retry silently once a popup has run recently.
+function effectiveRetryMode(mode) { return (mode === 'popup' && popupOpenedRecently()) ? 'silent' : mode; }
+const CAL_OFF_MSG = 'Calendar reminders are off — permission not granted.';
 const SYNC_KEY = 'doto-sync';
 const CLIENT_KEY = 'doto-google-client-id';
 
@@ -2719,21 +2734,23 @@ function loadSyncMeta() {
   try {
     const m = JSON.parse(localStorage.getItem(SYNC_KEY));
     if (m && typeof m === 'object') {
-      const out = { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false, ...m };
+      const out = { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false, calDeclinedAt: 0, ...m };
       // Old installs predate explicit calendar-grant tracking: their stored
       // token claims the calendar scope even when Google never granted it
       // (GIS does not reliably return granted scopes). Force one verified
       // re-consent instead of trusting the stored string forever.
       if (typeof m.calGranted !== 'boolean') out.calGranted = false;
-      // Tokens issued before calendar.calendarlist.readonly / calendar.app.created
-      // were requested (events-only, or events+list) still 403 on calendarList.list
-      // or fall back to the primary calendar even when calGranted is true.
-      // Force one re-consent so the new scopes are actually granted.
+      // Tokens issued before calendar.calendarlist.readonly was requested
+      // (events-only) still 403 on calendarList.list even when calGranted is
+      // true. Force one re-consent so the missing required scope is granted.
+      // calendar.app.created stays optional (primary-calendar fallback), so it
+      // is deliberately NOT part of tokenScopeHasCal() anymore.
       if (out.calGranted === true && out.token && !tokenScopeHasCal(out.token.scope)) out.calGranted = false;
+      if (typeof out.calDeclinedAt !== 'number') out.calDeclinedAt = 0;
       return out;
     }
   } catch {}
-  return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false };
+  return { fileId: '', base: null, lastSyncedAt: 0, auto: true, email: '', token: null, calGranted: false, calDeclinedAt: 0 };
 }
 let syncMeta = loadSyncMeta();
 let syncStatus = 'signedout'; // setup|signedout|checking|syncing|ok|error
@@ -2938,6 +2955,11 @@ async function doEnsureToken(mode, needCal) {
   // re-consent popup when the calendar grant is unverified. (Forcing it for
   // Drive too caused double popups and still never retried the calendar.)
   if (tokenValid() && (mode !== 'popup' || !needCal || tokenHasCal())) return syncMeta.token.access_token;
+  // One popup per gesture: a token minted moments ago satisfies later
+  // popup-mode acquisitions even when the calendar grant is still unverified.
+  // Without this, every Calendar call in a popup-mode reconcile opened its own
+  // window. Sync check only — no await, so iOS user-activation is preserved.
+  if (mode === 'popup' && tokenValid() && popupOpenedRecently()) return syncMeta.token.access_token;
   if (mode === 'popup' && isIOSStandalone() && /iPhone|iPad|iPod/.test(navigator.userAgent || '')) {
     // Best-effort hint: iOS home-screen (standalone) WebViews often block the
     // OAuth popup outright — the tap looks dead. We still try, but log a hint
@@ -2990,7 +3012,14 @@ async function doEnsureToken(mode, needCal) {
   // GIS rarely echoes granted scopes: optimistically trust a fresh popup,
   // then verify on the first real Calendar call (failure clears it again).
   if (mode === 'popup') {
+    lastPopupAt = Date.now();
     syncMeta.calGranted = tok.scope ? tokenScopeHasCal(tok.scope) : true;
+    try { slog('info', 'GIS scope: ' + tok.scope + ' | calGranted=' + syncMeta.calGranted); } catch {}
+    // A popup that still lacks the required calendar scopes means the user
+    // unticked them (or Google did not grant them): remember the decline so
+    // later calls do not re-prompt automatically.
+    if (tok.scope && !tokenScopeHasCal(tok.scope)) syncMeta.calDeclinedAt = Date.now();
+    else if (syncMeta.calGranted === true) syncMeta.calDeclinedAt = 0;
   }
   saveSyncMeta();
   fetchEmail().catch(() => {});
@@ -3019,10 +3048,11 @@ async function driveFetch(url, opts = {}, mode = 'silent') {
   // Only 401 means the token died (expired/revoked): drop it and retry ONCE
   // with a fresh token so one tap on Sync now recovers instead of needing two.
   // 403 (API disabled, scope denied, …) must NOT wipe the token — otherwise
-  // every retry re-opens the sign-in popup.
+  // every retry re-opens the sign-in popup. The retry never opens a second
+  // popup inside a gesture that already showed one (uses 'silent' then).
   if (r.status === 401) {
     syncMeta.token = null; saveSyncMeta();
-    try { r = await doFetch(await ensureToken(mode)); }
+    try { r = await doFetch(await ensureToken(effectiveRetryMode(mode))); }
     catch { throw new Error('auth'); }
     if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
   }
@@ -3618,13 +3648,17 @@ async function calFetch(path, opts = {}, mode = 'silent') {
   const doFetch = (at) => fetch('https://www.googleapis.com/calendar/v3' + path, {
     ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
   });
-  let r = await doFetch(await ensureToken(mode, true));
+  // Calendar calls never force a consent popup for scope reasons (no needCal):
+  // consent is decided once at the top of a user gesture. Scope failures
+  // surface as 403 and are handled by handleCalError(), not by re-prompting.
+  let r = await doFetch(await ensureToken(mode));
   // Same one-retry rule as Drive: a cached token can be valid locally but
   // dead at Google (expiry/revoke). Retry once with a fresh token so Sync now
   // heals in one tap. 403 (scope denied, API disabled) must NOT loop popups.
+  // The retry uses 'silent' once a popup already ran in this gesture.
   if (r.status === 401) {
     syncMeta.token = null; saveSyncMeta();
-    try { r = await doFetch(await ensureToken(mode, true)); }
+    try { r = await doFetch(await ensureToken(effectiveRetryMode(mode))); }
     catch { throw new Error('auth'); }
     if (r.status === 401) { syncMeta.token = null; saveSyncMeta(); throw new Error('auth'); }
   }
@@ -3795,6 +3829,16 @@ function scheduleCalendarSync() {
 async function calendarReconcile(mode) {
   if (calSyncing) { calSyncAgain = true; return; }
   if (!calConnected() || !navigator.onLine) return;
+  // Declined calendar permission: never re-prompt from the background. Silent
+  // reconciles skip (only an explicit Sync now tap clears calDeclinedAt and
+  // retries once). Without this, every silent 403 would nag again.
+  if (mode === 'silent' && syncMeta.calGranted !== true && syncMeta.calDeclinedAt) {
+    if (lastCalError !== CAL_OFF_MSG) {
+      lastCalError = CAL_OFF_MSG;
+      try { paintSync(); } catch {}
+    }
+    return;
+  }
   calSyncing = true; calSyncAgain = false;
   let changed = false;
   try {
@@ -3829,8 +3873,9 @@ async function calendarReconcile(mode) {
     }
     if (changed) { clearTimeout(calSyncTimer); save(); renderAll(); }
     lastCalError = '';
-    // A real Calendar round-trip proves the grant — trust it from here on.
-    if (syncMeta.calGranted !== true) { syncMeta.calGranted = true; saveSyncMeta(); }
+    // A real Calendar round-trip proves the grant — trust it from here on
+    // and clear any earlier decline.
+    if (syncMeta.calGranted !== true || syncMeta.calDeclinedAt) { syncMeta.calGranted = true; syncMeta.calDeclinedAt = 0; saveSyncMeta(); }
     const n = state.tasks.filter(needsCalEvent).length;
     const placed = state.tasks.filter((t) => t.calEventId && needsCalEvent(t)).length;
     const s = calStore();
@@ -3857,15 +3902,21 @@ function handleCalError(e, mode) {
   else if (detail.indexOf('accessNotConfigured') >= 0)
     msg = 'Google Calendar API is off for your Cloud project — enable it, then retry.';
   if (scopeDenied) {
-    // Stored token is Drive-only in reality: force one consent popup next time
-    // instead of silently reusing it forever (the old "nothing happens" loop).
+    // Stored token is Drive-only in reality: mark the grant unverified so the
+    // next explicit Sync now shows one consent popup (silent reconciles skip
+    // via calDeclinedAt instead of reusing it forever). 403 never wipes the
+    // access token itself.
     syncMeta.calGranted = false;
+    syncMeta.calDeclinedAt = Date.now();
     if (syncMeta.token) {
       let sc = String(syncMeta.token.scope || '');
-      for (const s of CAL_SCOPES) sc = sc.split(s).join(' ');
+      for (const s of CAL_REQUIRED_SCOPES) sc = sc.split(s).join(' ');
       syncMeta.token.scope = sc.replace(/\s+/g, ' ').trim();
     }
     saveSyncMeta();
+    // Background scope failures are a soft "reminders off" state, not a loud
+    // error: the explicit Sync now message tells the user how to re-grant.
+    if (mode === 'silent') msg = CAL_OFF_MSG;
   }
   lastCalError = msg + (detail && msg.indexOf('failed') >= 0 ? ' ' + detail.slice(0, 80) : '');
   slog('error', lastCalError);
@@ -4060,9 +4111,32 @@ function signInErrorMsg(e) {
 }
 async function syncNowFlow() {
   if (!googleClientId()) { openAccount(); return; }
-  // Drive sign-in first (no forced calendar popup here — that caused double
-  // popups). The calendar step below re-consents on its own when needed.
-  if (!syncMeta.email || !tokenValid()) {
+  // Calendar consent is decided ONCE here, at the top of the gesture and
+  // before any other await (iOS user-activation rule). Only !tokenHasCal()
+  // triggers a popup; everything below runs silent on the fresh token.
+  if (!tokenHasCal()) {
+    // Explicit Sync now tap: allow one retry even after a previous decline.
+    if (syncMeta.calDeclinedAt) { syncMeta.calDeclinedAt = 0; saveSyncMeta(); }
+    try { await ensureToken('popup', true); await fetchEmail(); }
+    catch (e) {
+      lastSyncError = signInErrorMsg(e);
+      slog('error', lastSyncError);
+      setSync('error'); paintSync();
+      return;
+    }
+    if (!tokenHasCal()) {
+      // Popup returned without the required calendar scopes: treat as
+      // "user declined" — no auto re-prompt, Drive still syncs, calendar off.
+      syncMeta.calDeclinedAt = Date.now(); saveSyncMeta();
+      lastCalError = CAL_OFF_MSG;
+      slog('error', CAL_OFF_MSG);
+      try { toast(CAL_OFF_MSG); } catch {}
+      await pullNow('silent');
+      await pushNow('silent');
+      paintSync();
+      return;
+    }
+  } else if (!syncMeta.email || !tokenValid()) {
     try { await ensureToken('popup'); await fetchEmail(); }
     catch (e) {
       lastSyncError = signInErrorMsg(e);
@@ -4071,11 +4145,9 @@ async function syncNowFlow() {
       return;
     }
   }
-  await pullNow('popup');
-  await pushNow('popup');
-  // ...then Calendar in popup mode so a missing scope actually shows the
-  // consent window instead of failing silently in the background.
-  try { await calendarReconcile('popup'); }
+  await pullNow('silent');
+  await pushNow('silent');
+  try { await calendarReconcile('silent'); }
   catch {}
   paintSync();
 }
@@ -4161,25 +4233,38 @@ function bindSync() {
       } else {
         try { toast('Opening Google…'); } catch {}
       }
-      // needCal=true: a still-valid token without the calendar grant must
-      // re-consent here (Sync now heals this via its calendar step; without it
-      // sign-in silently reused the scoped-down token and calendar only failed
-      // later in the background).
-      try { await ensureToken('popup', true); }
-      catch (e) {
-        lastSyncError = signInErrorMsg(e);
-        slog('error', lastSyncError);
-        setSync('error'); paintSync();
-        try { toast(lastSyncError); } catch {}
-        return;
+      // Single consent decision at the top of the click, before any other
+      // await: one popup covers Drive + Calendar (needCal forces re-consent
+      // when a valid token still lacks the calendar grant). Everything below
+      // runs silent on the fresh token, so per-Calendar-call popups are gone.
+      if (!tokenValid() || !tokenHasCal()) {
+        try { await ensureToken('popup', true); }
+        catch (e) {
+          lastSyncError = signInErrorMsg(e);
+          slog('error', lastSyncError);
+          setSync('error'); paintSync();
+          try { toast(lastSyncError); } catch {}
+          return;
+        }
       }
       try { await fetchEmail(); } catch {} // email is display-only; never fail sign-in on it
       slog('info', 'Signed in' + (syncMeta.email ? ' as ' + syncMeta.email : ''));
       try { toast('Signed in — syncing…'); } catch {}
-      await pullNow('popup');
-      // Same calendar verification as Sync now, so reminders work immediately
-      // instead of failing silently until the next Sync now.
-      try { await calendarReconcile('popup'); }
+      if (!tokenHasCal()) {
+        // User unticked the calendar scopes (or Google withheld them):
+        // Drive still syncs; calendar stays off with one clear message.
+        syncMeta.calDeclinedAt = Date.now(); saveSyncMeta();
+        lastCalError = CAL_OFF_MSG;
+        slog('error', CAL_OFF_MSG);
+        try { toast(CAL_OFF_MSG); } catch {}
+        await pullNow('silent');
+        paintSync();
+        return;
+      }
+      await pullNow('silent');
+      // Calendar was just consented above — verify silently instead of
+      // opening another popup per API call.
+      try { await calendarReconcile('silent'); }
       catch {}
       paintSync();
     } finally {
@@ -4192,7 +4277,7 @@ function bindSync() {
     }
     syncMeta.token = null; syncMeta.email = '';
     syncMeta.fileId = ''; syncMeta.base = null;
-    syncMeta.calGranted = false; lastCalError = '';
+    syncMeta.calGranted = false; syncMeta.calDeclinedAt = 0; lastCalError = '';
     saveSyncMeta(); setSync('signedout'); paintSync();
     slog('info', 'Signed out — this device keeps its own copy');
     toast('Signed out — this device keeps its own copy');
