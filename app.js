@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789626984'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789721782'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -777,7 +777,8 @@ async function deleteList(id) {
   if (ui.detailId && removedTasks.some((t) => t.id === ui.detailId)) closeDetail();
   save(); renderAll();
   toast('List deleted', () => {
-    state.lists.push(...removedLists); state.tasks.push(...removedTasks);
+    removedLists.forEach((l) => { if (!state.lists.some((x) => x.id === l.id)) state.lists.push(l); });
+    removedTasks.forEach((t) => { if (!getTask(t.id)) state.tasks.push(t); });
     if (savedTimer) state.timer = savedTimer;
     save(); renderAll();
   });
@@ -788,7 +789,6 @@ function fmtDate(isoStr) {
   if (!isoStr) return '';
   const d = new Date(isoStr + 'T12:00:00');
   const t = todayIso();
-  const diff = isoStr < t ? -1 : isoStr === t ? 0 : 1;
   // precise day diff
   const a = new Date(t + 'T12:00:00'), b = new Date(isoStr + 'T12:00:00');
   const dd = Math.round((b - a) / 864e5);
@@ -897,7 +897,9 @@ function recurOccursOn(t, iso) {
       return x.getTime();
     };
     const apart = Math.round((weekStart(iso) - weekStart(start)) / 6048e5);
-    return apart >= 0 && (apart % n === 0 || (apart === 0 && iso !== start));
+    // apart === 0 covers the start week (days before start are already
+    // excluded above); 0 % n === 0, so no special case is needed.
+    return apart >= 0 && apart % n === 0;
   }
   if (f === 'monthly' || f === 'yearly') {
     const step = f === 'monthly' ? n : n * 12;
@@ -1109,13 +1111,15 @@ function dropOntoTask(fromId, toId, offset) {
     if (!now || now.done !== to.done) { moveTask(fromId, to.listId); return; }
   }
   if (from.listId !== to.listId) { moveTask(fromId, to.listId, toId, offset); return; }
-  // same list reorder — use the full unfiltered group so hidden tasks keep their slots
+  // same list reorder — only meaningful in My-order sort. In Date / Title /
+  // Importance sorts the position is derived, so ask before switching.
   const group = listTasks(to.listId).filter((x) => x.done === to.done).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
   const without = group.filter((x) => x.id !== from.id);
   let idx = without.findIndex((x) => x.id === to.id) + offset;
   without.splice(Math.max(0, idx), 0, from);
   without.forEach((x, i) => x.order = i);
-  ui.sort = state.sort = 'order'; save(); renderAll();
+  if (state.sort !== 'order') { ui.sort = state.sort = 'order'; save(); renderAll(); toast('Switched to My order to reorder'); }
+  else { save(); renderAll(); }
 }
 
 /* ---------- list (category) reorder: mouse + touch ---------- */
@@ -1281,7 +1285,10 @@ function moveTask(taskId, targetListId, beforeTaskId = null, offset = 1) {
     group.splice(Math.max(0, idx), 0, t);
   } else group.push(t);
   group.forEach((x, i) => x.order = i);
-  ui.sort = state.sort = 'order'; save(); renderAll();
+  // cross-list moves keep the active sort — only same-list manual reorders
+  // switch to My order (see dropOntoTask). Reassigning order above just keeps
+  // positions sane for a later return to My order.
+  save(); renderAll();
   toast(`Moved to “${listName(targetListId)}”`, null);
   void fromName;
 }
@@ -1925,6 +1932,7 @@ function armTick() {
 }
 function tickTime() {
   if (!state.timer || !state.timer.running) return;
+  if (document.hidden) return; // math is derived from timestamps on return — no need to paint hidden tabs
   const el = $('#timeDisplay');
   if (el) el.textContent = fmtClock(timerElapsed());
   const tc = $('#timeCount');
@@ -2153,7 +2161,12 @@ function deleteTask(id) {
   if (ui.detailId === id) closeDetail();
   save(); renderAll();
   toast('Task deleted', () => {
-    state.tasks.push(rm);
+    // Guard against double-undo / cross-tab races: never restore a duplicate
+    // id, and drop a stale spawnedId link whose instance is gone so the
+    // recurrence chain can't point at a ghost (or fork a second live copy).
+    if (!getTask(rm.id)) state.tasks.push(rm);
+    else return;
+    if (rm.spawnedId && !getTask(rm.spawnedId)) rm.spawnedId = '';
     if (savedTimer) state.timer = savedTimer;
     save(); renderAll();
   });
@@ -2549,15 +2562,31 @@ function importTimes(arr, taskIdMap) {
   return n;
 }
 function detectAndImport(parsed, fileName, mode = 'auto') {
-  // 1. DoTo native export
+  // 1. DoTo native export. Lists with a matching name reuse the existing list;
+  // tasks identical to an existing one (same title/list/created/due) are
+  // skipped — so re-importing your own backup is a no-op instead of doubling
+  // every task.
   if ((mode === 'auto' || mode === 'doto') && parsed && Array.isArray(parsed.lists) && Array.isArray(parsed.tasks)) {
     const idMap = new Map();
-    parsed.lists.forEach((l) => { const nid = uid(); idMap.set(l.id, nid); state.lists.push({ id: nid, name: String(l.name || 'Imported').slice(0, 60), createdAt: l.createdAt || Date.now() }); });
+    let reusedLists = 0;
+    parsed.lists.forEach((l) => {
+      const name = String(l.name || 'Imported').slice(0, 60);
+      const same = state.lists.find((x) => x.name === name);
+      if (same) { idMap.set(l.id, same.id); reusedLists++; }
+      else { const nid = uid(); idMap.set(l.id, nid); state.lists.push({ id: nid, name, createdAt: l.createdAt || Date.now() }); }
+    });
+    const sig = (listId, t) => [listId, String(t.title || ''), t.createdAt || 0, t.date || '', t.time || ''].join('|');
+    const seen = new Set(state.tasks.map((t) => sig(t.listId, t)));
     const taskIdMap = new Map();
+    let skipped = 0;
     parsed.tasks.forEach((t, i) => {
+      const listId = idMap.get(t.listId) || fallbackList()?.id || state.lists[0].id;
+      const key = sig(listId, { title: String(t.title || '(untitled)').slice(0, 200), createdAt: t.createdAt || 0, date: t.date || '', time: t.time || '' });
+      if (seen.has(key)) { skipped++; return; }
+      seen.add(key);
       const nid = uid(); taskIdMap.set(t.id, nid);
       state.tasks.push({
-        id: nid, listId: idMap.get(t.listId) || fallbackList()?.id || state.lists[0].id,
+        id: nid, listId,
         title: String(t.title || '(untitled)').slice(0, 200), notes: String(t.notes || ''), date: t.date || '', time: t.time || '',
         tz: typeof t.tz === 'string' ? t.tz.slice(0, 64) : '',
         dueUtc: typeof t.dueUtc === 'number' && t.dueUtc > 0 ? t.dueUtc : 0,
@@ -2577,7 +2606,7 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
         if (okIds.has(k) && typeof v === 'string' && v.trim() && !state.colorNames[k]) state.colorNames[k] = v.trim().slice(0, 24);
       });
     }
-    return { lists: parsed.lists.length, tasks: parsed.tasks.length, times: importTimes(parsed.times, taskIdMap), colors: addedColors };
+    return { lists: parsed.lists.length - reusedLists, tasks: parsed.tasks.length - skipped, skipped, times: importTimes(parsed.times, taskIdMap), colors: addedColors };
   }
   if (mode === 'doto') throw new Error('Not a DoTo backup — switch the source to Google Tasks or Auto-detect');
   const base = (fileName || 'Imported').replace(/\.json$/i, '').split('/').pop() || 'Imported';
@@ -2617,19 +2646,20 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
     : 'Unrecognized JSON — expected DoTo export or Google Takeout Tasks file');
 }
 async function importFiles(files, mode = 'auto') {
-  let L = 0, T = 0, TM = 0, CM = 0; const errors = [];
+  let L = 0, T = 0, TM = 0, CM = 0, SK = 0; const errors = [];
   for (const f of files) {
     try {
       const text = await f.text();
       const parsed = JSON.parse(text);
       const r = detectAndImport(parsed, f.name, mode);
-      L += r.lists; T += r.tasks; TM += r.times || 0; CM += r.colors || 0;
+      L += r.lists; T += r.tasks; TM += r.times || 0; CM += r.colors || 0; SK += r.skipped || 0;
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
   if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
-  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} labels` : ''));
+  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} labels` : '') + (SK ? ` (${SK} duplicates skipped)` : ''));
+  else if (SK) toast(`Nothing new — ${SK} duplicate${SK === 1 ? '' : 's'} skipped`);
   if (errors.length) toast('Import issue: ' + errors[0]);
 }
 
@@ -4239,7 +4269,7 @@ function bindSync() {
   bindPullToRefresh();
   bindEdgeSwipe();
   bindDetailSwipe();
-  setInterval(() => { paintSync(); syncWatchdog(); }, 5000);
+  setInterval(() => { if (!document.hidden) paintSync(); syncWatchdog(); }, 5000);
   paintSync();
 }
 
@@ -4483,9 +4513,12 @@ function setTheme(dark, persist) {
   document.body.classList.toggle('dark', !!dark);
   const t = $('#darkModeToggle');
   if (t && document.activeElement !== t) t.checked = !!dark;
-  // 'auto' = follow the OS. Only an explicit toggle stores dark/light;
-  // every other path (startup, OS change, other tabs) keeps auto.
-  try { localStorage.setItem(THEME_KEY, persist ? (dark ? 'dark' : 'light') : 'auto'); } catch {}
+  // Only an explicit user toggle persists. Startup / OS-change / cross-tab
+  // sync must never overwrite a stored pick — otherwise every reload resets
+  // an explicit choice back to 'auto' (follow-OS).
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch {}
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#131314' : '#ffffff');
   const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
@@ -4539,7 +4572,7 @@ function bind() {
   $('#timePause').onclick = timePause;
   $('#timeStop').onclick = timeStop;
   if (state.timer && state.timer.running) armTick();
-  setInterval(paintHomeClock, 500); paintHomeClock();
+  setInterval(() => { if (!document.hidden) paintHomeClock(); }, 500); paintHomeClock();
   const shiftCalMonth = (n) => {
     if ((ui.calView || 'month') === 'year') { ui.calYear = (ui.calYear || new Date().getFullYear()) + n; ui.calAnim = n < 0 ? 'prev' : 'next'; renderAll(); return; }
     const [Y, M] = calMonth().split('-').map(Number);
@@ -4584,14 +4617,17 @@ function bind() {
   $('#createListBtn').onclick = createList;
   $('#renameListBtn').onclick = () => { $('#listMenu').classList.add('hidden'); renameList(state.activeView); };
   $('#deleteListBtn').onclick = () => { $('#listMenu').classList.add('hidden'); deleteList(state.activeView); };
-  $('#deleteCompletedBtn').onclick = () => {
+  $('#deleteCompletedBtn').onclick = async () => {
     $('#listMenu').classList.add('hidden');
     const id = state.activeView;
     const rm = state.tasks.filter((t) => t.listId === id && t.done);
     if (!rm.length) return toast('No completed tasks');
-    state.tasks = state.tasks.filter((t) => !(t.listId === id && t.done));
+    const ok = await showModal({ title: 'Delete completed?', message: `${rm.length} completed task${rm.length === 1 ? '' : 's'} in “${listName(id)}” will be deleted. You can undo right after.`, okLabel: 'Delete', danger: true });
+    if (!ok) return;
+    const ids = new Set(rm.map((t) => t.id));
+    state.tasks = state.tasks.filter((t) => !ids.has(t.id));
     save(); renderAll();
-    toast(`${rm.length} completed deleted`, () => { state.tasks.push(...rm); save(); renderAll(); });
+    toast(`${rm.length} completed deleted`, () => { rm.forEach((t) => { if (!getTask(t.id)) state.tasks.push(t); }); save(); renderAll(); });
   };
   $('#listMenuBtn').onclick = (e) => { e.stopPropagation(); $('#listMenu').classList.toggle('hidden'); $('#sortMenu').classList.add('hidden'); };
   $('#sortBtn').onclick = (e) => {
@@ -4601,7 +4637,7 @@ function bind() {
     $('#listMenu').classList.add('hidden');
     $('#sortBtn').setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
   };
-  $$('#sortMenu button').forEach((b) => b.onclick = () => { setSort(b.dataset.sort); $('#sortMenu').classList.add('hidden'); toast('Sorted: ' + b.textContent.trim()); });
+  $$('#sortMenu button').forEach((b) => b.onclick = () => { const label = { order: 'My order', date: 'Date', priority: 'Importance & weight', title: 'Title' }[b.dataset.sort] || b.dataset.sort; setSort(b.dataset.sort); $('#sortMenu').classList.add('hidden'); toast('Sorted: ' + label); });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#sortMenu') && !e.target.closest('#sortBtn')) {
       $('#sortMenu').classList.add('hidden');
@@ -4800,7 +4836,8 @@ if ('serviceWorker' in navigator) {
       .catch(() => {});
   };
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // version-stamped so a new release always replaces the worker script
+    navigator.serviceWorker.register('sw.js?v=' + APP_VERSION).catch(() => {});
     pokeSw();
     checkForUpdate();
   });
