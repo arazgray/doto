@@ -1002,7 +1002,7 @@ a.btn-ghost{text-decoration:none}
 .switch-icon .material-icons-outlined{font-size:19px;pointer-events:none}
 .switch-icon input:checked ~ .material-icons-outlined{color:var(--blue)}
 .switch-icon input:focus-visible ~ .material-icons-outlined{box-shadow:0 0 0 2px var(--blue-soft)}
-.note-modal .palette{margin:6px 0}
+.note-modal .palette{margin:6px 0; overflow: visible;}
 .note-actions .spacer{flex:1}
 /* Note editor: bottom sheet on mobile, like the task detail panel */
 @keyframes noteSheetIn{from{transform:translateY(100%)}to{transform:none}}
@@ -1034,7 +1034,7 @@ a.btn-ghost{text-decoration:none}
 @media (max-width:600px){
   #viewTrash .list-header > div{min-width:0}
   #viewTrash .list-header .board-hint{display:none}
-  #emptyTrashBtn{width:40px;height:40px;padding:0;justify-content:center}
+  #emptyTrashBtn{width:110px;height:40px;padding:0;justify-content:center}
   #emptyTrashBtn .btn-label{display:none}
 }
 
@@ -1055,4 +1055,9 @@ a.btn-ghost{text-decoration:none}
   .home-grid{gap:14px}
   .card{padding:14px}
   .card h2{margin:0 0 10px}
+}
+
+.viewHome .card {
+  border: none;
+  padding: 0;
 }
