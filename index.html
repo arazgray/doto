@@ -57,6 +57,7 @@
         <button id="navAll" class="list-item view-item"><span class="material-icons-outlined">view_column</span><span class="n">Board</span><span class="c" id="allCount"></span></button>
         <button id="navCal" class="list-item view-item"><span class="material-icons-outlined">calendar_month</span><span class="n">Calendar</span><span class="c" id="calCount"></span></button>
         <button id="navTime" class="list-item view-item"><span class="material-icons-outlined">timer</span><span class="n">Time</span><span class="c" id="timeCount"></span></button>
+        <button id="navNotes" class="list-item view-item"><span class="material-icons-outlined">note</span><span class="n">Notes</span><span class="c" id="notesCount"></span></button>
       </nav>
       <hr class="sidebar-divider" />
       <nav id="listNav" class="list-nav" aria-label="Lists"></nav>
@@ -68,6 +69,10 @@
         <div class="f-group"><span class="f-name">Importance</span><div id="filterImportanceBtns" class="f-btns"></div></div>
         <button id="clearFilters" class="link-btn hidden">Clear filters</button>
       </div>
+      <hr class="sidebar-divider" />
+      <nav class="list-nav" aria-label="Trash">
+        <button id="navTrash" class="list-item view-item"><span class="material-icons-outlined">delete</span><span class="n">Trash</span><span class="c" id="trashCount"></span></button>
+      </nav>
       <div class="sidebar-foot">
         <button id="accountBtn" class="btn-account"><span class="material-icons-outlined">cloud</span><span class="t">Sync &amp; Settings</span><span id="accountState" class="s"></span></button>
         <div class="io-row">
@@ -116,6 +121,7 @@
       <div id="homeStats" class="stat-grid"></div>
       <div class="chips" data-chips></div>
       <section id="notifCard" class="card hidden"><h2><span class="material-icons-outlined danger">notifications</span> Notifications <span id="notifCountPill" class="count-pill"></span></h2><ul id="notifList" class="task-list"></ul></section>
+      <section id="homeNotesCard" class="card"><h2><span class="material-icons-outlined purple">push_pin</span> Pinned notes <span id="homeNotesCount" class="count-pill"></span></h2><div id="homeNotes" class="home-notes"></div></section>
       <div class="home-grid">
         <section class="card"><h2><span class="material-icons-outlined danger">warning</span> Overdue</h2><ul id="homeOverdue" class="task-list"></ul></section>
         <section class="card"><h2><span class="material-icons-outlined blue">today</span> Today's tasks</h2><ul id="homeToday" class="task-list"></ul></section>
@@ -268,6 +274,48 @@
         </section>
       </div>
     </section>
+
+    <!-- NOTES VIEW (Google Keep style) -->
+    <section id="viewNotes" class="view hidden">
+      <div class="list-header">
+        <div><h1>Notes</h1><p class="muted small board-hint">Quick notes, Keep-style — pin important ones, show them on Home.</p></div>
+        <span id="notesCountPill" class="count-pill"></span>
+      </div>
+      <div class="search-wrap notes-search">
+        <span class="material-icons-outlined search-icon">search</span>
+        <input id="notesSearch" type="search" placeholder="Search notes" autocomplete="off" aria-label="Search notes" dir="auto" />
+      </div>
+      <form id="noteAddForm" class="note-add" autocomplete="off">
+        <input id="noteAddTitle" type="text" placeholder="Title" maxlength="120" aria-label="Note title" dir="auto" />
+        <textarea id="noteAddBody" rows="2" placeholder="Take a note…" aria-label="Note text" dir="auto"></textarea>
+        <div class="note-add-row">
+          <div id="noteAddColors" class="qa-colors"></div>
+          <button type="submit" class="btn-primary"><span class="material-icons-outlined">add</span> Add note</button>
+        </div>
+      </form>
+      <h2 id="notesPinnedHead" class="notes-head"><span class="material-icons-outlined">push_pin</span> Pinned</h2>
+      <div id="notesPinned" class="notes-grid"></div>
+      <h2 id="notesOthersHead" class="notes-head"><span class="material-icons-outlined">note</span> Others</h2>
+      <div id="notesGrid" class="notes-grid"></div>
+      <p id="notesEmpty" class="mini-empty hidden">No notes yet — jot one down above.</p>
+    </section>
+
+    <!-- TRASH VIEW -->
+    <section id="viewTrash" class="view hidden">
+      <div class="list-header">
+        <div><h1>Trash</h1><p class="muted small board-hint">Deleted tasks and notes stay here until you restore them or empty the trash.</p></div>
+        <div class="list-header-actions">
+          <span id="trashCountPill" class="count-pill"></span>
+          <button id="emptyTrashBtn" class="btn-ghost danger"><span class="material-icons-outlined">delete_forever</span> Empty trash</button>
+        </div>
+      </div>
+      <h2 class="notes-head"><span class="material-icons-outlined">task</span> Tasks</h2>
+      <ul id="trashTasks" class="task-list"></ul>
+      <p id="trashTasksEmpty" class="mini-empty hidden">No deleted tasks.</p>
+      <h2 class="notes-head"><span class="material-icons-outlined">note</span> Notes</h2>
+      <div id="trashNotes" class="notes-grid"></div>
+      <p id="trashNotesEmpty" class="mini-empty hidden">No deleted notes.</p>
+    </section>
   </main>
 
   <aside id="detail" class="detail hidden" aria-label="Task details">
@@ -408,45 +456,63 @@
 <div id="accountScrim" class="modal-scrim hidden">
   <div class="modal account-modal" role="dialog" aria-modal="true" aria-label="Sync and settings">
     <h3>Sync &amp; Settings</h3>
-    <p id="accountEmail" class="muted small">Not signed in.</p>
-    <div class="setup-row name-row">
-      <input id="userNameInput" type="text" placeholder="Your name (shown in greetings)" autocomplete="off" maxlength="40" aria-label="Your name" dir="auto" />
+    <div class="set-tabs" role="tablist" aria-label="Settings sections">
+      <button type="button" data-settab="sync" role="tab" class="selected" aria-selected="true"><span class="material-icons-outlined">sync</span> Sync</button>
+      <button type="button" data-settab="labels" role="tab" aria-selected="false"><span class="material-icons-outlined">label</span> Labels</button>
+      <button type="button" data-settab="home" role="tab" aria-selected="false"><span class="material-icons-outlined">home</span> Home page</button>
+      <button type="button" data-settab="general" role="tab" aria-selected="false"><span class="material-icons-outlined">tune</span> General</button>
     </div>
-    <div class="modal-actions account-actions">
-      <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
-      <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
-      <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
-      <button type="button" id="logOpenBtn" class="btn-ghost"><span class="material-icons-outlined">history</span> History</button>
-    </div>
-    <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
-    <p id="accountLast" class="muted small"></p>
-    <p id="accountError" class="sync-err hidden"></p>
-    <div class="set-group">
-      <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed tasks</label>
-      <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
-    </div>
-    <div class="set-group">
-      <p class="d-label">Labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
-      <div id="colorNames" class="color-names"></div>
-      <div class="setup-row color-add-row">
-        <input type="color" id="customColorPick" value="#1a73e8" aria-label="Custom label color" />
-        <input id="customColorName" type="text" placeholder="Label, e.g. Home" maxlength="24" aria-label="Custom label name" dir="auto" />
-        <button type="button" id="customColorAdd" class="btn-primary">Add</button>
+    <div class="set-pane" data-setpane="sync" role="tabpanel">
+      <p id="accountEmail" class="muted small">Not signed in.</p>
+      <div class="setup-row name-row">
+        <input id="userNameInput" type="text" placeholder="Your name (shown in greetings)" autocomplete="off" maxlength="40" aria-label="Your name" dir="auto" />
       </div>
-      <button type="button" id="resetColorsBtn" class="link-btn hidden">Reset built-in labels</button>
+      <div class="modal-actions account-actions">
+        <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
+        <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
+        <button type="button" id="syncNowBtn" class="btn-ghost"><span class="material-icons-outlined">sync</span> Sync now</button>
+        <button type="button" id="logOpenBtn" class="btn-ghost"><span class="material-icons-outlined">history</span> History</button>
+      </div>
+      <label class="switch-row"><input type="checkbox" id="autoSyncToggle" checked /> Auto-sync on changes</label>
+      <p id="accountLast" class="muted small"></p>
+      <p id="accountError" class="sync-err hidden"></p>
+      <p class="muted small">Synced with Drive's hidden app folder. Works offline.</p>
+      <p class="muted small">Sign-in requests access to your Drive app folder (sync), your email (display only), and Calendar events + calendar list (reminders in a dedicated “DoTo” calendar). Data goes only between your browser and Google. See the <a href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a> for details.</p>
     </div>
-    <div class="sidebar-divider"></div>
-    <div class="io-row import-row">
-      <select id="importMode" aria-label="Import source">
-        <option value="auto">Auto-detect</option>
-        <option value="doto">DoTo backup</option>
-        <option value="google">Google Tasks</option>
-      </select>
-      <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
-      <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export</button>
+    <div class="set-pane hidden" data-setpane="labels" role="tabpanel">
+      <div class="set-group">
+        <p class="d-label">Labels <span class="hint">— e.g. red for Home, blue for Work</span></p>
+        <div id="colorNames" class="color-names"></div>
+        <div class="setup-row color-add-row">
+          <input type="color" id="customColorPick" value="#1a73e8" aria-label="Custom label color" />
+          <input id="customColorName" type="text" placeholder="Label, e.g. Home" maxlength="24" aria-label="Custom label name" dir="auto" />
+          <button type="button" id="customColorAdd" class="btn-primary">Add</button>
+        </div>
+        <button type="button" id="resetColorsBtn" class="link-btn hidden">Reset built-in labels</button>
+      </div>
     </div>
-    <p class="muted small">Synced with Drive's hidden app folder. Works offline.</p>
-    <p class="muted small">Sign-in requests access to your Drive app folder (sync), your email (display only), and Calendar events + calendar list (reminders in a dedicated “DoTo” calendar). Data goes only between your browser and Google. See the <a href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a> for details.</p>
+    <div class="set-pane hidden" data-setpane="home" role="tabpanel">
+      <div class="set-group">
+        <p class="d-label">Home page <span class="hint">— pick which sections appear</span></p>
+        <div id="homeToggles"></div>
+      </div>
+    </div>
+    <div class="set-pane hidden" data-setpane="general" role="tabpanel">
+      <div class="set-group">
+        <label class="switch-row"><input type="checkbox" id="showCompletedToggle" checked /> Show completed tasks</label>
+        <label class="switch-row"><input type="checkbox" id="darkModeToggle" /> Dark mode</label>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="io-row import-row">
+        <select id="importMode" aria-label="Import source">
+          <option value="auto">Auto-detect</option>
+          <option value="doto">DoTo backup</option>
+          <option value="google">Google Tasks</option>
+        </select>
+        <button id="importBtn2" class="btn-ghost"><span class="material-icons-outlined">upload</span> Import</button>
+        <button id="exportBtn2" class="btn-ghost"><span class="material-icons-outlined">download</span> Export</button>
+      </div>
+    </div>
     <div class="modal-actions">
       <button type="button" id="accountClose" class="btn-primary">Done</button>
     </div>
@@ -485,6 +551,22 @@
     <div id="helpTable" class="help-table"></div>
     <div class="modal-actions">
       <button type="button" id="helpClose" class="btn-primary">Done</button>
+    </div>
+  </div>
+</div>
+<div id="noteScrim" class="modal-scrim hidden">
+  <div class="modal note-modal" role="dialog" aria-modal="true" aria-label="Edit note">
+    <input id="noteEditTitle" type="text" class="d-title" placeholder="Title" maxlength="120" dir="auto" />
+    <textarea id="noteEditBody" rows="6" placeholder="Take a note…" dir="auto"></textarea>
+    <p class="d-label">Color</p>
+    <div id="noteEditColors" class="palette"></div>
+    <label class="switch-row"><input type="checkbox" id="noteEditPinned" /> Pinned</label>
+    <label class="switch-row"><input type="checkbox" id="noteEditHome" /> Show on Home page</label>
+    <div class="modal-actions note-actions">
+      <button type="button" id="noteDeleteBtn" class="btn-ghost danger"><span class="material-icons-outlined">delete</span> Delete</button>
+      <span class="spacer"></span>
+      <button type="button" id="noteEditCancel" class="btn-ghost">Cancel</button>
+      <button type="button" id="noteEditSave" class="btn-primary">Save</button>
     </div>
   </div>
 </div>

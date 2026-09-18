@@ -41,10 +41,22 @@ const WEIGHT_IDS = Object.keys(WEIGHTS), IMP_IDS = Object.keys(IMPORTANCE);
 function clampWeight(v) { return WEIGHT_IDS.includes(v) ? v : 'medium'; }
 function clampImp(v) { return IMP_IDS.includes(v) ? v : 'medium'; }
 const REMIND_OFFSETS = [1, 5, 30, 60, 180, 1440]; // minutes before due; '' = off
-const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__';
+const HOME = '__home__', ALL = '__all__', CAL = '__cal__', TIME = '__time__', NOTES = '__notes__', TRASH = '__trash__';
+const HOME_SECTIONS = [
+  { key: 'weather', label: 'Weather' },
+  { key: 'quote', label: 'Quote' },
+  { key: 'stats', label: 'Stats' },
+  { key: 'notif', label: 'Notifications' },
+  { key: 'notes', label: 'Pinned notes' },
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'today', label: "Today's tasks" },
+  { key: 'important', label: 'Most important' },
+  { key: 'heavy', label: 'Heavy lifting' },
+];
+function defaultHomeShow() { const o = {}; HOME_SECTIONS.forEach((s) => o[s.key] = true); return o; }
 
 let state = migrate(load() || seed());
-let ui = { completedOpen: false, boardDone: {}, sort: (typeof state !== 'undefined' && state.sort) || 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '', searchFromHome: false };
+let ui = { completedOpen: false, boardDone: {}, sort: (typeof state !== 'undefined' && state.sort) || 'order', detailId: null, selectedId: null, dragId: null, dragListId: null, suppressClickUntil: 0, quick: {}, timeTaskId: null, timeQuery: '', searchFromHome: false, setTab: 'sync' };
 // shared single-click timer: opening any popup cancels a pending details-open
 // so the panel can never ambush a popup tap
 let pendingDetailTimer = 0;
@@ -61,6 +73,9 @@ function seed() {
     deletedColors: [],
     prefs: { sideW: 280, detailW: 440 },
     times: [],
+    notes: [],
+    trash: [],
+    homeShow: defaultHomeShow(),
     timer: null,
     sort: 'order',
     lastListId: l1.id,
@@ -157,6 +172,24 @@ function migrate(s) {
   if (s.filters && s.filters.color && !validColors.has(s.filters.color)) s.filters.color = '';
   Object.keys(s.colorNames).forEach((k) => { if (!validColors.has(k)) delete s.colorNames[k]; });
   if (!Array.isArray(s.times)) s.times = [];
+  if (!Array.isArray(s.notes)) s.notes = [];
+  if (!Array.isArray(s.trash)) s.trash = [];
+  // validate notes: Keep-style {id,title,body,color,pinned,showOnHome,order,createdAt,updatedAt}
+  const okColors = new Set([...BUILTIN_COLOR_IDS, ...(Array.isArray(s.customColors) ? s.customColors.map((c) => c.id) : [])]);
+  s.notes = s.notes.filter((n) => n && typeof n.id === 'string' && (typeof n.title === 'string' || typeof n.body === 'string')).map((n, i) => ({
+    id: n.id, title: String(n.title || '').slice(0, 120), body: String(n.body || '').slice(0, 8000),
+    color: okColors.has(n.color) ? n.color : 'default',
+    pinned: !!n.pinned, showOnHome: !!n.showOnHome,
+    order: typeof n.order === 'number' ? n.order : i,
+    createdAt: n.createdAt || Date.now(), updatedAt: n.updatedAt || Date.now(),
+  }));
+  // trash entries: {id, kind:'task'|'note', data, deletedAt}
+  s.trash = s.trash.filter((e) => e && (e.kind === 'task' || e.kind === 'note') && e.data && typeof e.data.id === 'string').map((e) => ({
+    id: typeof e.id === 'string' ? e.id : uid(), kind: e.kind, data: e.data,
+    deletedAt: e.deletedAt || Date.now(),
+  })).slice(-300);
+  if (!s.homeShow || typeof s.homeShow !== 'object') s.homeShow = defaultHomeShow();
+  HOME_SECTIONS.forEach((sec) => { if (typeof s.homeShow[sec.key] !== 'boolean') s.homeShow[sec.key] = true; });
   if (typeof s.dirtyAt !== 'number') s.dirtyAt = 0;
   if (typeof s.userName !== 'string') s.userName = '';
   if (s.timer && (typeof s.timer !== 'object' || !s.timer.taskId)) s.timer = null;
@@ -227,6 +260,10 @@ function isHome() { return state.activeView === HOME; }
 function isAll() { return state.activeView === ALL; }
 function isCal() { return state.activeView === CAL; }
 function isTime() { return state.activeView === TIME; }
+function isNotes() { return state.activeView === NOTES; }
+function isTrash() { return state.activeView === TRASH; }
+function getNote(id) { return state.notes.find((n) => n.id === id); }
+function nextNoteOrder() { const o = state.notes.map((n) => n.order || 0); return o.length ? Math.max(...o) + 1 : 0; }
 function activeList() { return state.lists.find((l) => l.id === state.activeView) || null; }
 function fallbackList() { return state.lists[0] || null; }
 function listName(id) { const l = state.lists.find((x) => x.id === id); return l ? l.name : '(deleted)'; }
@@ -353,6 +390,8 @@ const SHORTCUTS = [
   { keys: ['g', 'then', 'b'], desc: 'Go to Board' },
   { keys: ['g', 'then', 'c'], desc: 'Go to Calendar' },
   { keys: ['g', 'then', 't'], desc: 'Go to Time tracker' },
+  { keys: ['g', 'then', 'n'], desc: 'Go to Notes' },
+  { keys: ['g', 'then', 'r'], desc: 'Go to Trash' },
   { keys: ['g', 'then', '1-9'], desc: 'Jump to list by position' },
   { keys: ['u'], desc: 'Show / hide completed tasks' },
   { keys: ['d'], desc: 'Toggle dark mode' },
@@ -394,7 +433,10 @@ function paletteCommands() {
     { icon: 'view_column', label: 'Go to Board', run: () => go(ALL) },
     { icon: 'calendar_month', label: 'Go to Calendar', run: () => go(CAL) },
     { icon: 'timer', label: 'Go to Time tracker', run: () => go(TIME) },
+    { icon: 'note', label: 'Go to Notes', run: () => go(NOTES) },
+    { icon: 'delete', label: 'Go to Trash', run: () => go(TRASH) },
     { icon: 'add', label: 'New task', run: () => focusComposer() },
+    { icon: 'note_add', label: 'New note', run: () => { go(NOTES); setTimeout(() => $('#noteAddBody') && $('#noteAddBody').focus(), 120); } },
     { icon: 'playlist_add', label: 'New list', run: () => { if (window.innerWidth < 1024) openSidebar(); setTimeout(createList, 60); } },
     { icon: 'dark_mode', label: 'Toggle dark mode', run: () => toggleTheme() },
     { icon: 'visibility', label: 'Show / hide completed tasks', run: toggleShowCompleted },
@@ -511,7 +553,7 @@ function bindShortcuts() {
     if (e.key === 'Escape') { closePalette(); closeHelp(); closeAccount(); closeLog(); closeConflict(); clearTimeout(pendingG); pendingG = 0; return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? closePalette() : openPalette(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (typingNow() || paletteOpen() || helpOpen() || isLogOpen() || isConflictOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden')) return;
+    if (typingNow() || paletteOpen() || helpOpen() || isLogOpen() || isConflictOpen() || !$('#modalScrim').classList.contains('hidden') || !$('#accountScrim').classList.contains('hidden') || !$('#noteScrim').classList.contains('hidden')) return;
     if (pendingG) {
       clearTimeout(pendingG); pendingG = 0;
       const gk = e.key.toLowerCase();
@@ -519,6 +561,8 @@ function bindShortcuts() {
       if (gk === 'b') return go(ALL);
       if (gk === 'c') return go(CAL);
       if (gk === 't') return go(TIME);
+      if (gk === 'n') return go(NOTES);
+      if (gk === 'r') return go(TRASH);
       const n = parseInt(e.key, 10);
       if (n >= 1 && n <= 9 && state.lists[n - 1]) return go(state.lists[n - 1].id);
       return;
@@ -574,6 +618,13 @@ function renderNav() {
   $('#navAll').classList.toggle('active', isAll());
   $('#navCal').classList.toggle('active', isCal());
   $('#navTime').classList.toggle('active', isTime());
+  $('#navNotes').classList.toggle('active', isNotes());
+  $('#navTrash').classList.toggle('active', isTrash());
+  $('#notesCount').textContent = state.notes.length || '';
+  $('#notesCountPill').textContent = state.notes.length ? `${state.notes.length} note${state.notes.length === 1 ? '' : 's'}` : 'No notes';
+  const trashN = state.trash.length;
+  $('#trashCount').textContent = trashN || '';
+  $('#trashCountPill').textContent = trashN ? `${trashN} item${trashN === 1 ? '' : 's'}` : 'Empty';
   const unread = unreadNotifCount();
   const nc = $('#notifCount');
   nc.textContent = unread || '';
@@ -764,19 +815,21 @@ async function deleteList(id) {
   const l = state.lists.find((x) => x.id === id); if (!l) return;
   if (state.lists.length === 1) { toast('You need at least one list'); return; }
   const n = listTasks(id).length;
-  const ok = await showModal({ title: 'Delete list?', message: `“${l.name}” and its ${n} task${n === 1 ? '' : 's'} will be deleted.`, okLabel: 'Delete', danger: true });
+  const ok = await showModal({ title: 'Delete list?', message: `“${l.name}” and its ${n} task${n === 1 ? '' : 's'} will be moved to trash.`, okLabel: 'Delete', danger: true });
   if (!ok) return;
   const removedTasks = state.tasks.filter((t) => t.listId === id);
   const removedLists = state.lists.filter((x) => x.id === id);
   const savedTimer = state.timer && removedTasks.some((t) => t.id === state.timer.taskId) ? state.timer : null;
   removedTasks.forEach((t) => { if (t.calEventId) { queueCalDelete(t.calEventId); t.calEventId = ''; t.calRev = ''; } });
+  const entries = removedTasks.map((t) => trashPush('task', t));
   if (savedTimer) state.timer = null;
   state.tasks = state.tasks.filter((t) => t.listId !== id);
   state.lists = state.lists.filter((x) => x.id !== id);
   if (state.activeView === id) state.activeView = HOME;
   if (ui.detailId && removedTasks.some((t) => t.id === ui.detailId)) closeDetail();
   save(); renderAll();
-  toast('List deleted', () => {
+  toast('List moved to trash', () => {
+    entries.forEach((e) => trashDrop(e.id));
     removedLists.forEach((l) => { if (!state.lists.some((x) => x.id === l.id)) state.lists.push(l); });
     removedTasks.forEach((t) => { if (!getTask(t.id)) state.tasks.push(t); });
     if (savedTimer) state.timer = savedTimer;
@@ -1300,6 +1353,8 @@ function renderCurrentView() {
   $('#viewAll').classList.toggle('hidden', !isAll());
   $('#viewCal').classList.toggle('hidden', !isCal());
   $('#viewTime').classList.toggle('hidden', !isTime());
+  $('#viewNotes').classList.toggle('hidden', !isNotes());
+  $('#viewTrash').classList.toggle('hidden', !isTrash());
   document.body.classList.toggle('view-board', isAll());
   document.body.classList.toggle('view-cal', isCal());
   document.body.classList.toggle('view-time', isTime());
@@ -1307,6 +1362,8 @@ function renderCurrentView() {
   else if (isAll()) renderBoard();
   else if (isCal()) renderCalendar();
   else if (isTime()) renderTime();
+  else if (isNotes()) renderNotes();
+  else if (isTrash()) renderTrash();
   else renderSingle();
 }
 
@@ -1347,7 +1404,8 @@ function markNotifSeen() {
 function renderNotif() {
   const list = firedReminders();
   const card = $('#notifCard');
-  if (card) card.classList.toggle('hidden', !list.length);
+  const show = (state.homeShow || defaultHomeShow()).notif !== false;
+  if (card) card.classList.toggle('hidden', !list.length || !show);
   const pill = $('#notifCountPill');
   if (pill) pill.textContent = list.length ? `${list.length} fired` : '';
   const ul = $('#notifList');
@@ -1409,6 +1467,7 @@ function wmoInfo(code, isDay) {
 }
 function paintWeather(temp, label, icon, city, tom) {
   const card = $('#weatherCard'); if (!card) return;
+  if (state.homeShow && state.homeShow.weather === false) return;
   $('#weatherIcon').textContent = icon;
   $('#weatherTemp').textContent = Math.round(temp) + '°C';
   $('#weatherDesc').textContent = (city ? city + ' · ' : '') + label;
@@ -1522,6 +1581,18 @@ function renderHome() {
   fill('#homeImportant', important, 'No open tasks.');
   fill('#homeHeavy', heavy, 'No heavy tasks. Add weight in task details.');
   renderNotif(); // fired-reminder section (hidden when empty)
+  renderHomeNotes();
+  // Home page section visibility (Settings → Home page)
+  const hs = state.homeShow || defaultHomeShow();
+  const show = (sel, on) => { const el = $(sel); if (el) el.style.display = on ? '' : 'none'; };
+  show('#weatherCard', hs.weather);
+  show('#viewHome .quote', hs.quote);
+  show('#homeStats', hs.stats);
+  show('#homeNotesCard', hs.notes);
+  const cards = $$('#viewHome .home-grid > section');
+  const keys = ['overdue', 'today', 'important', 'heavy'];
+  cards.forEach((c, i) => { c.style.display = hs[keys[i]] === false ? 'none' : ''; });
+  if (!hs.notif) { const nc = $('#notifCard'); if (nc) nc.classList.add('hidden'); }
 }
 
 function renderSingle() {
@@ -1622,6 +1693,190 @@ function renderBoard() {
     board.appendChild(col);
   });
   if (!state.lists.length) board.innerHTML = '<p class="mini-empty">No lists yet — create one from the sidebar.</p>';
+}
+
+/* ---------- notes (Google Keep style) ---------- */
+let noteEditId = null, noteAddColor = 'default';
+function notesFiltered() {
+  const q = (($('#notesSearch') && $('#notesSearch').value) || '').trim().toLowerCase();
+  return state.notes
+    .filter((n) => !q || ((n.title + ' ' + n.body).toLowerCase().includes(q)))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+function addNote(title, body, color) {
+  title = (title || '').trim().slice(0, 120);
+  body = (body || '').trim().slice(0, 8000);
+  if (!title && !body) return null;
+  const okC = new Set(allColors().map((c) => c.id));
+  const n = {
+    id: uid(), title, body, color: okC.has(color) ? color : 'default',
+    pinned: false, showOnHome: false, order: nextNoteOrder(),
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+  state.notes.push(n); save(); renderAll();
+  return n;
+}
+function deleteNote(id) {
+  const i = state.notes.findIndex((n) => n.id === id); if (i < 0) return;
+  const [rm] = state.notes.splice(i, 1);
+  const entry = trashPush('note', rm);
+  if (noteEditId === id) closeNoteEditor();
+  save(); renderAll();
+  toast('Note moved to trash', () => { trashDrop(entry.id); restoreNoteSnapshot(rm); save(); renderAll(); });
+}
+function toggleNotePin(id) {
+  const n = getNote(id); if (!n) return;
+  n.pinned = !n.pinned; n.updatedAt = Date.now();
+  save(); renderAll();
+}
+function toggleNoteHome(id) {
+  const n = getNote(id); if (!n) return;
+  n.showOnHome = !n.showOnHome; n.updatedAt = Date.now();
+  save(); renderAll();
+  toast(n.showOnHome ? 'Note will show on Home' : 'Note hidden from Home');
+}
+// Keep-style card. opts: {trashEntryId} → restore UI, {home:true} → inline editable
+function noteCard(n, opts = {}) {
+  const card = document.createElement('article');
+  card.className = 'note-card' + (n.pinned ? ' pinned' : '');
+  card.dataset.noteId = n.id;
+  card.style.setProperty('--note-c', colorHex(n.color || 'default'));
+  const pin = document.createElement('button');
+  pin.className = 'icon-btn sm note-pin' + (n.pinned ? ' on' : '');
+  pin.innerHTML = '<span class="material-icons-outlined">push_pin</span>';
+  pin.title = n.pinned ? 'Unpin' : 'Pin';
+  pin.setAttribute('aria-label', n.pinned ? 'Unpin note' : 'Pin note');
+  card.appendChild(pin);
+  if (opts.home) {
+    const ti = document.createElement('input');
+    ti.className = 'note-title-input'; ti.value = n.title; ti.maxLength = 120;
+    ti.placeholder = 'Title'; ti.dir = 'auto'; ti.setAttribute('aria-label', 'Note title');
+    ti.oninput = () => { const x = getNote(n.id); if (x) { x.title = ti.value.slice(0, 120); x.updatedAt = Date.now(); save(); } };
+    ti.onchange = () => renderNav();
+    const ta = document.createElement('textarea');
+    ta.className = 'note-body-input'; ta.value = n.body; ta.rows = 3;
+    ta.placeholder = 'Take a note…'; ta.dir = 'auto'; ta.setAttribute('aria-label', 'Note text');
+    ta.oninput = () => { const x = getNote(n.id); if (x) { x.body = ta.value.slice(0, 8000); x.updatedAt = Date.now(); save(); } };
+    card.append(ti, ta);
+  } else {
+    if (n.title) { const h = document.createElement('h3'); h.textContent = n.title; h.dir = 'auto'; card.appendChild(h); }
+    if (n.body) { const p = document.createElement('p'); p.className = 'note-body'; p.textContent = n.body; p.dir = 'auto'; card.appendChild(p); }
+    if (!n.title && !n.body) { const p = document.createElement('p'); p.className = 'note-body muted'; p.textContent = '(empty note)'; card.appendChild(p); }
+  }
+  const foot = document.createElement('div');
+  foot.className = 'note-foot';
+  if (opts.trashEntryId) {
+    const rb = document.createElement('button');
+    rb.className = 'btn-ghost sm'; rb.innerHTML = '<span class="material-icons-outlined">restore</span> Restore';
+    rb.onclick = (e) => { e.stopPropagation(); if (restoreTrashEntry(opts.trashEntryId)) toast('Note restored'); else toast('Could not restore note'); };
+    const db = document.createElement('button');
+    db.className = 'icon-btn sm danger'; db.innerHTML = '<span class="material-icons-outlined">delete_forever</span>';
+    db.title = 'Delete forever'; db.setAttribute('aria-label', 'Delete note forever');
+    db.onclick = async (e) => {
+      e.stopPropagation();
+      const ok = await showModal({ title: 'Delete forever?', message: `“${(n.title || n.body || '(untitled)').slice(0, 80)}” will be permanently deleted.`, okLabel: 'Delete', danger: true });
+      if (!ok) return;
+      trashDrop(opts.trashEntryId); save(); renderAll();
+    };
+    foot.append(rb, db);
+  } else {
+    const home = document.createElement('button');
+    home.className = 'icon-btn sm' + (n.showOnHome ? ' on' : '');
+    home.innerHTML = '<span class="material-icons-outlined">home</span>';
+    home.title = n.showOnHome ? 'Shown on Home — tap to hide' : 'Show on Home';
+    home.setAttribute('aria-label', home.title);
+    home.onclick = (e) => { e.stopPropagation(); toggleNoteHome(n.id); };
+    const del = document.createElement('button');
+    del.className = 'icon-btn sm'; del.innerHTML = '<span class="material-icons-outlined">delete</span>';
+    del.title = 'Move to trash'; del.setAttribute('aria-label', 'Delete note');
+    del.onclick = (e) => { e.stopPropagation(); deleteNote(n.id); };
+    foot.append(home, del);
+  }
+  card.appendChild(foot);
+  pin.onclick = (e) => {
+    e.stopPropagation();
+    if (opts.trashEntryId) return;
+    toggleNotePin(n.id);
+  };
+  if (!opts.trashEntryId && !opts.home) {
+    card.onclick = () => openNoteEditor(n.id);
+    card.tabIndex = 0;
+    card.onkeydown = (e) => { if (e.key === 'Enter') openNoteEditor(n.id); };
+  }
+  return card;
+}
+function paintNoteAddColors() {
+  const host = $('#noteAddColors'); if (!host) return;
+  host.innerHTML = '';
+  allColors().forEach((c) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'f-dot' + (noteAddColor === c.id ? ' selected' : '');
+    b.style.background = c.hex; b.title = colorName(c.id);
+    b.setAttribute('aria-label', 'Note color ' + colorName(c.id));
+    b.onclick = () => { noteAddColor = c.id; paintNoteAddColors(); };
+    host.appendChild(b);
+  });
+}
+function renderNotes() {
+  paintNoteAddColors();
+  const all = notesFiltered();
+  const pinned = all.filter((n) => n.pinned), others = all.filter((n) => !n.pinned);
+  const ph = $('#notesPinned'), oh = $('#notesGrid');
+  ph.innerHTML = ''; oh.innerHTML = '';
+  pinned.forEach((n) => ph.appendChild(noteCard(n)));
+  others.forEach((n) => oh.appendChild(noteCard(n)));
+  $('#notesPinnedHead').style.display = pinned.length ? '' : 'none';
+  ph.style.display = pinned.length ? '' : 'none';
+  $('#notesOthersHead').style.display = (pinned.length && others.length) ? '' : 'none';
+  $('#notesEmpty').classList.toggle('hidden', all.length > 0);
+}
+function renderHomeNotes() {
+  const host = $('#homeNotes'); if (!host) return;
+  host.innerHTML = '';
+  const list = state.notes.filter((n) => n.showOnHome).sort((a, b) => ((b.pinned - a.pinned) || (a.order - b.order)));
+  $('#homeNotesCount').textContent = list.length ? String(list.length) : '';
+  if (!list.length) {
+    const p = document.createElement('p'); p.className = 'mini-empty';
+    p.textContent = 'No notes pinned to Home yet — open Notes and tap the home icon on any note.';
+    host.appendChild(p);
+    return;
+  }
+  list.slice(0, 6).forEach((n) => host.appendChild(noteCard(n, { home: true })));
+}
+function openNoteEditor(id) {
+  const n = getNote(id); if (!n) return;
+  noteEditId = id;
+  $('#noteEditTitle').value = n.title || '';
+  $('#noteEditBody').value = n.body || '';
+  $('#noteEditPinned').checked = !!n.pinned;
+  $('#noteEditHome').checked = !!n.showOnHome;
+  paintNoteEditColors();
+  $('#noteScrim').classList.remove('hidden');
+  setTimeout(() => $('#noteEditBody') && $('#noteEditBody').focus(), 60);
+}
+function closeNoteEditor() { noteEditId = null; $('#noteScrim').classList.add('hidden'); }
+function paintNoteEditColors() {
+  const n = getNote(noteEditId);
+  const host = $('#noteEditColors'); if (!host) return;
+  host.innerHTML = '';
+  allColors().forEach((c) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'palette-dot' + (n && n.color === c.id ? ' selected' : '');
+    b.style.background = c.hex; b.title = colorName(c.id);
+    b.setAttribute('aria-label', 'Note color ' + colorName(c.id));
+    b.onclick = () => { const x = getNote(noteEditId); if (x) { x.color = c.id; save(); paintNoteEditColors(); renderAll(); } };
+    host.appendChild(b);
+  });
+}
+function saveNoteEditor() {
+  const n = getNote(noteEditId); if (!n) return closeNoteEditor();
+  n.title = $('#noteEditTitle').value.trim().slice(0, 120);
+  n.body = $('#noteEditBody').value.trim().slice(0, 8000);
+  n.pinned = $('#noteEditPinned').checked;
+  n.showOnHome = $('#noteEditHome').checked;
+  n.updatedAt = Date.now();
+  closeNoteEditor();
+  save(); renderAll();
 }
 
 /* ---------- calendar view ---------- */
@@ -2080,6 +2335,8 @@ function paintQuickMeta() {
   if (inp && qa) qa.classList.toggle('hidden', !inp.value.trim());
 }
 function focusComposer() {
+  if (isNotes()) { const b = $('#noteAddBody'); if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => b.focus(), 250); } return; }
+  if (isTrash()) return;
   if (isHome()) { const f = state.lists.find((l) => l.id === state.lastListId) || fallbackList(); if (f) go(f.id); }
   else if (isAll()) { const first = $('#board input'); if (first) first.focus(); }
   else if (isCal()) {
@@ -2151,24 +2408,93 @@ function toggleDone(id) {
   if (spawned && becomingDone) { const f = fmtDate(displayDate(spawned) || spawned.date); toast(`Repeats — next: ${f ? f.label : (displayDate(spawned) || spawned.date)}`); }
   if (ui.detailId === id) renderDetail();
 }
+/* ---------- trash (deleted tasks + notes stay restorable) ---------- */
+function trashPush(kind, data) {
+  const entry = { id: uid(), kind, data: JSON.parse(JSON.stringify(data)), deletedAt: Date.now() };
+  state.trash.push(entry);
+  state.trash = state.trash.slice(-300); // cap: oldest fall off
+  return entry;
+}
+function trashDrop(entryId) { state.trash = state.trash.filter((e) => e.id !== entryId); }
+function restoreTaskSnapshot(rm) {
+  if (getTask(rm.id)) return false;
+  if (rm.spawnedId && !getTask(rm.spawnedId)) rm.spawnedId = '';
+  if (!state.lists.some((l) => l.id === rm.listId)) {
+    const f = fallbackList();
+    if (!f) return false;
+    rm.listId = f.id;
+  }
+  state.tasks.push(rm);
+  return true;
+}
+function restoreNoteSnapshot(n) {
+  if (getNote(n.id)) return false;
+  n.order = nextNoteOrder();
+  n.updatedAt = Date.now();
+  state.notes.push(n);
+  return true;
+}
+function restoreTrashEntry(entryId) {
+  const e = state.trash.find((x) => x.id === entryId);
+  if (!e) return false;
+  const ok = e.kind === 'task' ? restoreTaskSnapshot(e.data) : restoreNoteSnapshot(e.data);
+  if (ok) { trashDrop(entryId); save(); renderAll(); }
+  return ok;
+}
+async function emptyTrash() {
+  if (!state.trash.length) { toast('Trash is already empty'); return; }
+  const ok = await showModal({ title: 'Empty trash?', message: `${state.trash.length} item${state.trash.length === 1 ? '' : 's'} will be permanently deleted.`, okLabel: 'Empty trash', danger: true });
+  if (!ok) return;
+  const backup = state.trash;
+  state.trash = [];
+  save(); renderAll();
+  toast('Trash emptied', () => { backup.forEach((e) => { if (!state.trash.some((x) => x.id === e.id)) state.trash.push(e); }); save(); renderAll(); });
+}
+function renderTrash() {
+  const tasks = state.trash.filter((e) => e.kind === 'task').sort((a, b) => b.deletedAt - a.deletedAt);
+  const notes = state.trash.filter((e) => e.kind === 'note').sort((a, b) => b.deletedAt - a.deletedAt);
+  const tUl = $('#trashTasks'); tUl.innerHTML = '';
+  $('#trashTasksEmpty').classList.toggle('hidden', tasks.length > 0);
+  tasks.forEach((e) => {
+    const t = e.data;
+    const li = document.createElement('li');
+    li.className = 'task trash-row';
+    li.style.setProperty('--task-color', colorHex(t.color || 'default'));
+    li.innerHTML = `<span class="dot" style="background:${colorHex(t.color || 'default')}"></span><div class="trash-meta"><div class="trash-title" dir="auto"></div><div class="muted small trash-sub"></div></div><div class="trash-actions"><button class="btn-ghost sm restore-btn"><span class="material-icons-outlined">restore</span> Restore</button><button class="icon-btn sm danger forever-btn" aria-label="Delete forever"><span class="material-icons-outlined">delete_forever</span></button></div>`;
+    li.querySelector('.trash-title').textContent = t.title || '(untitled)';
+    li.querySelector('.trash-sub').textContent = `${listName(t.listId)} · deleted ${new Date(e.deletedAt).toLocaleDateString()}`;
+    li.querySelector('.restore-btn').onclick = () => { if (restoreTrashEntry(e.id)) toast('Task restored'); else toast('Could not restore task'); };
+    li.querySelector('.forever-btn').onclick = async () => {
+      const ok = await showModal({ title: 'Delete forever?', message: `“${(t.title || '(untitled)').slice(0, 80)}” will be permanently deleted.`, okLabel: 'Delete', danger: true });
+      if (!ok) return;
+      trashDrop(e.id); save(); renderAll();
+      toast('Deleted forever', () => { state.trash.push(e); save(); renderAll(); });
+    };
+    tUl.appendChild(li);
+  });
+  const nHost = $('#trashNotes'); nHost.innerHTML = '';
+  $('#trashNotesEmpty').classList.toggle('hidden', notes.length > 0);
+  notes.forEach((e) => {
+    const card = noteCard(e.data, { trashEntryId: e.id });
+    nHost.appendChild(card);
+  });
+}
 function deleteTask(id) {
   const i = state.tasks.findIndex((t) => t.id === id); if (i < 0) return;
   const [rm] = state.tasks.splice(i, 1);
   const savedTimer = state.timer && state.timer.taskId === id ? state.timer : null;
   if (savedTimer) state.timer = null;
-  // clear the link before the undo snapshot: undo re-creates the event fresh
+  // clear the link before the trash snapshot: restore re-creates the event fresh
   if (rm.calEventId) { queueCalDelete(rm.calEventId); rm.calEventId = ''; rm.calRev = ''; }
+  const entry = trashPush('task', rm);
   if (ui.detailId === id) closeDetail();
   save(); renderAll();
-  toast('Task deleted', () => {
-    // Guard against double-undo / cross-tab races: never restore a duplicate
-    // id, and drop a stale spawnedId link whose instance is gone so the
-    // recurrence chain can't point at a ghost (or fork a second live copy).
-    if (!getTask(rm.id)) state.tasks.push(rm);
-    else return;
-    if (rm.spawnedId && !getTask(rm.spawnedId)) rm.spawnedId = '';
-    if (savedTimer) state.timer = savedTimer;
-    save(); renderAll();
+  toast('Task moved to trash', () => {
+    trashDrop(entry.id);
+    if (restoreTaskSnapshot(rm)) {
+      if (savedTimer) state.timer = savedTimer;
+      save(); renderAll();
+    }
   });
 }
 
@@ -2438,7 +2764,7 @@ function download(filename, text) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function exportJSON() {
-  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [], customColors: state.customColors || [], colorNames: state.colorNames || {} };
+  const payload = { app: 'DoTo', version: 2, exportedAt: new Date().toISOString(), lists: state.lists, tasks: state.tasks, times: state.times || [], notes: state.notes || [], trash: state.trash || [], homeShow: state.homeShow || defaultHomeShow(), customColors: state.customColors || [], colorNames: state.colorNames || {} };
   download(`doto-export-${todayIso()}.json`, JSON.stringify(payload, null, 2));
   toast(`Exported ${state.tasks.length} tasks`);
 }
@@ -2599,6 +2925,36 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
       });
     });
     const addedColors = importCustomColors(parsed.customColors);
+    let addedNotes = 0, addedTrash = 0;
+    if (Array.isArray(parsed.notes)) {
+      const haveN = new Set(state.notes.map((n) => n.id));
+      parsed.notes.forEach((n) => {
+        if (!n || typeof n.id !== 'string' || haveN.has(n.id)) return;
+        haveN.add(n.id);
+        state.notes.push({
+          id: n.id, title: String(n.title || '').slice(0, 120), body: String(n.body || '').slice(0, 8000),
+          color: n.color || 'default', pinned: !!n.pinned, showOnHome: !!n.showOnHome,
+          order: typeof n.order === 'number' ? n.order : nextNoteOrder(),
+          createdAt: n.createdAt || Date.now(), updatedAt: n.updatedAt || Date.now(),
+        });
+        addedNotes++;
+      });
+    }
+    if (Array.isArray(parsed.trash)) {
+      const haveT = new Set(state.trash.map((e) => e.id));
+      parsed.trash.forEach((e) => {
+        if (!e || (e.kind !== 'task' && e.kind !== 'note') || !e.data || typeof e.data.id !== 'string') return;
+        const id = typeof e.id === 'string' ? e.id : uid();
+        if (haveT.has(id)) return;
+        haveT.add(id);
+        state.trash.push({ id, kind: e.kind, data: e.data, deletedAt: e.deletedAt || Date.now() });
+        addedTrash++;
+      });
+    }
+    if (parsed.homeShow && typeof parsed.homeShow === 'object') {
+      if (!state.homeShow || typeof state.homeShow !== 'object') state.homeShow = defaultHomeShow();
+      HOME_SECTIONS.forEach((s) => { if (typeof parsed.homeShow[s.key] === 'boolean' && typeof state.homeShow[s.key] !== 'boolean') state.homeShow[s.key] = parsed.homeShow[s.key]; });
+    }
     if (parsed.colorNames && typeof parsed.colorNames === 'object') {
       const okIds = new Set(allColors().map((c) => c.id));
       if (!state.colorNames) state.colorNames = {};
@@ -2606,7 +2962,7 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
         if (okIds.has(k) && typeof v === 'string' && v.trim() && !state.colorNames[k]) state.colorNames[k] = v.trim().slice(0, 24);
       });
     }
-    return { lists: parsed.lists.length - reusedLists, tasks: parsed.tasks.length - skipped, skipped, times: importTimes(parsed.times, taskIdMap), colors: addedColors };
+    return { lists: parsed.lists.length - reusedLists, tasks: parsed.tasks.length - skipped, skipped, times: importTimes(parsed.times, taskIdMap), colors: addedColors, notes: addedNotes, trash: addedTrash };
   }
   if (mode === 'doto') throw new Error('Not a DoTo backup — switch the source to Google Tasks or Auto-detect');
   const base = (fileName || 'Imported').replace(/\.json$/i, '').split('/').pop() || 'Imported';
@@ -2646,19 +3002,19 @@ function detectAndImport(parsed, fileName, mode = 'auto') {
     : 'Unrecognized JSON — expected DoTo export or Google Takeout Tasks file');
 }
 async function importFiles(files, mode = 'auto') {
-  let L = 0, T = 0, TM = 0, CM = 0, SK = 0; const errors = [];
+  let L = 0, T = 0, TM = 0, CM = 0, SK = 0, NT = 0, TR = 0; const errors = [];
   for (const f of files) {
     try {
       const text = await f.text();
       const parsed = JSON.parse(text);
       const r = detectAndImport(parsed, f.name, mode);
-      L += r.lists; T += r.tasks; TM += r.times || 0; CM += r.colors || 0; SK += r.skipped || 0;
+      L += r.lists; T += r.tasks; TM += r.times || 0; CM += r.colors || 0; SK += r.skipped || 0; NT += r.notes || 0; TR += r.trash || 0;
     } catch (err) { errors.push(`${f.name}: ${err.message}`); }
   }
   if (!fallbackList()) state.lists.push({ id: uid(), name: 'General', createdAt: Date.now() });
-  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
+  if (state.activeView !== HOME && state.activeView !== ALL && state.activeView !== CAL && state.activeView !== TIME && state.activeView !== NOTES && state.activeView !== TRASH && !state.lists.some((l) => l.id === state.activeView)) state.activeView = HOME;
   save(); renderAll();
-  if (T || L) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} labels` : '') + (SK ? ` (${SK} duplicates skipped)` : ''));
+  if (T || L || NT || TR) toast(`Imported ${T} tasks into ${L} list${L === 1 ? '' : 's'}` + (TM ? ` + ${TM} time records` : '') + (CM ? ` + ${CM} labels` : '') + (NT ? ` + ${NT} notes` : '') + (TR ? ` + ${TR} trash items` : '') + (SK ? ` (${SK} duplicates skipped)` : ''));
   else if (SK) toast(`Nothing new — ${SK} duplicate${SK === 1 ? '' : 's'} skipped`);
   if (errors.length) toast('Import issue: ' + errors[0]);
 }
@@ -3111,7 +3467,8 @@ async function driveUpload(data, mode) {
 function snapState(s) {
   return JSON.parse(JSON.stringify({
     lists: s.lists || [], tasks: s.tasks || [], times: s.times || [],
-    colorNames: s.colorNames || {},
+    notes: s.notes || [], trash: s.trash || [],
+    colorNames: s.colorNames || {}, homeShow: s.homeShow || defaultHomeShow(),
     customColors: s.customColors || [], userName: s.userName || '',
     deletedColors: s.deletedColors || [],
   }));
@@ -3214,22 +3571,29 @@ function applyRemote(remote, remoteTime) {
   salvageState(remote);
   if (!remote.lists.length) throw new Error('drive');
   remote.tasks.forEach((t) => { t.weight = clampWeight(t.weight); t.importance = clampImp(t.importance); if (typeof t.tz !== 'string') t.tz = ''; if (typeof t.dueUtc !== 'number' || isNaN(t.dueUtc)) t.dueUtc = 0; });
-  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], colorNames: {}, customColors: [], userName: '', deletedColors: [] };
+  const base = (syncMeta.base && Array.isArray(syncMeta.base.tasks)) ? syncMeta.base : { lists: [], tasks: [], times: [], notes: [], trash: [], colorNames: {}, homeShow: defaultHomeShow(), customColors: [], userName: '', deletedColors: [] };
   const takeRemote = remoteTime >= (state.dirtyAt || 0);
   const freshConflicts = [];
   const timeLabel = (l) => (l && l.title) || (l && l.taskId && getTask(l.taskId) && getTask(l.taskId).title) || 'Time record';
   const colorLabel = (l) => (l && l.name) || 'Label';
+  const noteLabel = (l) => (l && (l.title || l.body)) || 'Note';
+  const trashLabel = (l) => (l && l.data && (l.data.title || l.data.body)) || 'Trash item';
   const ml = mergeArrays(base.lists || [], state.lists, remote.lists || [], takeRemote, freshConflicts, 'lists', (l) => l.name || '(untitled)');
   const mt = mergeArrays(base.tasks || [], state.tasks, remote.tasks || [], takeRemote, freshConflicts, 'tasks', (l) => l.title || '(untitled)');
   const mm = mergeArrays(base.times || [], state.times || [], remote.times || [], takeRemote, freshConflicts, 'times', timeLabel);
+  const mn = mergeArrays(base.notes || [], state.notes || [], remote.notes || [], takeRemote, freshConflicts, 'notes', noteLabel);
+  const mtr = mergeArrays(base.trash || [], state.trash || [], remote.trash || [], takeRemote, freshConflicts, 'trash', trashLabel);
   const mc = mergeObj(base.colorNames, state.colorNames || {}, remote.colorNames, takeRemote);
+  const mhs = mergeObj(base.homeShow, state.homeShow || defaultHomeShow(), remote.homeShow, takeRemote);
   const mcc = mergeArrays(base.customColors || [], state.customColors || [], remote.customColors || [], takeRemote, freshConflicts, 'customColors', colorLabel);
   const mu = mergeScalar(typeof base.userName === 'string' ? base.userName : '', state.userName || '', typeof remote.userName === 'string' ? remote.userName : '', takeRemote);
   const mergedDeleted = mergeIdSet(base.deletedColors, state.deletedColors, remote.deletedColors);
   const mdl = { obj: mergedDeleted, conflict: 0, fromRemote: 0 };
   const timer = state.timer; // timer is device-local
   state.lists = ml.arr; state.tasks = mt.arr; state.times = mm.arr; state.timer = timer;
+  state.notes = mn.arr; state.trash = mtr.arr;
   state.colorNames = mc.obj;
+  state.homeShow = mhs.obj;
   state.customColors = mcc.arr;
   state.userName = mu.obj;
   state.deletedColors = (mdl.obj || []).filter((id) => BUILTIN_COLOR_IDS.has(id));
@@ -3240,8 +3604,8 @@ function applyRemote(remote, remoteTime) {
   // Only queued items need the user's pick. Plain settings (label renames,
   // your name) auto-resolve to newest and are just logged so the count in the
   // dialog always matches what you can actually review.
-  const autoSettings = (mc.auto || 0) + (mu.auto || 0);
-  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mc.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote;
+  const autoSettings = (mc.auto || 0) + (mu.auto || 0) + (mhs.auto || 0);
+  const fresh = ml.fromRemote + mt.fromRemote + mm.fromRemote + mn.fromRemote + mtr.fromRemote + mc.fromRemote + mhs.fromRemote + mcc.fromRemote + mu.fromRemote + mdl.fromRemote;
   save(); renderAll();
   syncMeta.base = snapState(state);
   syncMeta.lastSyncedAt = Date.now();
@@ -3265,14 +3629,16 @@ function applyRemote(remote, remoteTime) {
    it per item. Picks are whole-item — field rows below only explain WHAT
    differs, they are not individually pickable. */
 let pendingConflicts = [];
-const CONFLICT_KIND = { tasks: 'Task', lists: 'List', times: 'Time record', customColors: 'Label' };
+const CONFLICT_KIND = { tasks: 'Task', lists: 'List', times: 'Time record', notes: 'Note', trash: 'Trash item', customColors: 'Label' };
 const CONFLICT_FIELDS = {
-  title: 'Title', name: 'Name', notes: 'Notes', date: 'Due date', time: 'Time',
+  title: 'Title', name: 'Name', notes: 'Notes', body: 'Text', date: 'Due date', time: 'Time',
   tz: 'Time zone', dueUtc: 'Due moment', due: 'Due',
   done: 'Completed', color: 'Label', weight: 'Weight', importance: 'Importance',
   listId: 'List', extRef: 'Reference', subtasks: 'Subtasks', recur: 'Repeat',
   remindBefore: 'Reminder', seconds: 'Duration', startedAt: 'Logged at',
-  taskId: 'Task', hex: 'Color',
+  taskId: 'Task', hex: 'Color', pinned: 'Pinned', showOnHome: 'Show on Home',
+  order: 'Order', kind: 'Kind', data: 'Contents', deletedAt: 'Deleted at',
+  updatedAt: 'Updated',
 };
 function shortStr(s, n) {
   s = String(s == null ? '' : s);
@@ -3296,6 +3662,9 @@ function conflictFull(kind, t, k) {
   const v = k === 'due' ? conflictDue(t) : t[k];
   if (v === undefined || v === null || v === '' || v === 0) return '—';
   if (k === 'done') return v ? 'Completed' : 'Open';
+  if (k === 'pinned') return v ? 'Pinned' : 'Not pinned';
+  if (k === 'showOnHome') return v ? 'Shown on Home' : 'Hidden from Home';
+  if (k === 'deletedAt' || k === 'updatedAt') { const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString(); }
   if (k === 'due') return String(v);
   if (k === 'remindBefore') return typeof v === 'number' ? fmtOffset(v) : '—';
   if (k === 'dueUtc') { try { return fmtRemind(v); } catch { return String(v); } }
@@ -4056,7 +4425,7 @@ async function pullNow(mode) {
         const remote = await driveDownload(found.id, mode);
         const res = applyRemote(remote, remoteTime);
         const merged = snapState(state);
-        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], colorNames: remote.colorNames || {}, customColors: remote.customColors || [], userName: remote.userName || '', deletedColors: remote.deletedColors || [] };
+        const rsnap = { lists: remote.lists || [], tasks: remote.tasks || [], times: remote.times || [], notes: remote.notes || [], trash: remote.trash || [], colorNames: remote.colorNames || {}, homeShow: remote.homeShow || defaultHomeShow(), customColors: remote.customColors || [], userName: remote.userName || '', deletedColors: remote.deletedColors || [] };
         if (!recEq(merged, rsnap)) await driveUpload(state, mode);
         syncMeta.lastSyncedAt = Date.now();
         saveSyncMeta();
@@ -4152,11 +4521,33 @@ async function syncNowFlow() {
   paintSync();
 }
 
+function switchSetTab(name) {
+  ui.setTab = name;
+  $$('[data-settab]').forEach((b) => { const on = b.dataset.settab === name; b.classList.toggle('selected', on); b.setAttribute('aria-selected', String(on)); });
+  $$('[data-setpane]').forEach((p) => p.classList.toggle('hidden', p.dataset.setpane !== name));
+}
+function paintHomeToggles() {
+  const host = $('#homeToggles'); if (!host) return;
+  host.innerHTML = '';
+  if (!state.homeShow || typeof state.homeShow !== 'object') state.homeShow = defaultHomeShow();
+  HOME_SECTIONS.forEach((s) => {
+    const lab = document.createElement('label');
+    lab.className = 'switch-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = state.homeShow[s.key] !== false;
+    cb.onchange = () => { state.homeShow[s.key] = cb.checked; save(); renderAll(); };
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + s.label));
+    host.appendChild(lab);
+  });
+}
 function openAccount() {
   paintSync();
   const ni = $('#userNameInput');
   if (ni && document.activeElement !== ni) ni.value = state.userName || '';
   paintColorEditor();
+  paintHomeToggles();
+  switchSetTab(ui.setTab || 'sync');
   $('#accountScrim').classList.remove('hidden');
 }
 function colorLabelRow(c) {
@@ -4370,7 +4761,7 @@ function bindEdgeSwipe() {
   let sx = null, sy = null, active = false, mode = null, sbW = 0, lastDx = 0, fadeT = 0, boardEl = null;
   const sb = () => $('#sidebar');
   const sc = () => $('#scrim');
-  const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim']
+  const overlays = () => ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim', 'noteScrim']
     .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
   const blocked = () => window.innerWidth >= 1024 || ui.detailId || overlays();
   const reset = () => { sx = sy = null; active = false; mode = null; lastDx = 0; boardEl = null; };
@@ -4652,10 +5043,27 @@ function bind() {
   $('#navAll').onclick = () => go(ALL);
   $('#navCal').onclick = () => go(CAL);
   $('#navTime').onclick = () => go(TIME);
+  $('#navNotes').onclick = () => go(NOTES);
+  $('#navTrash').onclick = () => go(TRASH);
   $('#timeSearch').oninput = (e) => { ui.timeQuery = e.target.value; renderTime(); };
   $('#timePlay').onclick = timePlay;
   $('#timePause').onclick = timePause;
   $('#timeStop').onclick = timeStop;
+  // notes (Keep-style)
+  $('#noteAddForm').onsubmit = (e) => {
+    e.preventDefault();
+    const n = addNote($('#noteAddTitle').value, $('#noteAddBody').value, noteAddColor);
+    if (n) { $('#noteAddTitle').value = ''; $('#noteAddBody').value = ''; $('#noteAddBody').focus(); }
+  };
+  $('#notesSearch').oninput = () => renderNotes();
+  $('#emptyTrashBtn').onclick = emptyTrash;
+  // settings tabs (Sync first, then Labels, Home page, General)
+  $$('[data-settab]').forEach((b) => b.onclick = () => switchSetTab(b.dataset.settab));
+  // note editor dialog
+  $('#noteEditSave').onclick = saveNoteEditor;
+  $('#noteEditCancel').onclick = closeNoteEditor;
+  $('#noteDeleteBtn').onclick = () => { if (noteEditId) deleteNote(noteEditId); };
+  $('#noteScrim').onclick = (e) => { if (e.target === $('#noteScrim')) saveNoteEditor(); };
   if (state.timer && state.timer.running) armTick();
   setInterval(() => { if (!document.hidden) paintHomeClock(); }, 500); paintHomeClock();
   const shiftCalMonth = (n) => {
@@ -4707,12 +5115,13 @@ function bind() {
     const id = state.activeView;
     const rm = state.tasks.filter((t) => t.listId === id && t.done);
     if (!rm.length) return toast('No completed tasks');
-    const ok = await showModal({ title: 'Delete completed?', message: `${rm.length} completed task${rm.length === 1 ? '' : 's'} in “${listName(id)}” will be deleted. You can undo right after.`, okLabel: 'Delete', danger: true });
+    const ok = await showModal({ title: 'Delete completed?', message: `${rm.length} completed task${rm.length === 1 ? '' : 's'} in “${listName(id)}” will be moved to trash. You can undo right after.`, okLabel: 'Delete', danger: true });
     if (!ok) return;
     const ids = new Set(rm.map((t) => t.id));
+    const entries = rm.map((t) => trashPush('task', t));
     state.tasks = state.tasks.filter((t) => !ids.has(t.id));
     save(); renderAll();
-    toast(`${rm.length} completed deleted`, () => { rm.forEach((t) => { if (!getTask(t.id)) state.tasks.push(t); }); save(); renderAll(); });
+    toast(`${rm.length} completed moved to trash`, () => { entries.forEach((e) => trashDrop(e.id)); rm.forEach((t) => { if (!getTask(t.id)) state.tasks.push(t); }); save(); renderAll(); });
   };
   $('#listMenuBtn').onclick = (e) => { e.stopPropagation(); $('#listMenu').classList.toggle('hidden'); $('#sortMenu').classList.add('hidden'); };
   $('#sortBtn').onclick = (e) => {
@@ -4811,9 +5220,10 @@ function bind() {
   $('#detailBack').onclick = closeDetail; $('#detailClose').onclick = closeDetail;
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    const dialogOpen = ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim']
+    const dialogOpen = ['paletteScrim', 'helpScrim', 'accountScrim', 'logScrim', 'modalScrim', 'conflictScrim', 'noteScrim']
       .some((id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); });
     closePalette(); closeHelp(); closeAccount(); closeLog(); closeConflict();
+    if (noteEditId) saveNoteEditor(); else closeNoteEditor();
     closeColorPop(); closeMovePop(); closeWeightPop(); closeImportancePop();
     if (!dialogOpen) { closeDetail(); closeSidebar(); }
   });
@@ -4902,7 +5312,7 @@ window.addEventListener('storage', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Tab') return;
-  const scrim = ['modalScrim', 'paletteScrim', 'accountScrim', 'conflictScrim', 'logScrim', 'helpScrim']
+  const scrim = ['modalScrim', 'paletteScrim', 'accountScrim', 'conflictScrim', 'logScrim', 'helpScrim', 'noteScrim']
     .map((id) => document.getElementById(id)).find((el) => el && !el.classList.contains('hidden'));
   if (!scrim) return;
   const nodes = [...scrim.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
