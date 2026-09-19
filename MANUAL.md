@@ -3,7 +3,7 @@
 > DoTo — Task Manager, Simple. A ridiculously fast, light and powerful task
 > manager that lives entirely in your browser. No account, no server, no build step.
 >
-> Live app: <https://doto.arazgray.com/>
+> Live app: <https://arazgray.github.io/doto/>
 
 ## Contents
 
@@ -26,7 +26,7 @@
 
 ## Getting started
 
-1. Open <https://doto.arazgray.com/> in any modern browser.
+1. Open <https://arazgray.github.io/doto/> in any modern browser.
 2. You start with one list, **General**, holding a single **Example Task** with every field filled in — open it, then delete it when ready.
 3. Click the menu button (top left) to open the sidebar — or on touch screens,
    drag right starting in the left half (this also works in Board view when
@@ -41,9 +41,10 @@ By default your data lives only in this browser. **Sync & Settings** (blue
 button at the bottom of the sidebar, or the status pill in the top bar)
 connects your Google Drive for multi-device sync — still with no DoTo server:
 
-1. Open Sync & Settings and press **Sign in with Google** (the app ships with
-   its own client ID — no setup needed; only repo forks need their own, see
-   [Hosting it yourself](#hosting-it-yourself)), then **Sync now**.
+1. Open Sync & Settings and add your **Google client ID** in the Sync tab
+   (**Google client ID** field — see
+   [Hosting it yourself](#hosting-it-yourself) for how to get one), then
+   press **Sign in with Google**, then **Sync now**.
 2. From then on: changes upload automatically a few seconds after you make
    them, and the app pulls on launch, when the tab regains focus, and when
    you come back online.
@@ -248,9 +249,8 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
    → `main`, folder `/ (root)`. Your copy lives at
    `https://<you>.github.io/doto/`. Any static host works the same.
 3. **Use it as-is** — everything except Google Drive sync works immediately.
-   Sync needs its own client ID, because the shipped one only accepts the
-   original site's address (Google answers other origins with an
-   origin-mismatch error).
+   Sync needs your own client ID (no ID is bundled with the repo — the top
+   bar shows `Add client ID to sync` until you add one).
 
 ### Your own Google client ID (for sync on your host)
 
@@ -272,17 +272,19 @@ DoTo is static — no server, no build step. Fork it and host it anywhere:
      calendar.)
     - Publish the project if prompted (Production mode) so sign-in stays
       persistent — Testing mode limits sign-in to listed users and expires
-      about weekly. The shipped app at <https://doto.arazgray.com/> already
-      runs in Production, so it stays signed in; forks should publish too.
+      about weekly.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
    application type **Web application**. Under **Authorized JavaScript
-   origins** add your exact site address, e.g. `https://<you>.github.io`
-   (address only, no path at the end), then Create and copy the client ID
+   origins** add your exact site address, e.g. `https://arazgray.github.io`
+   for this repo (or `https://<you>.github.io` for a fork — address only, no
+   path at the end), then Create and copy the client ID
    (it ends with `.apps.googleusercontent.com`).
-5. In your fork, paste it into `app.js` as `GOOGLE_CLIENT_ID` (top of the
-   sync section), commit and push. Bump the release trio as usual (`?v=`
+5. Paste it into the app: open Sync & Settings → Sync → **Google client ID**,
+   paste, then Sign in. (It is stored per browser. Developers can also
+   hard-code it as `GOOGLE_CLIENT_ID` at the top of the sync section in
+   `app.js`, commit and push — bump the release trio as usual (`?v=`
    stamps in `index.html`, `APP_VERSION`, `version.json` — all the same
-   `1.0-<unix time>`) so installed copies pick up the update.
+   `1.0-<unix time>`) so installed copies pick up the update.)
 6. Open your hosted copy → Sync & Settings → Sign in with Google → Sync now.
 
 That is all — sync data moves only between your browser and your own Drive;
@@ -300,8 +302,8 @@ there is still no DoTo server involved.
 Only from a JSON export or your Drive sync copy (re-sign-in re-pulls it). Export regularly.
 
 **Does it sync between phone and desktop?**
-Yes — via Sync & Settings (Google Drive). Sign in on each device and both stay merged.
-The OAuth client runs in Production, so the grant persists — there is no
+Yes — via Sync & Settings (Google Drive). Add your client ID and sign in on each device and both stay merged.
+Publish your OAuth client in Production so the grant persists — there is no
 weekly expiry and no background refresh loop. The app reuses its token and
 renews it silently on demand whenever Drive/Calendar answers 401; if that
 silent step is refused (notably iOS home-screen WebViews), just tap Sync now

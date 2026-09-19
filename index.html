@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icon-180.png" />
-<link rel="stylesheet" href="assets/fonts.css?v=1.0-1789771400" />
-<link rel="stylesheet" href="styles.css?v=1.0-1789771400" />
+<link rel="stylesheet" href="assets/fonts.css?v=1.0-1789832963" />
+<link rel="stylesheet" href="styles.css?v=1.0-1789832963" />
 </head>
 <body>
 <header class="topbar">
@@ -467,6 +467,15 @@
       <div class="setup-row name-row">
         <input id="userNameInput" type="text" placeholder="Your name (shown in greetings)" autocomplete="off" maxlength="40" aria-label="Your name" dir="auto" />
       </div>
+      <div class="set-group client-id-group">
+        <p class="d-label">Google client ID <span class="hint">— required for sync &amp; reminders</span></p>
+        <div class="setup-row client-id-row">
+          <input id="clientIdInput" type="text" placeholder="xxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false" aria-label="Google OAuth client ID" dir="ltr" />
+          <button type="button" id="clientIdClear" class="btn-ghost" title="Clear saved client ID">Clear</button>
+        </div>
+        <p id="clientIdHint" class="sync-err">Sync is off until you add your client ID below — Sign in will not work without it.</p>
+        <p class="muted small">No ID is bundled with this app. Create one for free in <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a>, add this site as an authorized origin, then paste the ID here. Full steps: <a href="MANUAL.md#hosting-it-yourself" target="_blank" rel="noopener">Manual → Hosting it yourself</a>.</p>
+      </div>
       <div class="modal-actions account-actions">
         <button type="button" id="signInBtn" class="btn-primary">Sign in with Google</button>
         <button type="button" id="signOutBtn" class="btn-ghost hidden">Sign out</button>
@@ -591,6 +600,6 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo" class="hidden">Undo</button></div>
 <input id="importFile" type="file" accept=".json,application/json" multiple class="hidden" />
 
-<script src="app.js?v=1.0-1789771400"></script>
+<script src="app.js?v=1.0-1789832963"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
 
 <p align="center">
   <strong>Personal Task Manager. Ridiculously fast, lightweight, privacy-first and offline-first.<br>Hosted on GitHub & Synced with your own Google Drive & Google Calendar.</strong><br>
-  <a href="https://doto.arazgray.com/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
+  <a href="https://arazgray.github.io/doto/">Try it now!</a> | <a href="MANUAL.md">User Manual</a>
 </p>
 
 <p align="center">
@@ -66,14 +66,16 @@ snapshot (`doto-sync` in localStorage); both-sides-edited items resolve
 newest-wins with a toast. Auto-push (8s debounce) + pull on load, focus and
 reconnect. Details in [MANUAL.md](MANUAL.md#sync-and-settings).
 
-Ships with the app's own Google OAuth client ID — just press Sign in.
-(Repo forks need their own ID: set `GOOGLE_CLIENT_ID` in `app.js`, with the
-Drive + Calendar APIs enabled, the five OAuth scopes from
-[MANUAL.md](MANUAL.md#your-own-google-client-id-for-sync-on-your-host), and
-the site's origin added.)
+No client ID is bundled — sync stays off until you add your own (one-time,
+free). Paste it into **Sync & Settings → Sync → Google client ID**, then
+press Sign in. To get one: Google Cloud Console → enable the Drive +
+Calendar APIs → OAuth client ID (Web application) → add your site origin
+(e.g. `https://arazgray.github.io`) → paste the ID into the app. Full steps
+in [MANUAL.md](MANUAL.md#your-own-google-client-id-for-sync-on-your-host).
+(Developers can also hard-code it as `GOOGLE_CLIENT_ID` in `app.js`.)
 
 ## Install as app (PWA)
-Served over HTTPS (e.g. `https://doto.arazgray.com/`) the app is
+Served over HTTPS (e.g. `https://arazgray.github.io/doto/`) the app is
 installable and works offline:
 
 - **Desktop Chrome / Edge** — open the site, then *Install DoTo…* from the
@@ -192,7 +194,7 @@ Local-first in `localStorage` — no DoTo server. Optional Google Drive sync
 - `doto-notif-seen` — last time the Notifications inbox was opened (unread badge)
 - `doto-theme` — `'dark' | 'light'`
 - `doto-loc` — weather coordinates (7-day TTL)
-- `doto-google-client-id` — per-browser OAuth client override (only for forks)
+- `doto-google-client-id` — your Google OAuth client ID, entered in Sync & Settings → Sync (per browser)
 
 Task fields: `{ id, listId, title, notes, date, time, extRef, color, weight,
 importance, recur, recId, done, completedAt, order, createdAt, subtasks }`.
@@ -207,7 +209,7 @@ Corrupted saves are detected on load: the raw data is stashed under a
 ## Manual & wiki
 
 Full user manual: [MANUAL.md](MANUAL.md), also readable
-[in-app](https://doto.arazgray.com/manual.html) (sidebar → **Manual**)
+[in-app](https://arazgray.github.io/doto/manual.html) (sidebar → **Manual**)
 and on the **[GitHub wiki](https://github.com/arazgray/doto/wiki)**.
 
 <!-- Maintainer: after editing MANUAL.md, re-publish the wiki from the nested clone:

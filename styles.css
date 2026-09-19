@@ -904,6 +904,12 @@ a.btn-ghost{text-decoration:none}
 .setup-row{display:flex;gap:8px;margin-top:8px}
 .setup-row input{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 12px;outline:0;min-width:0;background:var(--bg)}
 .setup-row input:focus{border-color:var(--blue)}
+.client-id-group{margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:12px;background:var(--bg2)}
+.client-id-group .d-label{margin:0 0 4px}
+.client-id-row{margin-top:4px}
+.client-id-row input{font-family:Consolas,monospace;font-size:12px}
+.client-id-row .btn-ghost{flex:none}
+.client-id-group .muted.small{margin:8px 0 0}
 
 /* Import source picker */
 .import-row select{

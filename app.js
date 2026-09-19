@@ -2,7 +2,7 @@
 'use strict';
 
 const LS_KEY = 'doto-v1';
-const APP_VERSION = '1.0-1789771400'; // bump with ?v= stamps + version.json on every release
+const APP_VERSION = '1.0-1789832963'; // bump with ?v= stamps + version.json on every release
 let lastUpdateCheck = 0, updateNotified = '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -3090,7 +3090,12 @@ function renderAll() {
    push to Drive's hidden app folder (debounced) and pull on launch,
    focus and reconnect. Merge is per-item, three-way against the last
    synced snapshot; both-sides-edited items resolve newest-wins. */
-const GOOGLE_CLIENT_ID = '1053076438888-vgota4q9t6j5647of50008a9asitbrns.apps.googleusercontent.com'; // app-owned (production); per-browser override in the Account dialog
+/* To enable Google Drive sync + Calendar reminders, add your own OAuth client ID:
+   1. Create one in Google Cloud Console (see MANUAL.md "Hosting it yourself").
+   2. Paste it into Sync & Settings → Sync → Google client ID (saved per browser),
+      or hard-code it here as GOOGLE_CLIENT_ID and redeploy.
+   No ID is bundled with the repo — sync stays disabled until one is set. */
+const GOOGLE_CLIENT_ID = '';
 const DRIVE_FILE = 'doto-state.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.app.created'; // one sign-in covers Drive sync + Calendar reminders (events need calendar.events; finding the target calendar via calendarList.list needs calendar.calendarlist.readonly — events alone answers 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT; creating the dedicated "DoTo" calendar via calendars.insert needs calendar.app.created — without it everything falls back to the primary calendar)
 const CAL_SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.app.created'];
@@ -3115,7 +3120,18 @@ const SYNC_KEY = 'doto-sync';
 const CLIENT_KEY = 'doto-google-client-id';
 
 function googleClientId() {
-  try { return localStorage.getItem(CLIENT_KEY) || GOOGLE_CLIENT_ID; } catch { return GOOGLE_CLIENT_ID; }
+  try {
+    const saved = (localStorage.getItem(CLIENT_KEY) || '').trim();
+    if (saved) return saved;
+  } catch {}
+  return (GOOGLE_CLIENT_ID || '').trim();
+}
+function setGoogleClientId(v) {
+  v = (v || '').trim();
+  try {
+    if (v) localStorage.setItem(CLIENT_KEY, v);
+    else localStorage.removeItem(CLIENT_KEY);
+  } catch {}
 }
 function loadSyncMeta() {
   try {
@@ -3203,6 +3219,7 @@ function diagLines() {
   return [
     'status: ' + syncStatus,
     'email: ' + (syncMeta.email || 'none'),
+    'clientId: ' + (googleClientId() ? 'set' : 'missing — add it in Sync & Settings → Sync'),
     'token: ' + (t && t.access_token ? 'present' : 'none') + ' (' + texp + ')',
     'calGrant: ' + (syncMeta.calGranted === true ? 'verified' : syncMeta.calGranted === false ? 'missing — Sync now re-asks' : 'unknown'),
     'calError: ' + (lastCalError || 'none'),
@@ -3243,7 +3260,7 @@ function fmtAgo(ts) {
   return new Date(ts).toLocaleDateString();
 }
 function syncLabel() {
-  if (!googleClientId()) return ['Setup needed', 'warn'];
+  if (!googleClientId()) return ['Add client ID to sync', 'warn'];
   if (!navigator.onLine) return ['Offline', 'warn'];
   if (syncStatus === 'syncing' || syncStatus === 'checking') return [syncStatus === 'checking' ? 'Checking…' : 'Syncing…', 'busy'];
   if (syncStatus === 'error') return ['Sync failed — retry', 'err'];
@@ -3253,12 +3270,22 @@ function syncLabel() {
 function paintSync() {
   const pair = syncLabel(), label = pair[0], cls = pair[1];
   const pill = $('#syncPill'), txt = $('#syncPillText');
-  if (pill) pill.className = 'sync-pill' + (cls ? ' ' + cls : '');
+  if (pill) {
+    pill.className = 'sync-pill' + (cls ? ' ' + cls : '');
+    if (!googleClientId()) pill.title = 'Sync & Settings — add your Google client ID first';
+  }
   if (txt) txt.textContent = label;
   const st = $('#accountState');
   if (st) st.textContent = syncMeta.email ? (syncStatus === 'ok' && syncMeta.lastSyncedAt ? fmtAgo(syncMeta.lastSyncedAt) : label) : '';
   const em = $('#accountEmail');
   if (em) em.textContent = syncMeta.email ? 'Signed in as ' + syncMeta.email : 'Not signed in.';
+  const cid = $('#clientIdInput');
+  if (cid && document.activeElement !== cid && typeof cid.value !== 'undefined') {
+    const cur = googleClientId();
+    if (cid.value !== cur) cid.value = cur;
+  }
+  const setupHint = $('#clientIdHint');
+  if (setupHint) setupHint.classList.toggle('hidden', !!googleClientId());
   const last = $('#accountLast');
   if (last) last.textContent = syncMeta.lastSyncedAt ? 'Last synced: ' + new Date(syncMeta.lastSyncedAt).toLocaleString() : '';
   const ae = $('#accountError');
@@ -4368,7 +4395,7 @@ function handleCalError(e, mode) {
   const detail = (e && e.detail) || '';
   const scopeDenied = detail.indexOf('insufficient authentication scopes') >= 0 || detail.indexOf('insufficientPermissions') >= 0;
   let msg = 'Calendar sync failed — retry.';
-  if (m === 'auth' || m === 'setup') msg = m === 'setup' ? 'Set a Google client ID first' : 'Google session ended — sign in again';
+  if (m === 'auth' || m === 'setup') msg = m === 'setup' ? 'Add your Google client ID in Sync & Settings → Sync first' : 'Google session ended — sign in again';
   else if (e && e.gis) msg = 'Calendar sign-in failed (' + e.gis + '). Allow popups and try again.';
   else if (scopeDenied)
     msg = 'Calendar needs its permission — tap Sync now to re-grant it.';
@@ -4583,7 +4610,13 @@ function signInErrorMsg(e) {
     : 'Sign-in failed — try again.';
 }
 async function syncNowFlow() {
-  if (!googleClientId()) { openAccount(); return; }
+  if (!googleClientId()) {
+    try { toast('Add your Google client ID below first — then Sign in'); } catch {}
+    openAccount();
+    switchSetTab('sync');
+    setTimeout(() => { try { $('#clientIdInput').focus(); } catch {} }, 80);
+    return;
+  }
   // Calendar consent is decided ONCE here, at the top of the gesture and
   // before any other await (iOS user-activation rule). Only !tokenHasCal()
   // triggers a popup; everything below runs silent on the fresh token.
@@ -4722,7 +4755,12 @@ function bindSync() {
     const btn = $('#signInBtn');
     if (btn) { btn.disabled = true; btn.classList.add('busy'); }
     try {
-      if (!googleClientId()) { setSync('setup'); paintSync(); try { toast('Set a Google client ID first'); } catch {} return; }
+      if (!googleClientId()) {
+        setSync('setup'); paintSync();
+        try { toast('Add your Google client ID below first — see the setup steps'); } catch {}
+        try { $('#clientIdInput').focus(); } catch {}
+        return;
+      }
       if (isIOSStandalone()) {
         try { toast('Opening Google — if nothing happens, open DoTo in Safari to sign in'); } catch {}
       } else {
@@ -4800,6 +4838,38 @@ function bindSync() {
     toast(await copyText(diagLines() + '\n\n' + syncLog.slice(-20).map((e) => new Date(e.t).toLocaleString() + ' [' + e.kind + '] ' + e.msg).join('\n')) ? 'Diagnostics copied' : 'Copy failed');
   };
   $('#logScrim').onclick = (e) => { if (e.target === $('#logScrim')) closeLog(); };
+  const cidInput = $('#clientIdInput');
+  if (cidInput) {
+    cidInput.value = googleClientId();
+    cidInput.oninput = () => {
+      const v = cidInput.value.trim();
+      setGoogleClientId(v);
+      // a different ID invalidates the old token/client — sign out locally
+      if (tokenClientId && tokenClientId !== v) {
+        tokenClient = null; tokenClientId = '';
+        syncMeta.token = null; syncMeta.email = '';
+        syncMeta.calGranted = false; syncMeta.calDeclinedAt = 0; lastCalError = '';
+        saveSyncMeta(); setSync('signedout');
+      }
+      paintSync();
+    };
+    cidInput.onchange = () => {
+      const v = cidInput.value.trim();
+      if (v && !/\.apps\.googleusercontent\.com$/.test(v)) {
+        try { toast('That does not look like a Google client ID — it should end with .apps.googleusercontent.com'); } catch {}
+      } else if (v) {
+        try { toast('Client ID saved — press Sign in with Google'); } catch {}
+      }
+      paintSync();
+    };
+  }
+  const cidClear = $('#clientIdClear');
+  if (cidClear) cidClear.onclick = () => {
+    setGoogleClientId('');
+    tokenClient = null; tokenClientId = '';
+    if (cidInput) { cidInput.value = ''; cidInput.focus(); }
+    paintSync();
+  };
   $('#autoSyncToggle').onchange = (e) => {
     syncMeta.auto = e.target.checked; saveSyncMeta(); paintSync();
     if (syncMeta.auto) schedulePush();
